@@ -40,9 +40,13 @@ export function formatPin(pin: string): string {
 }
 
 /** "18,5 / 25" with Dutch decimals. */
-export function formatScore(score: number | null | undefined, max: number | null | undefined): string {
+export function formatScore(
+  score: number | null | undefined,
+  max: number | null | undefined,
+): string {
   if (score == null || max == null) return "—";
-  const fmt = (n: number) => n.toLocaleString("nl-NL", { maximumFractionDigits: 1 });
+  const fmt = (n: number) =>
+    n.toLocaleString("nl-NL", { maximumFractionDigits: 1 });
   return `${fmt(score)} / ${fmt(max)}`;
 }
 

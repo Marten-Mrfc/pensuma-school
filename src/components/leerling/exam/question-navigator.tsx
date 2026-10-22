@@ -29,7 +29,9 @@ export function QuestionNavigator({
   className,
 }: QuestionNavigatorProps) {
   const answeredCount = questions.filter((q) => answered.has(q.id)).length;
-  const pct = questions.length ? Math.round((answeredCount / questions.length) * 100) : 0;
+  const pct = questions.length
+    ? Math.round((answeredCount / questions.length) * 100)
+    : 0;
 
   return (
     <nav aria-label="Vragen" className={cn("flex flex-col gap-4", className)}>
@@ -75,7 +77,8 @@ export function QuestionNavigator({
                   isAnswered
                     ? "border-primary/30 bg-primary/12 text-primary hover:bg-primary/18"
                     : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                  isFlagged && "border-warning/60 bg-warning/12 text-warning-ink",
+                  isFlagged &&
+                    "border-warning/60 bg-warning/12 text-warning-ink",
                   isCurrent &&
                     "border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/25 ring-offset-1 ring-offset-background hover:bg-primary",
                 )}
@@ -97,15 +100,24 @@ export function QuestionNavigator({
 
       <ul className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
         <li className="flex items-center gap-1.5">
-          <span className="size-3 rounded-[4px] border border-primary/30 bg-primary/12" aria-hidden="true" />
+          <span
+            className="size-3 rounded-[4px] border border-primary/30 bg-primary/12"
+            aria-hidden="true"
+          />
           Beantwoord
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="size-3 rounded-[4px] border bg-card" aria-hidden="true" />
+          <span
+            className="size-3 rounded-[4px] border bg-card"
+            aria-hidden="true"
+          />
           Open
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="size-3 rounded-[4px] border border-warning/60 bg-warning/12" aria-hidden="true" />
+          <span
+            className="size-3 rounded-[4px] border border-warning/60 bg-warning/12"
+            aria-hidden="true"
+          />
           Gemarkeerd
         </li>
       </ul>

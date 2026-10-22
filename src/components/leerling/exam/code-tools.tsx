@@ -1,6 +1,10 @@
 "use client";
 
-import type { CodeCheck, CodeGradingResult, CodeTest } from "@/lib/questions/schema";
+import type {
+  CodeCheck,
+  CodeGradingResult,
+  CodeTest,
+} from "@/lib/questions/schema";
 
 /** Imperative handle so Ctrl/Cmd+Enter in the editor can start a run. */
 export type RunHandle = { run: () => void };

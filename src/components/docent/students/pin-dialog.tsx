@@ -60,9 +60,14 @@ export function PinDialog({
               <KeyRound className="size-5" aria-hidden="true" />
             </span>
             <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-foreground">{student.name}</span>
+              <span className="font-semibold text-foreground">
+                {student.name}
+              </span>
               <span className="text-sm text-muted-foreground">
-                Leerlingnummer <span className="font-mono text-foreground">{student.studentNumber}</span>
+                Leerlingnummer{" "}
+                <span className="font-mono text-foreground">
+                  {student.studentNumber}
+                </span>
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -72,7 +77,10 @@ export function PinDialog({
               >
                 {formatPin(student.pin)}
               </output>
-              <CopyButton value={student.pin} successMessage="Pincode gekopieerd" />
+              <CopyButton
+                value={student.pin}
+                successMessage="Pincode gekopieerd"
+              />
             </div>
           </div>
         ) : null}

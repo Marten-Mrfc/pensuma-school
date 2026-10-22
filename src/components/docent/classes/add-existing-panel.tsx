@@ -1,6 +1,11 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Loader2, Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -21,7 +26,12 @@ export interface AddExistingPanelProps {
 }
 
 /** Search existing students (not yet in this class) and add them. */
-export function AddExistingPanel({ classId, className, onCancel, onAdded }: AddExistingPanelProps) {
+export function AddExistingPanel({
+  classId,
+  className,
+  onCancel,
+  onAdded,
+}: AddExistingPanelProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -51,7 +61,9 @@ export function AddExistingPanel({ classId, className, onCancel, onAdded }: AddE
           queryClient.invalidateQueries({ queryKey: trpc.student.pathKey() }),
         ]);
         toast.success(
-          res.added === 1 ? `1 leerling toegevoegd aan ${className}` : `${res.added} leerlingen toegevoegd aan ${className}`,
+          res.added === 1
+            ? `1 leerling toegevoegd aan ${className}`
+            : `${res.added} leerlingen toegevoegd aan ${className}`,
         );
         setSelected(new Map());
         onAdded();
@@ -99,7 +111,9 @@ export function AddExistingPanel({ classId, className, onCancel, onAdded }: AddE
         ) : rows.length === 0 ? (
           <EmptyBlock
             icon={Search}
-            title={debounced ? "Geen leerlingen gevonden" : "Geen andere leerlingen"}
+            title={
+              debounced ? "Geen leerlingen gevonden" : "Geen andere leerlingen"
+            }
             description={
               debounced
                 ? "Controleer de spelling of zoek op leerlingnummer."
@@ -107,28 +121,42 @@ export function AddExistingPanel({ classId, className, onCancel, onAdded }: AddE
             }
           />
         ) : (
-          <ul className={cn("divide-y rounded-lg border", query.isFetching && "opacity-70")}>
+          <ul
+            className={cn(
+              "divide-y rounded-lg border",
+              query.isFetching && "opacity-70",
+            )}
+          >
             {rows.map((s) => {
               const checked = selected.has(s.id);
               return (
                 <li key={s.id}>
                   <label
+                    htmlFor={`pick-${s.id}`}
                     className={cn(
                       "flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50",
                       checked && "bg-primary/5",
                     )}
                   >
-                    <Checkbox checked={checked} onCheckedChange={() => toggle(s.id, s.name)} />
+                    <Checkbox
+                      id={`pick-${s.id}`}
+                      checked={checked}
+                      onCheckedChange={() => toggle(s.id, s.name)}
+                    />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-medium">
                         {s.name}
                         {s.banned ? (
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">(gedeactiveerd)</span>
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            (gedeactiveerd)
+                          </span>
                         ) : null}
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
                         <span className="font-mono">{s.studentNumber}</span>
-                        {s.classes.length > 0 ? ` · ${s.classes.map((c) => c.name).join(", ")}` : " · geen klas"}
+                        {s.classes.length > 0
+                          ? ` · ${s.classes.map((c) => c.name).join(", ")}`
+                          : " · geen klas"}
                       </span>
                     </span>
                   </label>

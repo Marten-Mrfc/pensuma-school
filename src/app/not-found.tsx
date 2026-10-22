@@ -35,7 +35,7 @@ export default function NotFound() {
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="font-display-wide text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="font-display-wide text-3xl font-bold tracking-tight text-balance sm:text-4xl">
               Deze pagina bestaat niet
             </h1>
             <p className="text-muted-foreground">

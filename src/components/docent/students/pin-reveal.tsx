@@ -5,7 +5,11 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { CopyButton } from "@/components/app/copy-button";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
 import { formatPin } from "./format";
@@ -20,7 +24,12 @@ export interface PinRevealProps {
 }
 
 /** Masked PIN ("••• •••") that is fetched and shown on click, with a copy button. */
-export function PinReveal({ userId, hasPin, size = "sm", className }: PinRevealProps) {
+export function PinReveal({
+  userId,
+  hasPin,
+  size = "sm",
+  className,
+}: PinRevealProps) {
   const trpc = useTRPC();
   const [shown, setShown] = useState(false);
   const { data, isFetching, isError } = useQuery({
@@ -44,17 +53,27 @@ export function PinReveal({ userId, hasPin, size = "sm", className }: PinRevealP
   return (
     <span className={cn("inline-flex items-center gap-1", className)}>
       <span
+        aria-hidden="true"
         className={cn(
           "font-mono tabular-nums select-all",
-          large ? "text-3xl font-medium tracking-[0.18em]" : "text-sm tracking-[0.14em]",
+          large
+            ? "text-3xl font-medium tracking-[0.18em]"
+            : "text-sm tracking-[0.14em]",
           !(shown && pin) && "text-muted-foreground",
         )}
-        aria-label={shown && pin ? `Pincode ${pin.split("").join(" ")}` : "Pincode verborgen"}
       >
         {shown && isError ? "fout" : text}
       </span>
+      <span className="sr-only">
+        {shown && pin
+          ? `Pincode ${pin.split("").join(" ")}`
+          : "Pincode verborgen"}
+      </span>
       {shown && isFetching && !pin ? (
-        <Loader2 className="size-4 text-muted-foreground motion-safe:animate-spin" aria-hidden="true" />
+        <Loader2
+          className="size-4 text-muted-foreground motion-safe:animate-spin"
+          aria-hidden="true"
+        />
       ) : null}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -65,7 +84,11 @@ export function PinReveal({ userId, hasPin, size = "sm", className }: PinRevealP
             aria-label={shown ? "Pincode verbergen" : "Pincode tonen"}
             onClick={() => setShown((s) => !s)}
           >
-            {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            {shown ? (
+              <EyeOff className="size-3.5" />
+            ) : (
+              <Eye className="size-3.5" />
+            )}
           </Button>
         </TooltipTrigger>
         <TooltipContent>{shown ? "Verbergen" : "Tonen"}</TooltipContent>

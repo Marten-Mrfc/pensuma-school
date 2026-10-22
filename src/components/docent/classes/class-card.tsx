@@ -23,7 +23,11 @@ export function ClassCard({ klas }: { klas: ClassListItem }) {
         aria-hidden="true"
         className={cn(
           "absolute inset-x-0 top-0 h-[3px]",
-          klas.archived ? "bg-border" : open > 0 ? "bg-success" : "bg-primary/60",
+          klas.archived
+            ? "bg-border"
+            : open > 0
+              ? "bg-success"
+              : "bg-primary/60",
         )}
       />
       <div className="flex items-start justify-between gap-3">
@@ -37,7 +41,11 @@ export function ClassCard({ klas }: { klas: ClassListItem }) {
             {klas.name}
           </h2>
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            {klas.schoolYear ? <span>Schooljaar {klas.schoolYear}</span> : <span>Geen schooljaar</span>}
+            {klas.schoolYear ? (
+              <span>Schooljaar {klas.schoolYear}</span>
+            ) : (
+              <span>Geen schooljaar</span>
+            )}
             {klas.archived ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium">
                 <Archive className="size-3" aria-hidden="true" />
@@ -53,13 +61,20 @@ export function ClassCard({ klas }: { klas: ClassListItem }) {
       </div>
 
       {klas.description ? (
-        <p className="line-clamp-2 text-sm text-pretty text-muted-foreground">{klas.description}</p>
+        <p className="line-clamp-2 text-sm text-pretty text-muted-foreground">
+          {klas.description}
+        </p>
       ) : null}
 
       <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4 text-sm">
         <span className="inline-flex items-center gap-1.5">
-          <UsersRound className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span className="font-medium tabular-nums">{plural(klas.studentCount, "leerling", "leerlingen")}</span>
+          <UsersRound
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <span className="font-medium tabular-nums">
+            {plural(klas.studentCount, "leerling", "leerlingen")}
+          </span>
         </span>
         <span className="inline-flex items-center gap-1.5">
           {open > 0 ? (
@@ -68,9 +83,19 @@ export function ClassCard({ klas }: { klas: ClassListItem }) {
               <span className="relative inline-flex size-2 rounded-full bg-success" />
             </span>
           ) : (
-            <CalendarClock className="size-4 text-muted-foreground" aria-hidden="true" />
+            <CalendarClock
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
           )}
-          <span className={cn("tabular-nums", open > 0 ? "font-medium text-success-ink" : "text-muted-foreground")}>
+          <span
+            className={cn(
+              "tabular-nums",
+              open > 0
+                ? "font-medium text-success-ink"
+                : "text-muted-foreground",
+            )}
+          >
             {open > 0
               ? `${open} open ${open === 1 ? "afname" : "afnames"}`
               : klas.plannedAssignmentCount > 0

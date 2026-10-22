@@ -52,6 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="nl"
+      data-scroll-behavior="smooth"
       // next-themes sets the `dark` class before hydration.
       suppressHydrationWarning
       className={cn(

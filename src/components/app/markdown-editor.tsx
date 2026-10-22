@@ -139,6 +139,8 @@ export function MarkdownEditor({
     const action = key === "b" ? ACTIONS[0] : key === "i" ? ACTIONS[1] : null;
     if (action) {
       e.preventDefault();
+      // Keep Ctrl+B from also toggling the docent sidebar.
+      e.stopPropagation();
       apply(action.edit);
     }
   }

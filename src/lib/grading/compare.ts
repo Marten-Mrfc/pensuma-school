@@ -172,8 +172,11 @@ export function extractNumbers(text: string): FoundNumber[] {
       // "1,2,3": a comma chain without spaces is a list, not a decimal.
       let k = j + 1;
       while (isDigit(text[k])) k++;
+      const afterChainComma =
+        text[start - 1] === "," && isDigit(text[start - 2]);
       const isChain =
-        text[j] === "," && text[k] === "," && isDigit(text[k + 1]);
+        text[j] === "," &&
+        (afterChainComma || (text[k] === "," && isDigit(text[k + 1])));
       if (!isChain) {
         j++;
         while (isDigit(text[j])) frac += text[j++];

@@ -16,7 +16,11 @@ export type ClientEventType =
   | "code_run"
   | "self_test";
 
-type QueuedEvent = { type: ClientEventType; at: string; details?: Record<string, unknown> };
+type QueuedEvent = {
+  type: ClientEventType;
+  at: string;
+  details?: Record<string, unknown>;
+};
 
 type SendFn = (events: QueuedEvent[]) => Promise<unknown>;
 
@@ -40,7 +44,8 @@ export class ActivityLogger {
   log(type: ClientEventType, details?: Record<string, unknown>) {
     if (this.stopped) return;
     this.queue.push({ type, at: new Date().toISOString(), details });
-    if (this.queue.length > MAX_QUEUE) this.queue.splice(0, this.queue.length - MAX_QUEUE);
+    if (this.queue.length > MAX_QUEUE)
+      this.queue.splice(0, this.queue.length - MAX_QUEUE);
   }
 
   async flush() {

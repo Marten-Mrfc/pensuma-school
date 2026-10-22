@@ -19,7 +19,9 @@ export function ClassesPage() {
   const router = useRouter();
   const [showArchived, setShowArchived] = useState(false);
   const [creating, setCreating] = useState(false);
-  const query = useQuery(trpc.class.list.queryOptions({ includeArchived: showArchived }));
+  const query = useQuery(
+    trpc.class.list.queryOptions({ includeArchived: showArchived }),
+  );
 
   const classes = query.data ?? [];
   const active = classes.filter((c) => !c.archived);
@@ -37,8 +39,16 @@ export function ClassesPage() {
         }
         actions={
           <>
-            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-muted-foreground select-none hover:text-foreground">
-              <Switch checked={showArchived} onCheckedChange={setShowArchived} size="sm" />
+            <label
+              htmlFor="show-archived"
+              className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-muted-foreground select-none hover:text-foreground"
+            >
+              <Switch
+                id="show-archived"
+                checked={showArchived}
+                onCheckedChange={setShowArchived}
+                size="sm"
+              />
               Toon gearchiveerd
             </label>
             <Button onClick={() => setCreating(true)}>
@@ -68,7 +78,10 @@ export function ClassesPage() {
       ) : (
         <div className="flex flex-col gap-8">
           {active.length > 0 ? (
-            <section aria-label="Actieve klassen" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <section
+              aria-label="Actieve klassen"
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            >
               {active.map((c) => (
                 <ClassCard key={c.id} klas={c} />
               ))}
@@ -87,8 +100,14 @@ export function ClassesPage() {
             />
           )}
           {showArchived && archived.length > 0 ? (
-            <section aria-labelledby="archived-heading" className="flex flex-col gap-3">
-              <h2 id="archived-heading" className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+            <section
+              aria-labelledby="archived-heading"
+              className="flex flex-col gap-3"
+            >
+              <h2
+                id="archived-heading"
+                className="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+              >
                 Gearchiveerd
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

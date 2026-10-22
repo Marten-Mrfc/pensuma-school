@@ -5,7 +5,13 @@ import { cn } from "@/lib/utils";
 import type { SaverSnapshot } from "./answer-saver";
 
 /** "Alles opgeslagen ✓" / "Opslaan…" / "Offline: we proberen het opnieuw". */
-export function SaveIndicator({ snapshot, className }: { snapshot: SaverSnapshot; className?: string }) {
+export function SaveIndicator({
+  snapshot,
+  className,
+}: {
+  snapshot: SaverSnapshot;
+  className?: string;
+}) {
   const { state } = snapshot;
   let icon = <CheckCircle2 className="size-4" aria-hidden="true" />;
   let label = "Alles opgeslagen";
@@ -28,8 +34,7 @@ export function SaveIndicator({ snapshot, className }: { snapshot: SaverSnapshot
     tone = "text-muted-foreground";
   }
   return (
-    <span
-      role="status"
+    <output
       aria-live="polite"
       title={label}
       className={cn(
@@ -45,6 +50,6 @@ export function SaveIndicator({ snapshot, className }: { snapshot: SaverSnapshot
       <span aria-hidden="true" className="hidden sm:inline lg:hidden">
         {short}
       </span>
-    </span>
+    </output>
   );
 }

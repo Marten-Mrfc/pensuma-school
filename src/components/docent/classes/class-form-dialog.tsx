@@ -18,7 +18,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 
-type ClassRow = Pick<RouterOutputs["class"]["get"], "id" | "name" | "schoolYear" | "description">;
+type ClassRow = Pick<
+  RouterOutputs["class"]["get"],
+  "id" | "name" | "schoolYear" | "description"
+>;
 
 export interface ClassFormDialogProps {
   open: boolean;
@@ -38,7 +41,9 @@ export function currentSchoolYear(now = new Date()): string {
 export function ClassFormDialog(props: ClassFormDialogProps) {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="sm:max-w-md">{props.open ? <ClassForm {...props} /> : null}</DialogContent>
+      <DialogContent className="sm:max-w-md">
+        {props.open ? <ClassForm {...props} /> : null}
+      </DialogContent>
     </Dialog>
   );
 }
@@ -48,21 +53,29 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
   const queryClient = useQueryClient();
   const editing = Boolean(klas);
   const [name, setName] = useState(klas?.name ?? "");
-  const [schoolYear, setSchoolYear] = useState(klas ? (klas.schoolYear ?? "") : currentSchoolYear());
+  const [schoolYear, setSchoolYear] = useState(
+    klas ? (klas.schoolYear ?? "") : currentSchoolYear(),
+  );
   const [description, setDescription] = useState(klas?.description ?? "");
   const [nameError, setNameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
 
   const onSuccess = async (saved: { id: string; name: string }) => {
     await queryClient.invalidateQueries({ queryKey: trpc.class.pathKey() });
-    toast.success(editing ? "Klas bijgewerkt" : `Klas ${saved.name} aangemaakt`);
+    toast.success(
+      editing ? "Klas bijgewerkt" : `Klas ${saved.name} aangemaakt`,
+    );
     onOpenChange(false);
     onSaved?.(saved);
   };
   const onError = (e: unknown) => setFormError(getErrorMessage(e));
 
-  const create = useMutation(trpc.class.create.mutationOptions({ onSuccess, onError }));
-  const update = useMutation(trpc.class.update.mutationOptions({ onSuccess, onError }));
+  const create = useMutation(
+    trpc.class.create.mutationOptions({ onSuccess, onError }),
+  );
+  const update = useMutation(
+    trpc.class.update.mutationOptions({ onSuccess, onError }),
+  );
   const pending = create.isPending || update.isPending;
 
   function submit(e: FormEvent) {
@@ -73,7 +86,11 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
       return;
     }
     setNameError(undefined);
-    const values = { name: name.trim(), schoolYear: schoolYear.trim() || null, description: description.trim() || null };
+    const values = {
+      name: name.trim(),
+      schoolYear: schoolYear.trim() || null,
+      description: description.trim() || null,
+    };
     if (klas) update.mutate({ id: klas.id, ...values });
     else create.mutate(values);
   }
@@ -101,7 +118,11 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
             autoComplete="off"
           />
         </FormField>
-        <FormField label="Schooljaar" htmlFor="class-year" description="Optioneel, bijvoorbeeld 2026-2027.">
+        <FormField
+          label="Schooljaar"
+          htmlFor="class-year"
+          description="Optioneel, bijvoorbeeld 2026-2027."
+        >
           <Input
             id="class-year"
             value={schoolYear}
@@ -111,7 +132,11 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
             autoComplete="off"
           />
         </FormField>
-        <FormField label="Omschrijving" htmlFor="class-description" description="Optioneel, alleen zichtbaar voor docenten.">
+        <FormField
+          label="Omschrijving"
+          htmlFor="class-description"
+          description="Optioneel, alleen zichtbaar voor docenten."
+        >
           <textarea
             id="class-description"
             value={description}
@@ -123,18 +148,28 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
           />
         </FormField>
         {formError ? (
-          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink">
+          <p
+            role="alert"
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
+          >
             {formError}
           </p>
         ) : null}
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={() => onOpenChange(false)}
+        >
           Annuleren
         </Button>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          {pending ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : null}
+          {pending ? (
+            <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+          ) : null}
           {editing ? "Opslaan" : "Klas aanmaken"}
         </Button>
       </DialogFooter>

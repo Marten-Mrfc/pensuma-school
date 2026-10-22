@@ -43,9 +43,17 @@ export function OpenQuestion({
         className="min-h-56 w-full resize-y rounded-xl border border-input bg-card px-4 py-3 text-base leading-relaxed shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-60"
       />
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{blockPaste ? "Plakken is uitgeschakeld." : "Je antwoord wordt automatisch opgeslagen."}</span>
-        <span className={cn("tabular-nums", near && "font-medium text-warning-ink")}>
-          {maxLength ? `${count}/${maxLength} tekens` : `${count} ${count === 1 ? "teken" : "tekens"}`}
+        <span>
+          {blockPaste
+            ? "Plakken is uitgeschakeld."
+            : "Je antwoord wordt automatisch opgeslagen."}
+        </span>
+        <span
+          className={cn("tabular-nums", near && "font-medium text-warning-ink")}
+        >
+          {maxLength
+            ? `${count}/${maxLength} tekens`
+            : `${count} ${count === 1 ? "teken" : "tekens"}`}
         </span>
       </div>
     </div>

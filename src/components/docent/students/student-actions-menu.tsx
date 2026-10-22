@@ -149,7 +149,10 @@ export function StudentActionsMenu({
               Deactiveren
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem variant="destructive" onSelect={() => setDialog("delete")}>
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => setDialog("delete")}
+          >
             <Trash2 />
             Verwijderen
           </DropdownMenuItem>
@@ -212,7 +215,11 @@ export function StudentActionsMenu({
         }}
       />
 
-      <StudentFormDialog open={dialog === "edit"} onOpenChange={close} student={student} />
+      <StudentFormDialog
+        open={dialog === "edit"}
+        onOpenChange={close}
+        student={student}
+      />
 
       <PinDialog
         open={newPin !== null}

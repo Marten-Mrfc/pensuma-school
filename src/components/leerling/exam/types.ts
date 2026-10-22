@@ -1,4 +1,8 @@
-import type { AnswerResponse, CodeCheck, CodeTest } from "@/lib/questions/schema";
+import type {
+  AnswerResponse,
+  CodeCheck,
+  CodeTest,
+} from "@/lib/questions/schema";
 import type { RouterOutputs } from "@/trpc/react";
 
 export type AttemptData = RouterOutputs["portal"]["getAttempt"];
@@ -12,7 +16,10 @@ export type CodeData = {
   tests: CodeTest[];
   checks: CodeCheck[];
 };
-export type ChoiceData = { multiple: boolean; options: { id: string; text: string }[] };
+export type ChoiceData = {
+  multiple: boolean;
+  options: { id: string; text: string }[];
+};
 export type OpenData = { maxLength?: number | null };
 
 export const codeData = (q: ExamQuestion) => q.data as unknown as CodeData;
@@ -22,12 +29,17 @@ export const openData = (q: ExamQuestion) => q.data as unknown as OpenData;
 export type Responses = Record<string, AnswerResponse | undefined>;
 
 /** Same rules as the server: blank, or (code) unchanged starter code. */
-export function isAnswered(q: ExamQuestion, response: AnswerResponse | undefined): boolean {
+export function isAnswered(
+  q: ExamQuestion,
+  response: AnswerResponse | undefined,
+): boolean {
   if (!response) return false;
   switch (q.type) {
     case "code": {
       const code = "code" in response ? response.code : "";
-      return code.trim() !== "" && code.trim() !== codeData(q).starterCode.trim();
+      return (
+        code.trim() !== "" && code.trim() !== codeData(q).starterCode.trim()
+      );
     }
     case "multiple_choice":
       return "selected" in response && response.selected.length > 0;

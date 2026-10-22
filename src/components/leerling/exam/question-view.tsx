@@ -11,7 +11,12 @@ import type { ClientEventType } from "./activity-logger";
 import { ChoiceQuestion } from "./choice-question";
 import { CodeQuestion } from "./code-question";
 import { OpenQuestion } from "./open-question";
-import { choiceData, type ExamQuestion, type ExamSettings, openData } from "./types";
+import {
+  choiceData,
+  type ExamQuestion,
+  type ExamSettings,
+  openData,
+} from "./types";
 
 export interface QuestionViewProps {
   question: ExamQuestion;
@@ -32,7 +37,10 @@ export function QuestionHeader({
   flagged,
   onToggleFlag,
   className,
-}: Pick<QuestionViewProps, "question" | "number" | "flagged" | "onToggleFlag"> & {
+}: Pick<
+  QuestionViewProps,
+  "question" | "number" | "flagged" | "onToggleFlag"
+> & {
   className?: string;
 }) {
   return (
@@ -52,11 +60,17 @@ export function QuestionHeader({
           aria-pressed={flagged}
           className={cn(
             "ml-auto h-8 text-muted-foreground",
-            flagged && "bg-warning/12 text-warning-ink hover:bg-warning/20 hover:text-warning-ink",
+            flagged &&
+              "bg-warning/12 text-warning-ink hover:bg-warning/20 hover:text-warning-ink",
           )}
         >
           <Flag className={cn(flagged && "fill-current")} aria-hidden="true" />
-          {flagged ? "Gemarkeerd" : "Markeren voor later"}
+          <span className="max-sm:hidden">
+            {flagged ? "Gemarkeerd" : "Markeren voor later"}
+          </span>
+          <span className="sm:hidden">
+            {flagged ? "Gemarkeerd" : "Markeren"}
+          </span>
         </Button>
       </div>
       <h2 className="font-display text-xl leading-snug font-bold tracking-tight text-balance sm:text-2xl">
@@ -85,7 +99,9 @@ export function QuestionView(props: QuestionViewProps) {
         {question.type === "multiple_choice" ? (
           <ChoiceQuestion
             data={choiceData(question)}
-            selected={response && "selected" in response ? response.selected : []}
+            selected={
+              response && "selected" in response ? response.selected : []
+            }
             onChange={(selected) => onChange({ selected })}
             disabled={disabled}
           />
@@ -95,7 +111,12 @@ export function QuestionView(props: QuestionViewProps) {
             onChange={(text) => onChange({ text })}
             maxLength={openData(question).maxLength}
             blockPaste={settings.blockPaste}
-            onPaste={() => onLog("paste", { questionId: question.id, blocked: settings.blockPaste })}
+            onPaste={() =>
+              onLog("paste", {
+                questionId: question.id,
+                blocked: settings.blockPaste,
+              })
+            }
             disabled={disabled}
           />
         )}

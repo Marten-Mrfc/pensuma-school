@@ -3,7 +3,10 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { type SimpleTableColumn, SimpleTable } from "@/components/app/simple-table";
+import {
+  SimpleTable,
+  type SimpleTableColumn,
+} from "@/components/app/simple-table";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/lib/routes";
 import type { RouterOutputs } from "@/trpc/react";
@@ -20,11 +23,18 @@ export interface ClassStudentsTableProps {
 }
 
 /** Members of one class with PIN reveal and row actions. */
-export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps) {
+export function ClassStudentsTable({
+  classId,
+  members,
+}: ClassStudentsTableProps) {
   const [filter, setFilter] = useState("");
   const term = filter.trim().toLowerCase();
   const rows = term
-    ? members.filter((m) => m.name.toLowerCase().includes(term) || m.studentNumber.startsWith(term))
+    ? members.filter(
+        (m) =>
+          m.name.toLowerCase().includes(term) ||
+          m.studentNumber.startsWith(term),
+      )
     : members;
 
   const columns: SimpleTableColumn<Member>[] = [
@@ -32,7 +42,11 @@ export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps
       key: "studentNumber",
       header: "Nummer",
       sortValue: (m) => m.studentNumber,
-      cell: (m) => <span className="font-mono text-[0.8rem] tabular-nums">{m.studentNumber}</span>,
+      cell: (m) => (
+        <span className="font-mono text-[0.8rem] tabular-nums">
+          {m.studentNumber}
+        </span>
+      ),
       className: "w-24",
     },
     {
@@ -80,7 +94,12 @@ export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps
       cell: (m) => (
         <StudentActionsMenu
           classId={classId}
-          student={{ id: m.id, name: m.name, studentNumber: m.studentNumber, banned: m.banned }}
+          student={{
+            id: m.id,
+            name: m.name,
+            studentNumber: m.studentNumber,
+            banned: m.banned,
+          }}
         />
       ),
     },
@@ -103,7 +122,11 @@ export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps
         caption="Leerlingen in deze klas"
         columns={columns}
         rows={rows}
-        emptyText={term ? "Geen leerlingen gevonden met dit filter." : "Nog geen leerlingen in deze klas."}
+        emptyText={
+          term
+            ? "Geen leerlingen gevonden met dit filter."
+            : "Nog geen leerlingen in deze klas."
+        }
       />
     </div>
   );

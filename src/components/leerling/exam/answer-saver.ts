@@ -21,7 +21,10 @@ export type SaverSnapshot = {
   pendingCount: number;
 };
 
-type SaveFn = (questionId: string, response: AnswerResponse) => Promise<{ status: string }>;
+type SaveFn = (
+  questionId: string,
+  response: AnswerResponse,
+) => Promise<{ status: string }>;
 
 export type BackupEntry = { response: AnswerResponse; updatedAt: number };
 export type Backup = Record<string, BackupEntry>;
@@ -33,11 +36,18 @@ const MAX_RETRY_MS = 30_000;
 function isLockedError(err: unknown): boolean {
   const e = err as { data?: { code?: string } } | null;
   const code = e?.data?.code;
-  return code === "PRECONDITION_FAILED" || code === "NOT_FOUND" || code === "FORBIDDEN";
+  return (
+    code === "PRECONDITION_FAILED" ||
+    code === "NOT_FOUND" ||
+    code === "FORBIDDEN"
+  );
 }
 
 export class AnswerSaver {
-  private pending = new Map<string, { response: AnswerResponse; version: number }>();
+  private pending = new Map<
+    string,
+    { response: AnswerResponse; version: number }
+  >();
   private version = 0;
   private running = false;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,7 +58,11 @@ export class AnswerSaver {
   private locked = false;
   private waiters: Array<(ok: boolean) => void> = [];
   private listeners = new Set<() => void>();
-  private snapshot: SaverSnapshot = { state: "saved", lastSavedAt: null, pendingCount: 0 };
+  private snapshot: SaverSnapshot = {
+    state: "saved",
+    lastSavedAt: null,
+    pendingCount: 0,
+  };
   private backupKey: string;
 
   constructor(
@@ -106,7 +120,10 @@ export class AnswerSaver {
 
   private writeBackup(questionId: string, response: AnswerResponse) {
     const backup = this.readBackup();
-    backup[questionId] = { response, updatedAt: Date.now() + this.hooks.serverOffsetMs() };
+    backup[questionId] = {
+      response,
+      updatedAt: Date.now() + this.hooks.serverOffsetMs(),
+    };
     writeStorage(this.backupKey, backup);
   }
 
@@ -121,7 +138,11 @@ export class AnswerSaver {
   }
 
   /** Record a change: backup now, save soon. */
-  update(questionId: string, response: AnswerResponse, opts: { backup?: boolean } = {}) {
+  update(
+    questionId: string,
+    response: AnswerResponse,
+    opts: { backup?: boolean } = {},
+  ) {
     if (this.locked) return;
     if (opts.backup !== false) this.writeBackup(questionId, response);
     this.pending.set(questionId, { response, version: ++this.version });
@@ -203,7 +224,10 @@ export class AnswerSaver {
         } else {
           failed = true;
           this.offline = true;
-          this.retryDelay = Math.min(MAX_RETRY_MS, this.retryDelay ? this.retryDelay * 2 : 1000);
+          this.retryDelay = Math.min(
+            MAX_RETRY_MS,
+            this.retryDelay ? this.retryDelay * 2 : 1000,
+          );
           this.retryTimer = setTimeout(() => {
             this.retryTimer = null;
             void this.run();
@@ -215,7 +239,8 @@ export class AnswerSaver {
     this.running = false;
     if (!this.pending.size) this.firstDirtyAt = null;
     this.emit();
-    if (!this.pending.size && !failed && !this.locked) this.resolveWaiters(true);
+    if (!this.pending.size && !failed && !this.locked)
+      this.resolveWaiters(true);
     else if (failed || this.locked) this.resolveWaiters(false);
   }
 }

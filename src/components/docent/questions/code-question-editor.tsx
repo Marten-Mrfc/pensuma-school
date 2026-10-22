@@ -202,7 +202,7 @@ export function CodeQuestionEditor({
               className="w-28"
               onChange={(v) => v !== undefined && set({ timeLimitMs: Math.round(v * 1000) })}
             />
-            <span className="hidden text-xs text-muted-foreground sm:inline">0,5 – 30 seconden</span>
+            <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:inline">0,5 – 30 seconden</span>
           </div>
         </div>
       </EditorSection>

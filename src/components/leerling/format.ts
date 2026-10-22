@@ -56,7 +56,9 @@ export function formatDay(value: Date | string | null | undefined): string {
   return d ? dateOnly.format(d) : "";
 }
 
-export function formatLongDate(value: Date | string | null | undefined): string {
+export function formatLongDate(
+  value: Date | string | null | undefined,
+): string {
   const d = toDate(value);
   return d ? longDate.format(d) : "";
 }
@@ -67,13 +69,17 @@ export function formatTime(value: Date | string | null | undefined): string {
 }
 
 /** "nog 2 dagen", "nog 3 uur", "nog 12 minuten". */
-export function formatTimeLeft(value: Date | string | null | undefined, nowMs = Date.now()): string {
+export function formatTimeLeft(
+  value: Date | string | null | undefined,
+  nowMs = Date.now(),
+): string {
   const d = toDate(value);
   if (!d) return "";
   const diff = d.getTime() - nowMs;
   if (diff <= 0) return "verlopen";
   const minutes = Math.round(diff / 60_000);
-  if (minutes < 60) return minutes <= 1 ? "nog 1 minuut" : `nog ${minutes} minuten`;
+  if (minutes < 60)
+    return minutes <= 1 ? "nog 1 minuut" : `nog ${minutes} minuten`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return hours === 1 ? "nog 1 uur" : `nog ${hours} uur`;
   const days = Math.round(hours / 24);
@@ -81,7 +87,10 @@ export function formatTimeLeft(value: Date | string | null | undefined, nowMs = 
 }
 
 /** 2 → "2", 1.5 → "1,5", 0.67 → "0,67". */
-export function formatNumber(n: number | null | undefined, maxDecimals = 2): string {
+export function formatNumber(
+  n: number | null | undefined,
+  maxDecimals = 2,
+): string {
   if (n == null || Number.isNaN(n)) return "–";
   return n.toLocaleString("nl-NL", { maximumFractionDigits: maxDecimals });
 }
@@ -93,7 +102,10 @@ export function formatPoints(n: number | null | undefined): string {
 
 export function formatGrade(n: number | null | undefined): string {
   if (n == null) return "–";
-  return n.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return n.toLocaleString("nl-NL", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }
 
 export function formatMinutes(minutes: number | null | undefined): string {

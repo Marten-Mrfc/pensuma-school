@@ -41,9 +41,9 @@ import { SaveIndicator } from "./save-indicator";
 import {
   type AttemptData,
   isAnswered,
+  type Responses,
   readStorage,
   removeStorage,
-  type Responses,
   storageKey,
   writeStorage,
 } from "./types";
@@ -52,7 +52,11 @@ import {
 /*                                   Loader                                   */
 /* -------------------------------------------------------------------------- */
 
-export function ExamPage({ params }: { params: Promise<{ pogingId: string }> }) {
+export function ExamPage({
+  params,
+}: {
+  params: Promise<{ pogingId: string }>;
+}) {
   const { pogingId } = use(params);
   return <ExamLoader attemptId={pogingId} />;
 }
@@ -101,8 +105,13 @@ function ExamLoader({ attemptId }: { attemptId: string }) {
   if (submitted) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center">
-        <Loader2 className="size-6 animate-spin text-primary" aria-hidden="true" />
-        <p className="text-muted-foreground">Deze toets is ingeleverd. Je gaat naar je resultaat…</p>
+        <Loader2
+          className="size-6 animate-spin text-primary"
+          aria-hidden="true"
+        />
+        <p className="text-muted-foreground">
+          Deze toets is ingeleverd. Je gaat naar je resultaat…
+        </p>
       </div>
     );
   }
@@ -110,7 +119,9 @@ function ExamLoader({ attemptId }: { attemptId: string }) {
     <ExamRunner
       key={attemptId}
       data={query.data}
-      serverOffsetMs={new Date(query.data.serverNow).getTime() - query.dataUpdatedAt}
+      serverOffsetMs={
+        new Date(query.data.serverNow).getTime() - query.dataUpdatedAt
+      }
     />
   );
 }
@@ -136,15 +147,22 @@ function initialState(data: AttemptData, serverOffsetMs: number) {
   for (const [questionId, entry] of Object.entries(backup)) {
     if (!known.has(questionId) || !entry?.response) continue;
     const serverTime = savedAt[questionId] ?? 0;
-    const same = JSON.stringify(entry.response) === JSON.stringify(responses[questionId] ?? null);
+    const same =
+      JSON.stringify(entry.response) ===
+      JSON.stringify(responses[questionId] ?? null);
     if (!same && entry.updatedAt > serverTime) {
       responses[questionId] = entry.response;
       restored.push(questionId);
     }
   }
-  const flagged = new Set(readStorage<string[]>(storageKey(attemptId, "flags")) ?? []);
+  const flagged = new Set(
+    readStorage<string[]>(storageKey(attemptId, "flags")) ?? [],
+  );
   const pos = readStorage<number>(storageKey(attemptId, "pos")) ?? 0;
-  const index = Math.min(Math.max(0, pos), Math.max(0, data.questions.length - 1));
+  const index = Math.min(
+    Math.max(0, pos),
+    Math.max(0, data.questions.length - 1),
+  );
   void serverOffsetMs;
   return { responses, restored, flagged, index };
 }
@@ -160,7 +178,13 @@ function useFullscreenElement() {
   );
 }
 
-function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetMs: number }) {
+function ExamRunner({
+  data,
+  serverOffsetMs,
+}: {
+  data: AttemptData;
+  serverOffsetMs: number;
+}) {
   const attemptId = data.attempt.id;
   const settings = data.assignment.settings;
   const questions = data.questions;
@@ -192,7 +216,11 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
       new AnswerSaver(
         attemptId,
         (questionId, response) =>
-          trpcClient.portal.saveAnswer.mutate({ attemptId, questionId, response }),
+          trpcClient.portal.saveAnswer.mutate({
+            attemptId,
+            questionId,
+            response,
+          }),
         {
           serverOffsetMs: () => offsetRef.current,
           onLocked: (err) => handlers.current.locked(err),
@@ -201,17 +229,27 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
   );
   const [logger] = useState(
     () =>
-      new ActivityLogger((events) => trpcClient.portal.logEvents.mutate({ attemptId, events })),
+      new ActivityLogger((events) =>
+        trpcClient.portal.logEvents.mutate({ attemptId, events }),
+      ),
   );
-  const snapshot = useSyncExternalStore(saver.subscribe, saver.getSnapshot, saver.getSnapshot);
+  const snapshot = useSyncExternalStore(
+    saver.subscribe,
+    saver.getSnapshot,
+    saver.getSnapshot,
+  );
   const isFullscreen = useFullscreenElement();
-  const fullscreenSupported = typeof document !== "undefined" && document.fullscreenEnabled;
+  const fullscreenSupported =
+    typeof document !== "undefined" && document.fullscreenEnabled;
   const mustFullscreen = settings.requireFullscreen && fullscreenSupported;
 
   const question = questions[index];
-  const answered = new Set(questions.filter((q) => isAnswered(q, responses[q.id])).map((q) => q.id));
+  const answered = new Set(
+    questions.filter((q) => isAnswered(q, responses[q.id])).map((q) => q.id),
+  );
 
-  const log = (type: ClientEventType, details?: Record<string, unknown>) => logger.log(type, details);
+  const log = (type: ClientEventType, details?: Record<string, unknown>) =>
+    logger.log(type, details);
 
   /* ------------------------------ lifecycle ------------------------------ */
 
@@ -219,7 +257,8 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
     removeStorage(storageKey(attemptId));
     removeStorage(storageKey(attemptId, "flags"));
     removeStorage(storageKey(attemptId, "pos"));
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    if (document.fullscreenElement)
+      void document.exitFullscreen().catch(() => {});
     void queryClient.invalidateQueries({ queryKey: trpc.portal.pathKey() });
     router.replace(routes.leerling.result(attemptId));
   };
@@ -234,7 +273,9 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
       new Promise<boolean>((r) => setTimeout(() => r(false), 8000)),
     ]);
     if (!flushed && mode === "manual" && !saver.isLocked) {
-      toast.warning("Niet alles kon worden opgeslagen. We leveren in wat er op de server staat.");
+      toast.warning(
+        "Niet alles kon worden opgeslagen. We leveren in wat er op de server staat.",
+      );
     }
     await logger.flush();
     for (let attempt = 0; ; attempt++) {
@@ -247,7 +288,9 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
         if (mode === "manual" || attempt >= 20) {
           finishingRef.current = false;
           setFinishing(null);
-          toast.error(getErrorMessage(err, "Inleveren lukte niet. Probeer het opnieuw."));
+          toast.error(
+            getErrorMessage(err, "Inleveren lukte niet. Probeer het opnieuw."),
+          );
           return;
         }
         await new Promise((r) => setTimeout(r, 3000));
@@ -381,7 +424,9 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
         }
         setDeadlineAt((current) => {
           const incoming = res.deadlineAt ? new Date(res.deadlineAt) : null;
-          return current?.getTime() === incoming?.getTime() ? current : incoming;
+          return current?.getTime() === incoming?.getTime()
+            ? current
+            : incoming;
         });
         if (res.status === "submitted") handlers.current.locked(null);
       } catch {
@@ -398,7 +443,13 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
     const timers: ReturnType<typeof setTimeout>[] = [];
     const remaining = deadlineAt.getTime() - (Date.now() + offset);
     const warn = (ms: number, text: string) => {
-      if (remaining > ms) timers.push(setTimeout(() => toast.warning(text, { duration: 8000 }), remaining - ms));
+      if (remaining > ms)
+        timers.push(
+          setTimeout(
+            () => toast.warning(text, { duration: 8000 }),
+            remaining - ms,
+          ),
+        );
     };
     warn(5 * 60_000, "Nog 5 minuten! Rond je antwoorden af.");
     warn(60_000, "Nog 1 minuut. Je werk wordt straks automatisch ingeleverd.");
@@ -438,7 +489,12 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
   // Keyboard: Alt+←/→ switch questions, Ctrl/Cmd+S saves.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      if (
+        e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        (e.key === "ArrowLeft" || e.key === "ArrowRight")
+      ) {
         e.preventDefault();
         goToRef.current(indexRef.current + (e.key === "ArrowRight" ? 1 : -1));
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -454,9 +510,13 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
   });
 
   const enterFullscreen = () => {
-    void document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {
-      toast.error("Volledig scherm lukte niet. Probeer F11 of vraag je docent om hulp.");
-    });
+    void document.documentElement
+      .requestFullscreen({ navigationUI: "hide" })
+      .catch(() => {
+        toast.error(
+          "Volledig scherm lukte niet. Probeer F11 of vraag je docent om hulp.",
+        );
+      });
   };
 
   /* -------------------------------- render ------------------------------- */
@@ -498,7 +558,8 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
     <p className="flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
       <Eye className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
       <span>
-        Tijdens deze toets wordt bijgehouden wanneer je {settings.requireFullscreen ? "het volledige scherm of " : ""}
+        Tijdens deze toets wordt bijgehouden wanneer je{" "}
+        {settings.requireFullscreen ? "het volledige scherm of " : ""}
         het venster verlaat.
       </span>
     </p>
@@ -511,7 +572,10 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
         subtitle={
           <>
             Vraag {index + 1} van {questions.length}
-            <span className="hidden sm:inline"> · {answered.size} beantwoord</span>
+            <span className="hidden sm:inline">
+              {" "}
+              · {answered.size} beantwoord
+            </span>
           </>
         }
         bodyMode="fixed"
@@ -533,19 +597,31 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
               className="max-sm:px-3"
               aria-label="Inleveren"
             >
-              {finishing ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
+              {finishing ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Send aria-hidden="true" />
+              )}
               <span className="max-sm:sr-only">Inleveren</span>
             </Button>
           </>
         }
         footer={
           <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-5">
-            <Button variant="outline" onClick={() => goTo(index - 1)} disabled={index === 0}>
+            <Button
+              variant="outline"
+              onClick={() => goTo(index - 1)}
+              disabled={index === 0}
+            >
               <ArrowLeft aria-hidden="true" />
               <span className="max-sm:sr-only">Vorige</span>
             </Button>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" className="xl:hidden" onClick={() => setNavOpen(true)}>
+              <Button
+                variant="ghost"
+                className="xl:hidden"
+                onClick={() => setNavOpen(true)}
+              >
                 <LayoutGrid aria-hidden="true" />
                 <span className="tabular-nums">
                   {index + 1}/{questions.length}
@@ -556,7 +632,10 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
               </span>
             </div>
             {isLast ? (
-              <Button onClick={() => setSubmitOpen(true)} disabled={!!finishing}>
+              <Button
+                onClick={() => setSubmitOpen(true)}
+                disabled={!!finishing}
+              >
                 <span className="max-sm:sr-only">Naar inleveren</span>
                 <Send aria-hidden="true" />
               </Button>
@@ -595,13 +674,20 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
       </ExamShell>
 
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-5 pb-6">
+        <SheetContent
+          side="bottom"
+          className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-5 pb-6"
+        >
           <SheetHeader className="px-0">
             <SheetTitle>Vragen</SheetTitle>
-            <SheetDescription>Kies een vraag om ernaartoe te gaan.</SheetDescription>
+            <SheetDescription>
+              Kies een vraag om ernaartoe te gaan.
+            </SheetDescription>
           </SheetHeader>
           <div className="mx-auto w-full max-w-sm">{navigator}</div>
-          {monitoringNote ? <div className="mx-auto mt-4 w-full max-w-sm">{monitoringNote}</div> : null}
+          {monitoringNote ? (
+            <div className="mx-auto mt-4 w-full max-w-sm">{monitoringNote}</div>
+          ) : null}
         </SheetContent>
       </Sheet>
 
@@ -622,7 +708,9 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
                   ? "1 vraag is nog niet beantwoord:"
                   : `${unanswered.length} vragen zijn nog niet beantwoord:`}
               </p>
-              <div className="flex flex-wrap gap-1.5">{unanswered.map(jumpChip)}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {unanswered.map(jumpChip)}
+              </div>
             </div>
           ) : (
             <p className="rounded-lg bg-success/10 p-3 font-medium text-success-ink">
@@ -635,12 +723,15 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
                 <Flag className="size-4 text-warning-ink" aria-hidden="true" />
                 Gemarkeerd voor later:
               </p>
-              <div className="flex flex-wrap gap-1.5">{flaggedList.map(jumpChip)}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {flaggedList.map(jumpChip)}
+              </div>
             </div>
           ) : null}
           {snapshot.state === "offline" ? (
             <p className="text-sm text-warning-ink">
-              Let op: je bent offline. We proberen je antwoorden eerst op te slaan.
+              Let op: je bent offline. We proberen je antwoorden eerst op te
+              slaan.
             </p>
           ) : null}
         </div>
@@ -657,14 +748,22 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
             <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
               <Maximize className="size-7" aria-hidden="true" />
             </span>
-            <h2 id="fullscreen-title" className="font-display text-2xl font-bold tracking-tight">
+            <h2
+              id="fullscreen-title"
+              className="font-display text-2xl font-bold tracking-tight"
+            >
               Ga terug naar volledig scherm om verder te gaan
             </h2>
             <p className="text-muted-foreground">
-              Deze toets werkt alleen in volledig scherm. Het verlaten ervan wordt bijgehouden. Je
-              antwoorden zijn veilig opgeslagen.
+              Deze toets werkt alleen in volledig scherm. Het verlaten ervan
+              wordt bijgehouden. Je antwoorden zijn veilig opgeslagen.
             </p>
-            <Button size="lg" className="h-12 px-6 text-base" onClick={enterFullscreen} autoFocus>
+            <Button
+              size="lg"
+              className="h-12 px-6 text-base"
+              onClick={enterFullscreen}
+              autoFocus
+            >
               <Maximize aria-hidden="true" />
               Volledig scherm
             </Button>
@@ -684,12 +783,18 @@ function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetM
           className={cn(
             "fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm",
           )}
-          role="status"
+          aria-live="polite"
+          aria-busy="true"
         >
           <div className="flex flex-col items-center gap-3 text-center">
-            <Loader2 className="size-8 animate-spin text-primary" aria-hidden="true" />
+            <Loader2
+              className="size-8 animate-spin text-primary"
+              aria-hidden="true"
+            />
             <p className="font-display text-lg font-semibold">
-              {finishing === "auto" ? "De tijd is om. Je werk wordt ingeleverd…" : "Inleveren…"}
+              {finishing === "auto"
+                ? "De tijd is om. Je werk wordt ingeleverd…"
+                : "Inleveren…"}
             </p>
           </div>
         </div>

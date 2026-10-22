@@ -453,17 +453,17 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Code must show exactly what was typed: DM Mono's contextual alternates
-   would otherwise turn a leading "f" into "ƒ" (e.g. "for", f-strings). */
-code,
-kbd,
-samp,
-pre,
-.font-mono,
-.cm-editor,
-.cm-content {
-  font-feature-settings:
-    "liga" 0,
-    "calt" 0;
-  font-variant-ligatures: none;
+/* Overlays: uipkge uses bg-foreground/50, which turns into a light wash in
+   dark mode. Use a calm forest-tinted scrim in light and a dark one in dark. */
+[data-slot="dialog-overlay"],
+[data-slot="sheet-overlay"],
+[data-slot="command-dialog-overlay"] {
+  background-color: oklch(0.2 0.02 150 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.dark [data-slot="dialog-overlay"],
+.dark [data-slot="sheet-overlay"],
+.dark [data-slot="command-dialog-overlay"] {
+  background-color: oklch(0.05 0.01 150 / 0.65);
 }

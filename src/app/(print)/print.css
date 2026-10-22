@@ -1,0 +1,127 @@
+/*
+ * Printable login cards: A4 portrait, 2 × 4 cut-out cards per sheet.
+ * Everything is scoped to .login-* classes; the named @page only applies to
+ * a body that contains login sheets (on the body, so trailing elements such
+ * as the toaster don't force an extra blank page).
+ */
+
+@page login-cards {
+  size: A4 portrait;
+  margin: 0;
+}
+
+/* Paper always uses the light palette, also when the app is in dark mode. */
+.login-paper {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.2 0.012 150);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.012 150);
+  --primary: oklch(0.46 0.08 145);
+  --primary-foreground: oklch(0.98 0.006 130);
+  --muted: oklch(0.95 0.01 130);
+  --muted-foreground: oklch(0.45 0.014 150);
+  --border: oklch(0.86 0.014 135);
+  color-scheme: light;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body:has(.login-sheets) {
+  page: login-cards;
+}
+
+.login-sheets {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10mm;
+}
+
+.login-sheet {
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  padding: 10mm;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 8px 28px -6px rgb(0 0 0 / 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.login-card {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+  padding: 6mm 7mm 5mm;
+  min-width: 0;
+  /* Dashed cut lines; neighbouring outlines overlap into one line. */
+  outline: 0.25mm dashed var(--border);
+  outline-offset: -0.125mm;
+  break-inside: avoid;
+}
+
+.login-card-pin {
+  font-size: 9.5mm;
+  line-height: 1;
+  letter-spacing: 0.12em;
+}
+
+/* Phones: no paper sheets, just a column of real-size cards. */
+@media screen and (max-width: 860px) {
+  .login-sheets {
+    gap: 4mm;
+  }
+  .login-sheet {
+    width: auto;
+    height: auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4mm;
+    box-shadow: none;
+    background: transparent;
+  }
+  .login-card {
+    width: 95mm;
+    max-width: 100%;
+    height: 69mm;
+    outline: none;
+    border: 0.3mm dashed var(--border);
+    border-radius: 2mm;
+    background: var(--card);
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+  body:has(.login-sheets)::before {
+    display: none;
+  }
+  .login-sheets {
+    display: block;
+  }
+  .login-sheet {
+    /* A hair under 297mm so rounding never spills onto a blank extra page. */
+    height: 296mm;
+    box-shadow: none;
+    border-radius: 0;
+    break-after: page;
+  }
+  .login-sheet:last-child {
+    break-after: auto;
+  }
+  .login-paper,
+  .login-paper * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

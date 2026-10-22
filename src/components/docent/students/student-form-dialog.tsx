@@ -59,10 +59,16 @@ function StudentForm({
   const queryClient = useQueryClient();
   const editing = Boolean(student);
 
-  const [studentNumber, setStudentNumber] = useState(student?.studentNumber ?? "");
+  const [studentNumber, setStudentNumber] = useState(
+    student?.studentNumber ?? "",
+  );
   const [name, setName] = useState(student?.name ?? "");
   const [classId, setClassId] = useState(defaultClassId ?? "");
-  const [errors, setErrors] = useState<{ number?: string; name?: string; form?: string }>({});
+  const [errors, setErrors] = useState<{
+    number?: string;
+    name?: string;
+    form?: string;
+  }>({});
 
   const classesQuery = useQuery({
     ...trpc.class.list.queryOptions({}),
@@ -99,14 +105,16 @@ function StudentForm({
   );
 
   const pending = create.isPending || update.isPending;
-  const numberChanged = editing && studentNumber.trim() !== student?.studentNumber;
+  const numberChanged =
+    editing && studentNumber.trim() !== student?.studentNumber;
 
   function submit(e: FormEvent) {
     e.preventDefault();
     const number = studentNumber.trim();
     const cleanName = name.trim().replace(/\s+/g, " ");
     const next: typeof errors = {};
-    if (!STUDENT_NUMBER_REGEX.test(number)) next.number = "Een leerlingnummer bestaat uit 3 tot 12 cijfers.";
+    if (!STUDENT_NUMBER_REGEX.test(number))
+      next.number = "Een leerlingnummer bestaat uit 3 tot 12 cijfers.";
     if (!cleanName) next.name = "Vul de naam van de leerling in.";
     setErrors(next);
     if (next.number || next.name) return;
@@ -114,14 +122,20 @@ function StudentForm({
     if (student) {
       update.mutate({ id: student.id, name: cleanName, studentNumber: number });
     } else {
-      create.mutate({ studentNumber: number, name: cleanName, classId: classId || undefined });
+      create.mutate({
+        studentNumber: number,
+        name: cleanName,
+        classId: classId || undefined,
+      });
     }
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
       <DialogHeader>
-        <DialogTitle>{editing ? "Leerling bewerken" : "Leerling toevoegen"}</DialogTitle>
+        <DialogTitle>
+          {editing ? "Leerling bewerken" : "Leerling toevoegen"}
+        </DialogTitle>
         <DialogDescription>
           {editing
             ? "Pas de naam of het leerlingnummer aan."
@@ -147,13 +161,20 @@ function StudentForm({
             autoComplete="off"
             autoFocus={!editing}
             value={studentNumber}
-            onChange={(e) => setStudentNumber(e.target.value.replace(/\s/g, ""))}
+            onChange={(e) =>
+              setStudentNumber(e.target.value.replace(/\s/g, ""))
+            }
             className="font-mono"
             maxLength={12}
           />
         </FormField>
 
-        <FormField label="Naam" htmlFor="student-name" required error={errors.name}>
+        <FormField
+          label="Naam"
+          htmlFor="student-name"
+          required
+          error={errors.name}
+        >
           <Input
             id="student-name"
             autoComplete="off"
@@ -165,7 +186,11 @@ function StudentForm({
         </FormField>
 
         {!editing && !hideClassPicker ? (
-          <FormField label="Klas" htmlFor="student-class" description="Optioneel. Je kunt dit later nog aanpassen.">
+          <FormField
+            label="Klas"
+            htmlFor="student-class"
+            description="Optioneel. Je kunt dit later nog aanpassen."
+          >
             <NativeSelect
               id="student-class"
               value={classId}
@@ -184,18 +209,28 @@ function StudentForm({
         ) : null}
 
         {errors.form ? (
-          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink">
+          <p
+            role="alert"
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
+          >
             {errors.form}
           </p>
         ) : null}
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={() => onOpenChange(false)}
+        >
           Annuleren
         </Button>
         <Button type="submit" disabled={pending} aria-busy={pending}>
-          {pending ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : null}
+          {pending ? (
+            <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+          ) : null}
           {editing ? "Opslaan" : "Toevoegen"}
         </Button>
       </DialogFooter>

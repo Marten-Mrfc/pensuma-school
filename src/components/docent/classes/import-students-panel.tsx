@@ -1,8 +1,28 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, FileUp, Loader2, UserPlus, UsersRound, X } from "lucide-react";
-import { type DragEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  CircleAlert,
+  CircleCheck,
+  FileUp,
+  Loader2,
+  UserPlus,
+  UsersRound,
+  X,
+} from "lucide-react";
+import {
+  type DragEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -40,7 +60,12 @@ type PreviewStatus =
   | { kind: "member"; currentName: string; nameDiffers: boolean }
   | { kind: "error"; message: string };
 
-type PreviewRow = { line: number; studentNumber: string; name: string; status: PreviewStatus };
+type PreviewRow = {
+  line: number;
+  studentNumber: string;
+  name: string;
+  status: PreviewStatus;
+};
 
 export interface ImportStudentsPanelProps {
   classId: string;
@@ -50,7 +75,12 @@ export interface ImportStudentsPanelProps {
 }
 
 /** Paste/CSV import with a live, validated preview. */
-export function ImportStudentsPanel({ classId, className, onCancel, onImported }: ImportStudentsPanelProps) {
+export function ImportStudentsPanel({
+  classId,
+  className,
+  onCancel,
+  onImported,
+}: ImportStudentsPanelProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const inputId = useId();
@@ -68,13 +98,17 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
   const debouncedNumbers = useDebouncedValue(numbers, 300);
 
   const existingQuery = useQuery({
-    ...trpc.student.checkExisting.queryOptions({ studentNumbers: debouncedNumbers, classId }),
+    ...trpc.student.checkExisting.queryOptions({
+      studentNumbers: debouncedNumbers,
+      classId,
+    }),
     enabled: debouncedNumbers.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 10_000,
   });
   const checking =
-    numbers.length > 0 && (existingQuery.isFetching || debouncedNumbers.join() !== numbers.join());
+    numbers.length > 0 &&
+    (existingQuery.isFetching || debouncedNumbers.join() !== numbers.join());
 
   const existing = useMemo(
     () => new Map((existingQuery.data ?? []).map((e) => [e.studentNumber, e])),
@@ -86,9 +120,13 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
       const found = existing.get(r.studentNumber);
       let status: PreviewStatus = { kind: "new" };
       if (found && !found.isStudent) {
-        status = { kind: "error", message: "Dit nummer is al in gebruik door een ander account." };
+        status = {
+          kind: "error",
+          message: "Dit nummer is al in gebruik door een ander account.",
+        };
       } else if (found) {
-        const nameDiffers = found.name.trim().toLowerCase() !== r.name.trim().toLowerCase();
+        const nameDiffers =
+          found.name.trim().toLowerCase() !== r.name.trim().toLowerCase();
         status = found.inClass
           ? { kind: "member", currentName: found.name, nameDiffers }
           : { kind: "existing", currentName: found.name, nameDiffers };
@@ -96,7 +134,12 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
       return { ...r, status };
     });
     for (const e of parsed.errors) {
-      rows.push({ line: e.line, studentNumber: "", name: e.raw, status: { kind: "error", message: e.message } });
+      rows.push({
+        line: e.line,
+        studentNumber: "",
+        name: e.raw,
+        status: { kind: "error", message: e.message },
+      });
     }
     return rows.sort((a, b) => a.line - b.line);
   }, [parsed, existing]);
@@ -105,7 +148,11 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
     const c = { new: 0, existing: 0, member: 0, error: 0, renamable: 0 };
     for (const r of preview) {
       c[r.status.kind]++;
-      if ((r.status.kind === "existing" || r.status.kind === "member") && r.status.nameDiffers) c.renamable++;
+      if (
+        (r.status.kind === "existing" || r.status.kind === "member") &&
+        r.status.nameDiffers
+      )
+        c.renamable++;
     }
     return c;
   }, [preview]);
@@ -132,7 +179,8 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
     if (!file) return;
     if (SPREADSHEET_EXT.test(file.name)) {
       toast.error("Excel-bestanden kun je niet direct inlezen", {
-        description: "Kopieer de cellen in Excel en plak ze hier, of sla het bestand op als CSV.",
+        description:
+          "Kopieer de cellen in Excel en plak ze hier, of sla het bestand op als CSV.",
       });
       return;
     }
@@ -148,7 +196,7 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
     }
   }
 
-  function onDrop(e: DragEvent) {
+  function onDrop(e: DragEvent<HTMLTextAreaElement>) {
     e.preventDefault();
     setDragging(false);
     void loadFile(e.dataTransfer.files?.[0]);
@@ -158,7 +206,11 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
     importMutation.mutate({
       classId,
       onExisting: updateNames ? "update_name" : "skip",
-      rows: importable.map((r) => ({ studentNumber: r.studentNumber, name: r.name, line: r.line })),
+      rows: importable.map((r) => ({
+        studentNumber: r.studentNumber,
+        name: r.name,
+        line: r.line,
+      })),
     });
   }
 
@@ -189,7 +241,11 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
                   </button>
                 </span>
               ) : null}
-              <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInput.current?.click()}
+              >
                 <FileUp aria-hidden="true" />
                 CSV-bestand kiezen
               </Button>
@@ -207,17 +263,15 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
               />
             </div>
           </div>
-          <div
-            className={cn("relative rounded-md", dragging && "ring-[3px] ring-primary/40")}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-          >
+          <div className="relative rounded-md">
             <textarea
               id={inputId}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
               value={text}
               onChange={(e) => {
                 setText(e.target.value);
@@ -226,34 +280,64 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
               rows={7}
               spellCheck={false}
               placeholder={`Bijvoorbeeld:\n${EXAMPLE.replaceAll("\t", "  ")}`}
-              className="block min-h-36 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className={cn(
+                "block min-h-36 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                dragging && "border-primary ring-[3px] ring-primary/40",
+              )}
             />
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Eén leerling per regel: leerlingnummer en naam. Kopieer de kolommen uit Excel, Magister of SOMtoday, of
-            sleep een CSV-bestand hierheen. Een kopregel (zoals <span className="font-mono">Leerlingnummer;Naam</span>{" "}
-            of <span className="font-mono">Voornaam;Tussenvoegsel;Achternaam</span>) wordt herkend.
+            Eén leerling per regel: leerlingnummer en naam. Kopieer de kolommen
+            uit Excel, Magister of SOMtoday, of sleep een CSV-bestand hierheen.
+            Een kopregel (zoals{" "}
+            <span className="font-mono">Leerlingnummer;Naam</span> of{" "}
+            <span className="font-mono">Voornaam;Tussenvoegsel;Achternaam</span>
+            ) wordt herkend.
           </p>
         </div>
 
         {hasInput ? (
-          <section aria-label="Voorbeeld van de import" className="flex flex-col gap-3">
+          <section
+            aria-label="Voorbeeld van de import"
+            className="flex flex-col gap-3"
+          >
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <SummaryChip tone="success" icon={UserPlus} label={`${counts.new} nieuw`} />
-              <SummaryChip tone="info" icon={UsersRound} label={`${counts.existing} bestaan al`} />
+              <SummaryChip
+                tone="success"
+                icon={UserPlus}
+                label={`${counts.new} nieuw`}
+              />
+              <SummaryChip
+                tone="info"
+                icon={UsersRound}
+                label={`${counts.existing} bestaan al`}
+              />
               {counts.member > 0 ? (
-                <SummaryChip tone="muted" icon={CircleCheck} label={`${counts.member} al in klas`} />
+                <SummaryChip
+                  tone="muted"
+                  icon={CircleCheck}
+                  label={`${counts.member} al in klas`}
+                />
               ) : null}
               {counts.error > 0 ? (
-                <SummaryChip tone="destructive" icon={CircleAlert} label={`${counts.error} met fout`} />
+                <SummaryChip
+                  tone="destructive"
+                  icon={CircleAlert}
+                  label={`${counts.error} met fout`}
+                />
               ) : null}
               {checking ? (
                 <span className="inline-flex items-center gap-1 text-muted-foreground">
-                  <Loader2 className="size-3 motion-safe:animate-spin" aria-hidden="true" />
+                  <Loader2
+                    className="size-3 motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
                   Controleren…
                 </span>
               ) : null}
-              {parsed.headerDetected ? <span className="text-muted-foreground">Kopregel herkend</span> : null}
+              {parsed.headerDetected ? (
+                <span className="text-muted-foreground">Kopregel herkend</span>
+              ) : null}
             </div>
 
             <div className="overflow-hidden rounded-lg border">
@@ -274,7 +358,10 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
                   </thead>
                   <tbody>
                     {preview.map((r) => (
-                      <PreviewTableRow key={`${r.line}-${r.studentNumber}`} row={r} />
+                      <PreviewTableRow
+                        key={`${r.line}-${r.studentNumber}`}
+                        row={r}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -282,14 +369,20 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
             </div>
 
             {counts.renamable > 0 ? (
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border bg-muted/30 p-3 text-sm">
+              <label
+                htmlFor="import-update-names"
+                className="flex cursor-pointer items-start gap-2.5 rounded-lg border bg-muted/30 p-3 text-sm"
+              >
                 <Checkbox
+                  id="import-update-names"
                   checked={updateNames}
                   onCheckedChange={(v) => setUpdateNames(v === true)}
                   className="mt-0.5"
                 />
                 <span className="flex flex-col gap-0.5">
-                  <span className="font-medium">Namen van bestaande leerlingen bijwerken</span>
+                  <span className="font-medium">
+                    Namen van bestaande leerlingen bijwerken
+                  </span>
                   <span className="text-xs text-muted-foreground">
                     {counts.renamable === 1
                       ? "1 bestaande leerling heeft een andere naam in je lijst."
@@ -304,12 +397,18 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
       </div>
 
       <div className="flex flex-col-reverse gap-2 border-t bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <Button variant="outline" onClick={onCancel} disabled={importMutation.isPending}>
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          disabled={importMutation.isPending}
+        >
           Annuleren
         </Button>
         <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center">
           {importMutation.isPending ? (
-            <span className="text-center text-xs text-muted-foreground">Accounts aanmaken, even geduld…</span>
+            <span className="text-center text-xs text-muted-foreground">
+              Accounts aanmaken, even geduld…
+            </span>
           ) : null}
           <Button
             onClick={submit}
@@ -317,7 +416,10 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
             aria-busy={importMutation.isPending}
           >
             {importMutation.isPending ? (
-              <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <UserPlus aria-hidden="true" />
             )}
@@ -366,15 +468,23 @@ function PreviewTableRow({ row }: { row: PreviewRow }) {
   const { status } = row;
   const isError = status.kind === "error";
   return (
-    <tr className={cn("border-t align-top", isError && "bg-destructive/[0.04]")}>
-      <td className="px-3 py-2 font-mono text-xs text-muted-foreground tabular-nums">{row.line}</td>
+    <tr
+      className={cn("border-t align-top", isError && "bg-destructive/[0.04]")}
+    >
+      <td className="px-3 py-2 font-mono text-xs text-muted-foreground tabular-nums">
+        {row.line}
+      </td>
       <td className="px-3 py-2">
         {isError ? (
-          <span className="font-mono text-xs break-all text-muted-foreground">{row.name || "(leeg)"}</span>
+          <span className="font-mono text-xs break-all text-muted-foreground">
+            {row.name || "(leeg)"}
+          </span>
         ) : (
           <span className="flex flex-col">
             <span className="font-medium">{row.name}</span>
-            <span className="font-mono text-xs text-muted-foreground">{row.studentNumber}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {row.studentNumber}
+            </span>
           </span>
         )}
       </td>
@@ -391,7 +501,9 @@ function PreviewTableRow({ row }: { row: PreviewRow }) {
               Bestaat al – wordt aan klas toegevoegd
             </span>
             {status.nameDiffers ? (
-              <span className="text-muted-foreground">Nu: {status.currentName}</span>
+              <span className="text-muted-foreground">
+                Nu: {status.currentName}
+              </span>
             ) : null}
           </span>
         ) : status.kind === "member" ? (
@@ -401,12 +513,17 @@ function PreviewTableRow({ row }: { row: PreviewRow }) {
               Zit al in deze klas
             </span>
             {status.nameDiffers ? (
-              <span className="text-muted-foreground">Nu: {status.currentName}</span>
+              <span className="text-muted-foreground">
+                Nu: {status.currentName}
+              </span>
             ) : null}
           </span>
         ) : (
           <span className="inline-flex items-start gap-1 font-medium text-destructive-ink">
-            <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+            <CircleAlert
+              className="mt-px size-3.5 shrink-0"
+              aria-hidden="true"
+            />
             {status.message}
           </span>
         )}

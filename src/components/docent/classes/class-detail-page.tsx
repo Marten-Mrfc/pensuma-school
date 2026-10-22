@@ -49,7 +49,11 @@ import { ClassStudentsTable } from "./class-students-table";
 type DialogName = "edit" | "archive" | "delete" | "resetPins" | null;
 
 /** /docent/klassen/[klasId] */
-export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }> }) {
+export function ClassDetailPage({
+  params,
+}: {
+  params: Promise<{ klasId: string }>;
+}) {
   const { klasId } = use(params);
   const trpc = useTRPC();
   const router = useRouter();
@@ -73,11 +77,19 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
   if (query.isError || !query.data) {
     return (
       <>
-        <PageHeader title="Klas" backHref={routes.docent.classes} backLabel="Klassen" />
+        <PageHeader
+          title="Klas"
+          backHref={routes.docent.classes}
+          backLabel="Klassen"
+        />
         <ErrorState
           title="Deze klas kon niet worden geladen"
           error={query.error}
-          onRetry={query.error?.data?.code === "NOT_FOUND" ? undefined : () => query.refetch()}
+          onRetry={
+            query.error?.data?.code === "NOT_FOUND"
+              ? undefined
+              : () => query.refetch()
+          }
         />
       </>
     );
@@ -91,7 +103,10 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
     if (!open) setDialog(null);
   };
 
-  const description = [klas.schoolYear ? `Schooljaar ${klas.schoolYear}` : null, klas.description]
+  const description = [
+    klas.schoolYear ? `Schooljaar ${klas.schoolYear}` : null,
+    klas.description,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -117,7 +132,11 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
               Leerlingen importeren
             </Button>
             <Button variant="outline" asChild>
-              <Link href={routes.docent.classLoginCards(klas.id)} target="_blank" rel="noopener">
+              <Link
+                href={routes.docent.classLoginCards(klas.id)}
+                target="_blank"
+                rel="noopener"
+              >
                 <Printer aria-hidden="true" />
                 Inlogkaarten printen
               </Link>
@@ -139,7 +158,10 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
                   <Pencil />
                   Bewerken
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDialog("resetPins")} disabled={members.length === 0}>
+                <DropdownMenuItem
+                  onSelect={() => setDialog("resetPins")}
+                  disabled={members.length === 0}
+                >
                   <KeyRound />
                   Alle pincodes resetten
                 </DropdownMenuItem>
@@ -148,7 +170,10 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
                   {klas.archived ? <ArchiveRestore /> : <Archive />}
                   {klas.archived ? "Terugzetten uit archief" : "Archiveren"}
                 </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onSelect={() => setDialog("delete")}>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => setDialog("delete")}
+                >
                   <Trash2 />
                   Verwijderen
                 </DropdownMenuItem>
@@ -164,7 +189,11 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
           value={members.length}
           icon={UsersRound}
           tone="primary"
-          hint={members.length - active > 0 ? `${members.length - active} gedeactiveerd` : "Allemaal actief"}
+          hint={
+            members.length - active > 0
+              ? `${members.length - active} gedeactiveerd`
+              : "Allemaal actief"
+          }
         />
         <StatCard
           label="Open afnames"
@@ -178,17 +207,31 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
           value={loggedIn}
           icon={LogIn}
           tone="info"
-          hint={members.length > 0 ? `van de ${members.length} leerlingen (recent)` : "Nog geen leerlingen"}
+          hint={
+            members.length > 0
+              ? `van de ${members.length} leerlingen (recent)`
+              : "Nog geen leerlingen"
+          }
         />
       </div>
 
-      <section aria-labelledby="students-heading" className="flex flex-col gap-3">
+      <section
+        aria-labelledby="students-heading"
+        className="flex flex-col gap-3"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="students-heading" className="font-display text-lg font-bold tracking-tight">
+          <h2
+            id="students-heading"
+            className="font-display text-lg font-bold tracking-tight"
+          >
             Leerlingen
           </h2>
           {members.length > 0 ? (
-            <Button variant="ghost" size="sm" onClick={() => setSheetOpen(true)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSheetOpen(true)}
+            >
               <UserPlus aria-hidden="true" />
               Leerlingen toevoegen
             </Button>
@@ -211,14 +254,27 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
         )}
       </section>
 
-      <AddStudentsSheet open={sheetOpen} onOpenChange={setSheetOpen} classId={klas.id} className={klas.name} />
+      <AddStudentsSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        classId={klas.id}
+        className={klas.name}
+      />
 
-      <ClassFormDialog open={dialog === "edit"} onOpenChange={close} klas={klas} />
+      <ClassFormDialog
+        open={dialog === "edit"}
+        onOpenChange={close}
+        klas={klas}
+      />
 
       <ConfirmDialog
         open={dialog === "archive"}
         onOpenChange={close}
-        title={klas.archived ? `${klas.name} terugzetten?` : `${klas.name} archiveren?`}
+        title={
+          klas.archived
+            ? `${klas.name} terugzetten?`
+            : `${klas.name} archiveren?`
+        }
         description={
           klas.archived
             ? "De klas verschijnt weer in je overzicht en bij het plannen van afnames."
@@ -226,9 +282,14 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
         }
         confirmLabel={klas.archived ? "Terugzetten" : "Archiveren"}
         onConfirm={async () => {
-          await setArchived.mutateAsync({ id: klas.id, archived: !klas.archived });
+          await setArchived.mutateAsync({
+            id: klas.id,
+            archived: !klas.archived,
+          });
           await invalidate();
-          toast.success(klas.archived ? "Klas teruggezet" : "Klas gearchiveerd");
+          toast.success(
+            klas.archived ? "Klas teruggezet" : "Klas gearchiveerd",
+          );
         }}
       />
 
@@ -247,7 +308,9 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
           await remove.mutateAsync({ id: klas.id });
           toast.success(`Klas ${klas.name} verwijderd`);
           router.push(routes.docent.classes);
-          await queryClient.invalidateQueries({ queryKey: trpc.class.list.queryKey() });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.class.list.queryKey(),
+          });
         }}
       />
 
@@ -264,13 +327,16 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
         }}
       />
 
-      <Dialog open={pinsReset !== null} onOpenChange={(open) => !open && setPinsReset(null)}>
+      <Dialog
+        open={pinsReset !== null}
+        onOpenChange={(open) => !open && setPinsReset(null)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nieuwe pincodes aangemaakt</DialogTitle>
             <DialogDescription>
-              {plural(pinsReset ?? 0, "leerling heeft", "leerlingen hebben")} een nieuwe pincode. Print nieuwe
-              inlogkaarten en deel ze uit.
+              {plural(pinsReset ?? 0, "leerling heeft", "leerlingen hebben")}{" "}
+              een nieuwe pincode. Print nieuwe inlogkaarten en deel ze uit.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -278,7 +344,11 @@ export function ClassDetailPage({ params }: { params: Promise<{ klasId: string }
               Sluiten
             </Button>
             <Button asChild>
-              <Link href={routes.docent.classLoginCards(klas.id)} target="_blank" rel="noopener">
+              <Link
+                href={routes.docent.classLoginCards(klas.id)}
+                target="_blank"
+                rel="noopener"
+              >
                 <Printer aria-hidden="true" />
                 Inlogkaarten printen
               </Link>

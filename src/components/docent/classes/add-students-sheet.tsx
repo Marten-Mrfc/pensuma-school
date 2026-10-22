@@ -2,11 +2,20 @@
 
 import { ClipboardPaste, UserSearch } from "lucide-react";
 import { useState } from "react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddExistingPanel } from "./add-existing-panel";
 import { ImportResultView } from "./import-result-view";
-import { type ImportResult, ImportStudentsPanel } from "./import-students-panel";
+import {
+  type ImportResult,
+  ImportStudentsPanel,
+} from "./import-students-panel";
 
 export interface AddStudentsSheetProps {
   open: boolean;
@@ -16,7 +25,12 @@ export interface AddStudentsSheetProps {
 }
 
 /** "Leerlingen toevoegen": paste/CSV import or add existing students. */
-export function AddStudentsSheet({ open, onOpenChange, classId, className }: AddStudentsSheetProps) {
+export function AddStudentsSheet({
+  open,
+  onOpenChange,
+  classId,
+  className,
+}: AddStudentsSheetProps) {
   const [tab, setTab] = useState("import");
   const [result, setResult] = useState<ImportResult | null>(null);
   // Bumped to reset the import panel ("Nog een lijst importeren").
@@ -36,10 +50,16 @@ export function AddStudentsSheet({ open, onOpenChange, classId, className }: Add
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 sm:max-w-2xl" aria-describedby="add-students-description">
+      <SheetContent
+        side="right"
+        className="w-full gap-0 sm:max-w-2xl"
+        aria-describedby="add-students-description"
+      >
         <SheetHeader className="px-4 pt-5 pb-4 sm:px-6">
           <SheetTitle className="font-display text-xl tracking-tight">
-            {result ? "Import voltooid" : `Leerlingen toevoegen aan ${className}`}
+            {result
+              ? "Import voltooid"
+              : `Leerlingen toevoegen aan ${className}`}
           </SheetTitle>
           <SheetDescription id="add-students-description">
             {result
@@ -60,7 +80,11 @@ export function AddStudentsSheet({ open, onOpenChange, classId, className }: Add
             onDone={() => handleOpenChange(false)}
           />
         ) : (
-          <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-4">
+          <Tabs
+            value={tab}
+            onValueChange={setTab}
+            className="min-h-0 flex-1 gap-4"
+          >
             <div className="px-4 sm:px-6">
               <TabsList className="w-full sm:w-auto">
                 <TabsTrigger value="import" className="flex-1 sm:flex-none">
@@ -73,7 +97,11 @@ export function AddStudentsSheet({ open, onOpenChange, classId, className }: Add
                 </TabsTrigger>
               </TabsList>
             </div>
-            <TabsContent forceMount value="import" className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+            <TabsContent
+              forceMount
+              value="import"
+              className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+            >
               <ImportStudentsPanel
                 key={importKey}
                 classId={classId}
@@ -82,7 +110,10 @@ export function AddStudentsSheet({ open, onOpenChange, classId, className }: Add
                 onImported={setResult}
               />
             </TabsContent>
-            <TabsContent value="existing" className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+            <TabsContent
+              value="existing"
+              className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+            >
               <AddExistingPanel
                 classId={classId}
                 className={className}

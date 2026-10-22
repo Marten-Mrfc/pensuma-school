@@ -41,7 +41,6 @@ import {
   DEADLINE_GRACE_MS,
   dutchGrade,
   effectiveAssignmentStatus,
-  isPastDeadline,
   parseAssignmentSettings,
   resultsVisible,
 } from "@/server/services/assignment-status";
@@ -50,6 +49,7 @@ import {
   autoSubmitIfExpired,
   createOrResumeAttempt,
   findResumableAttempt,
+  isAttemptExpired,
   isClassMember,
   logServerEvent,
   optionOrderFor,
@@ -208,8 +208,11 @@ async function loadOwnedAttempt(userId: string, attemptId: string) {
 }
 
 /** Auto-submit an expired attempt and return its fresh row. */
-async function refreshIfExpired(attempt: AttemptRow): Promise<AttemptRow> {
-  if (!(await autoSubmitIfExpired(attempt))) return attempt;
+async function refreshIfExpired(
+  attempt: AttemptRow,
+  assignment: Pick<AssignmentRow, "status" | "opensAt" | "closesAt">,
+): Promise<AttemptRow> {
+  if (!(await autoSubmitIfExpired(attempt, assignment))) return attempt;
   const [fresh] = await db
     .select()
     .from(attempts)
@@ -321,13 +324,19 @@ export const portalRouter = createTRPCRouter({
       : [];
 
     // Expired attempts are submitted on sight.
-    if (
-      myAttempts.some(
-        (a) => a.status === "in_progress" && isPastDeadline(a.deadlineAt, now),
-      )
-    ) {
+    const assignmentById = new Map(
+      visibleRows.map((r) => [r.assignment.id, r.assignment]),
+    );
+    const expired = (a: AttemptRow) => {
+      const asg = assignmentById.get(a.assignmentId);
+      return asg ? isAttemptExpired(a, asg, now) : false;
+    };
+    if (myAttempts.some(expired)) {
       myAttempts = await Promise.all(
-        myAttempts.map((a) => refreshIfExpired(a)),
+        myAttempts.map((a) => {
+          const asg = assignmentById.get(a.assignmentId);
+          return asg ? refreshIfExpired(a, asg) : a;
+        }),
       );
     }
 
@@ -440,7 +449,7 @@ export const portalRouter = createTRPCRouter({
       const settings = studentSettings(a.settings);
       const stats = (await testStats([a.testId])).get(a.testId);
 
-      const inProgress = await findResumableAttempt(a.id, ctx.user.id);
+      const inProgress = await findResumableAttempt(a, ctx.user.id);
       const mine = await db
         .select({
           id: attempts.id,
@@ -501,7 +510,7 @@ export const portalRouter = createTRPCRouter({
       );
 
       // Continuing never needs the access code again.
-      const resumable = await findResumableAttempt(a.id, ctx.user.id);
+      const resumable = await findResumableAttempt(a, ctx.user.id);
       if (resumable) {
         await logServerEvent(resumable.id, "resumed");
         return { attemptId: resumable.id, resumed: true };
@@ -546,7 +555,7 @@ export const portalRouter = createTRPCRouter({
     .input(z.object({ attemptId: idSchema }))
     .query(async ({ ctx, input }) => {
       const row = await loadOwnedAttempt(ctx.user.id, input.attemptId);
-      const attempt = await refreshIfExpired(row.attempt);
+      const attempt = await refreshIfExpired(row.attempt, row.assignment);
       const a = row.assignment;
 
       const order = attempt.questionOrder ?? [];
@@ -627,7 +636,8 @@ export const portalRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { attempt } = await loadOwnedAttempt(ctx.user.id, input.attemptId);
+      const row = await loadOwnedAttempt(ctx.user.id, input.attemptId);
+      const { attempt } = row;
       const now = new Date();
       if (attempt.status !== "in_progress") {
         throw new TRPCError({
@@ -635,12 +645,13 @@ export const portalRouter = createTRPCRouter({
           message: "Deze poging is al ingeleverd. Je kunt niets meer wijzigen.",
         });
       }
-      if (isPastDeadline(attempt.deadlineAt, now)) {
-        await autoSubmitIfExpired(attempt, now);
+      if (isAttemptExpired(attempt, row.assignment, now)) {
+        await autoSubmitIfExpired(attempt, row.assignment, now);
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message:
-            "De tijd is om. Je antwoord kon niet meer worden opgeslagen.",
+          message: attempt.deadlineAt
+            ? "De tijd is om. Je antwoord kon niet meer worden opgeslagen."
+            : "Deze toets is gesloten. Je antwoord kon niet meer worden opgeslagen.",
         });
       }
       if (!attempt.questionOrder.includes(input.questionId)) {
@@ -738,7 +749,7 @@ export const portalRouter = createTRPCRouter({
     .input(z.object({ attemptId: idSchema }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadOwnedAttempt(ctx.user.id, input.attemptId);
-      const attempt = await refreshIfExpired(row.attempt);
+      const attempt = await refreshIfExpired(row.attempt, row.assignment);
       const now = new Date();
       if (attempt.status === "in_progress") {
         await db
@@ -777,7 +788,7 @@ export const portalRouter = createTRPCRouter({
     .input(z.object({ attemptId: idSchema }))
     .query(async ({ ctx, input }) => {
       const row = await loadOwnedAttempt(ctx.user.id, input.attemptId);
-      const attempt = await refreshIfExpired(row.attempt);
+      const attempt = await refreshIfExpired(row.attempt, row.assignment);
       const a = row.assignment;
       const settings = parseAssignmentSettings(a.settings);
       const now = new Date();
@@ -906,6 +917,11 @@ export const portalRouter = createTRPCRouter({
             earned: graded && ans ? effectiveScore(ans) : null,
             status: ans?.status ?? "empty",
             reviewed: ans?.manualScore != null,
+            answered: !isBlankResponse(
+              typed.type,
+              response,
+              typed.type === "code" ? typed.data.starterCode : "",
+            ),
             feedback: ans?.feedback ?? null,
             response,
             codeResult,

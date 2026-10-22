@@ -1,12 +1,21 @@
 "use client";
 
-import { ClipboardX, RotateCcw, SquareTerminal, TestTubeDiagonal } from "lucide-react";
+import {
+  ClipboardX,
+  RotateCcw,
+  SquareTerminal,
+  TestTubeDiagonal,
+} from "lucide-react";
 import { useState } from "react";
 import { CodeEditor } from "@/components/app/code-editor";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { CodeRunTab, CodeTestTab, type RunHandle } from "./code-tools";
@@ -17,9 +26,12 @@ import { useMediaQuery } from "./use-media-query";
 export function CodeQuestion(props: QuestionViewProps) {
   const { question, response, onChange, settings, onLog, disabled } = props;
   const data = codeData(question);
-  const code = response && "code" in response ? response.code : data.starterCode;
+  const code =
+    response && "code" in response ? response.code : data.starterCode;
   const wide = useMediaQuery("(min-width: 1024px)");
-  const [tab, setTab] = useState<"run" | "test">(settings.allowCodeRun ? "run" : "test");
+  const [tab, setTab] = useState<"run" | "test">(
+    settings.allowCodeRun ? "run" : "test",
+  );
   const [resetOpen, setResetOpen] = useState(false);
   const [pasteBlockedAt, setPasteBlockedAt] = useState<number | null>(null);
   const [runHandle, setRunHandle] = useState<RunHandle | null>(null);
@@ -95,7 +107,9 @@ export function CodeQuestion(props: QuestionViewProps) {
         minHeight={wide ? "100%" : 260}
         maxHeight={wide ? undefined : "60vh"}
         aria-label={`Code voor vraag ${props.number}: ${question.title}`}
-        className={cn(wide && "h-full min-h-0 flex-1 [&>div:first-child]:h-full")}
+        className={cn(
+          wide && "h-full min-h-0 flex-1 [&>div:first-child]:h-full",
+        )}
       />
     </div>
   );
@@ -106,7 +120,7 @@ export function CodeQuestion(props: QuestionViewProps) {
       onValueChange={(v) => setTab(v as "run" | "test")}
       className="flex h-full min-h-0 flex-col gap-3"
     >
-      <TabsList className="w-full shrink-0">
+      <TabsList className="w-full shrink-0 [&_svg]:size-4">
         {settings.allowCodeRun ? (
           <TabsTrigger value="run" className="flex-1">
             <SquareTerminal aria-hidden="true" />
@@ -118,13 +132,20 @@ export function CodeQuestion(props: QuestionViewProps) {
             <TestTubeDiagonal aria-hidden="true" />
             Testen
             {data.tests.length ? (
-              <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">{data.tests.length}</span>
+              <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">
+                {data.tests.length}
+              </span>
             ) : null}
           </TabsTrigger>
         ) : null}
       </TabsList>
       {settings.allowCodeRun ? (
-        <TabsContent value="run" forceMount hidden={tab !== "run"} className="min-h-0 flex-1">
+        <TabsContent
+          value="run"
+          forceMount
+          hidden={tab !== "run"}
+          className="min-h-0 flex-1"
+        >
           <CodeRunTab
             code={code}
             timeLimitMs={data.timeLimitMs}
@@ -135,7 +156,12 @@ export function CodeQuestion(props: QuestionViewProps) {
         </TabsContent>
       ) : null}
       {settings.allowSelfTest ? (
-        <TabsContent value="test" forceMount hidden={tab !== "test"} className="min-h-0 flex-1">
+        <TabsContent
+          value="test"
+          forceMount
+          hidden={tab !== "test"}
+          className="min-h-0 flex-1"
+        >
           <CodeTestTab
             code={code}
             tests={data.tests}
@@ -155,7 +181,8 @@ export function CodeQuestion(props: QuestionViewProps) {
     </Tabs>
   ) : (
     <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-      Uitvoeren en testen zijn bij deze toets uitgeschakeld. Je code wordt na het inleveren nagekeken.
+      Uitvoeren en testen zijn bij deze toets uitgeschakeld. Je code wordt na
+      het inleveren nagekeken.
     </p>
   );
 
@@ -190,9 +217,15 @@ export function CodeQuestion(props: QuestionViewProps) {
 
   return (
     <>
-      <ResizablePanelGroup direction="horizontal" autoSaveId="pensuma-exam-code-h">
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="pensuma-exam-code-h"
+      >
         <ResizablePanel defaultSize={hasTools ? 58 : 100} minSize={35}>
-          <ResizablePanelGroup direction="vertical" autoSaveId="pensuma-exam-code-v">
+          <ResizablePanelGroup
+            direction="vertical"
+            autoSaveId="pensuma-exam-code-v"
+          >
             <ResizablePanel defaultSize={36} minSize={12}>
               <div className="h-full overflow-y-auto px-6 py-5">
                 <div className="flex flex-col gap-4">
@@ -214,7 +247,9 @@ export function CodeQuestion(props: QuestionViewProps) {
           <>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={42} minSize={25}>
-              <div className="h-full min-h-0 bg-card/40 px-4 pt-4 pb-4">{tools}</div>
+              <div className="h-full min-h-0 bg-card/40 px-4 pt-4 pb-4">
+                {tools}
+              </div>
             </ResizablePanel>
           </>
         ) : null}

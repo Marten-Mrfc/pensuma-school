@@ -5,7 +5,11 @@ import { StartScreen } from "@/components/leerling/start-screen";
 
 export const metadata: Metadata = { title: "Toets starten" };
 
-export default function AfnamePage({ params }: { params: Promise<{ afnameId: string }> }) {
+export default function AfnamePage({
+  params,
+}: {
+  params: Promise<{ afnameId: string }>;
+}) {
   return (
     <Suspense fallback={<LoadingState />}>
       <StartScreen params={params} />

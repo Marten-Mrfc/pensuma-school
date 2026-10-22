@@ -17,16 +17,27 @@ export interface ImportResultViewProps {
 }
 
 /** Shown after an import: new students with their PINs and a big print button. */
-export function ImportResultView({ classId, className, result, onImportMore, onDone }: ImportResultViewProps) {
+export function ImportResultView({
+  classId,
+  className,
+  result,
+  onImportMore,
+  onDone,
+}: ImportResultViewProps) {
   const { created, existing, errors } = result;
   const addedExisting = existing.filter((e) => e.addedToClass);
   const total = created.length + addedExisting.length;
-  const printIds = [...created.map((c) => c.id), ...addedExisting.map((e) => e.id)];
+  const printIds = [
+    ...created.map((c) => c.id),
+    ...addedExisting.map((e) => e.id),
+  ];
   const printHref =
     printIds.length > 0
       ? `${routes.docent.classLoginCards(classId)}?ids=${printIds.map(encodeURIComponent).join(",")}`
       : routes.docent.classLoginCards(classId);
-  const asTable = created.map((c) => `${c.studentNumber}\t${c.name}\t${c.pin}`).join("\n");
+  const asTable = created
+    .map((c) => `${c.studentNumber}\t${c.name}\t${c.pin}`)
+    .join("\n");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -45,8 +56,12 @@ export function ImportResultView({ classId, className, result, onImportMore, onD
               {created.length > 0
                 ? `${plural(created.length, "nieuw account", "nieuwe accounts")} met pincode`
                 : "Geen nieuwe accounts"}
-              {existing.length > 0 ? ` · ${plural(existing.length, "bestaande leerling", "bestaande leerlingen")}` : ""}
-              {errors.length > 0 ? ` · ${plural(errors.length, "fout", "fouten")}` : ""}
+              {existing.length > 0
+                ? ` · ${plural(existing.length, "bestaande leerling", "bestaande leerlingen")}`
+                : ""}
+              {errors.length > 0
+                ? ` · ${plural(errors.length, "fout", "fouten")}`
+                : ""}
             </p>
           </div>
         </div>
@@ -61,12 +76,19 @@ export function ImportResultView({ classId, className, result, onImportMore, onD
         ) : null}
 
         {created.length > 0 ? (
-          <section className="flex flex-col gap-2" aria-labelledby="created-heading">
+          <section
+            className="flex flex-col gap-2"
+            aria-labelledby="created-heading"
+          >
             <div className="flex items-center justify-between gap-2">
               <h3 id="created-heading" className="text-sm font-semibold">
                 Nieuwe accounts
               </h3>
-              <CopyButton value={asTable} label="Kopieer als tabel" successMessage="Tabel gekopieerd" />
+              <CopyButton
+                value={asTable}
+                label="Kopieer als tabel"
+                successMessage="Tabel gekopieerd"
+              />
             </div>
             <div className="overflow-hidden rounded-lg border">
               <div className="max-h-[38vh] overflow-auto">
@@ -79,7 +101,10 @@ export function ImportResultView({ classId, className, result, onImportMore, onD
                       <th scope="col" className="px-3 py-2 font-medium">
                         Naam
                       </th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">
+                      <th
+                        scope="col"
+                        className="px-3 py-2 text-right font-medium"
+                      >
                         Pincode
                       </th>
                     </tr>
@@ -87,7 +112,9 @@ export function ImportResultView({ classId, className, result, onImportMore, onD
                   <tbody>
                     {created.map((c) => (
                       <tr key={c.id} className="border-t">
-                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{c.studentNumber}</td>
+                        <td className="px-3 py-2 font-mono text-xs tabular-nums">
+                          {c.studentNumber}
+                        </td>
                         <td className="px-3 py-2">{c.name}</td>
                         <td className="px-3 py-2 text-right font-mono tracking-[0.14em] tabular-nums">
                           {formatPin(c.pin)}
@@ -99,26 +126,43 @@ export function ImportResultView({ classId, className, result, onImportMore, onD
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Je kunt de pincodes later altijd opnieuw bekijken of printen vanuit de klas.
+              Je kunt de pincodes later altijd opnieuw bekijken of printen
+              vanuit de klas.
             </p>
           </section>
         ) : null}
 
         {existing.length > 0 ? (
-          <section className="flex flex-col gap-2" aria-labelledby="existing-heading">
-            <h3 id="existing-heading" className="flex items-center gap-1.5 text-sm font-semibold">
-              <UsersRound className="size-4 text-muted-foreground" aria-hidden="true" />
+          <section
+            className="flex flex-col gap-2"
+            aria-labelledby="existing-heading"
+          >
+            <h3
+              id="existing-heading"
+              className="flex items-center gap-1.5 text-sm font-semibold"
+            >
+              <UsersRound
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               Bestaande leerlingen
             </h3>
             <ul className="divide-y rounded-lg border text-sm">
               {existing.map((e) => (
-                <li key={e.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-3 py-2">
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-3 py-2"
+                >
                   <span>
                     <span className="font-medium">{e.name}</span>{" "}
-                    <span className="font-mono text-xs text-muted-foreground">{e.studentNumber}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {e.studentNumber}
+                    </span>
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {e.addedToClass ? "Toegevoegd aan de klas" : "Zat al in de klas"}
+                    {e.addedToClass
+                      ? "Toegevoegd aan de klas"
+                      : "Zat al in de klas"}
                     {e.nameUpdated ? " · naam bijgewerkt" : ""}
                   </span>
                 </li>
@@ -128,15 +172,26 @@ export function ImportResultView({ classId, className, result, onImportMore, onD
         ) : null}
 
         {errors.length > 0 ? (
-          <section className="flex flex-col gap-2" aria-labelledby="errors-heading">
-            <h3 id="errors-heading" className="flex items-center gap-1.5 text-sm font-semibold text-destructive-ink">
+          <section
+            className="flex flex-col gap-2"
+            aria-labelledby="errors-heading"
+          >
+            <h3
+              id="errors-heading"
+              className="flex items-center gap-1.5 text-sm font-semibold text-destructive-ink"
+            >
               <CircleAlert className="size-4" aria-hidden="true" />
               Niet geïmporteerd
             </h3>
             <ul className="divide-y rounded-lg border border-destructive/20 text-sm">
               {errors.map((e) => (
-                <li key={`${e.row}-${e.studentNumber}`} className="flex gap-3 px-3 py-2">
-                  <span className="font-mono text-xs text-muted-foreground tabular-nums">regel {e.row}</span>
+                <li
+                  key={`${e.row}-${e.studentNumber}`}
+                  className="flex gap-3 px-3 py-2"
+                >
+                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                    regel {e.row}
+                  </span>
                   <span>{e.message}</span>
                 </li>
               ))}

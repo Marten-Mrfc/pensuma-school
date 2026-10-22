@@ -65,10 +65,19 @@ function Section({
   );
 }
 
-function Fact({ icon: Icon, children }: { icon: typeof Clock3; children: ReactNode }) {
+function Fact({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof Clock3;
+  children: ReactNode;
+}) {
   return (
     <li className="flex items-center gap-1.5 text-sm text-muted-foreground">
-      <Icon className="size-4 shrink-0 text-muted-foreground/80" aria-hidden="true" />
+      <Icon
+        className="size-4 shrink-0 text-muted-foreground/80"
+        aria-hidden="true"
+      />
       <span className="truncate">{children}</span>
     </li>
   );
@@ -78,10 +87,14 @@ function ScorePill({ item }: { item: DashboardItem }) {
   const last = item.lastAttempt;
   if (!last) return null;
   if (!last.resultsVisible) {
-    return <span className="text-sm text-muted-foreground">Resultaat volgt</span>;
+    return (
+      <span className="text-sm text-muted-foreground">Resultaat volgt</span>
+    );
   }
   if (last.gradingStatus === "pending" || last.score == null) {
-    return <span className="text-sm text-muted-foreground">Wordt nagekeken…</span>;
+    return (
+      <span className="text-sm text-muted-foreground">Wordt nagekeken…</span>
+    );
   }
   return (
     <span className="text-sm text-muted-foreground">
@@ -116,12 +129,18 @@ function OpenCard({ item }: { item: DashboardItem }) {
         aria-hidden="true"
         className={cn(
           "absolute inset-x-0 top-0 h-1",
-          inProgress ? "bg-warning" : item.mode === "exam" ? "bg-primary" : "bg-info",
+          inProgress
+            ? "bg-warning"
+            : item.mode === "exam"
+              ? "bg-primary"
+              : "bg-info",
         )}
       />
       <div className="flex flex-wrap items-center gap-2">
         <ModeBadge mode={item.mode} />
-        <span className="text-xs font-medium text-muted-foreground">{item.className}</span>
+        <span className="text-xs font-medium text-muted-foreground">
+          {item.className}
+        </span>
         {inProgress ? (
           <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-warning/12 px-2.5 py-0.5 text-xs font-medium text-warning-ink">
             <Hourglass className="size-3.5" aria-hidden="true" />
@@ -136,29 +155,38 @@ function OpenCard({ item }: { item: DashboardItem }) {
       </div>
       <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
         <Fact icon={FileQuestion}>
-          {pluralize(item.questionCount, "vraag", "vragen")} · {formatNumber(item.totalPoints)}{" "}
+          {pluralize(item.questionCount, "vraag", "vragen")} ·{" "}
+          {formatNumber(item.totalPoints)}{" "}
           {item.totalPoints === 1 ? "punt" : "punten"}
         </Fact>
         <Fact icon={Clock3}>
-          {item.timeLimitMinutes ? formatMinutes(item.timeLimitMinutes) : "Geen tijdslimiet"}
+          {item.timeLimitMinutes
+            ? formatMinutes(item.timeLimitMinutes)
+            : "Geen tijdslimiet"}
         </Fact>
         <Fact icon={CalendarClock}>
-          {item.closesAt ? `Sluit ${formatMoment(item.closesAt)}` : "Geen sluitingstijd"}
+          {item.closesAt
+            ? `Sluit ${formatMoment(item.closesAt)}`
+            : "Geen sluitingstijd"}
         </Fact>
         {item.needsAccessCode ? (
           <Fact icon={KeyRound}>Toegangscode nodig</Fact>
         ) : item.maxAttempts > 1 ? (
           <Fact icon={RotateCcw}>
-            Poging {Math.min(item.attemptsUsed + (inProgress ? 0 : 1), item.maxAttempts)} van{" "}
-            {item.maxAttempts}
+            Poging{" "}
+            {Math.min(
+              item.attemptsUsed + (inProgress ? 0 : 1),
+              item.maxAttempts,
+            )}{" "}
+            van {item.maxAttempts}
           </Fact>
         ) : null}
       </ul>
 
       {inProgress?.deadlineAt ? (
         <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning-ink">
-          Je bent al begonnen. Je hebt {formatTimeLeft(inProgress.deadlineAt)} (tot{" "}
-          {formatMoment(inProgress.deadlineAt)}).
+          Je bent al begonnen. Je hebt {formatTimeLeft(inProgress.deadlineAt)}{" "}
+          (tot {formatMoment(inProgress.deadlineAt)}).
         </p>
       ) : null}
 
@@ -167,7 +195,9 @@ function OpenCard({ item }: { item: DashboardItem }) {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {retry && item.lastAttempt ? (
             <Button asChild variant="ghost" size="sm">
-              <Link href={routes.leerling.result(item.lastAttempt.attemptId)}>Bekijk resultaat</Link>
+              <Link href={routes.leerling.result(item.lastAttempt.attemptId)}>
+                Bekijk resultaat
+              </Link>
             </Button>
           ) : null}
           <Button asChild>
@@ -206,7 +236,9 @@ function UpcomingRow({ item }: { item: DashboardItem }) {
         <span className="truncate font-medium">{item.title}</span>
         <span className="text-sm text-muted-foreground">
           {item.className} · {pluralize(item.questionCount, "vraag", "vragen")}
-          {item.timeLimitMinutes ? ` · ${formatMinutes(item.timeLimitMinutes)}` : ""}
+          {item.timeLimitMinutes
+            ? ` · ${formatMinutes(item.timeLimitMinutes)}`
+            : ""}
         </span>
       </div>
       <div className="flex items-center gap-3 max-sm:w-full max-sm:justify-between">
@@ -226,7 +258,9 @@ function FinishedRow({ item }: { item: DashboardItem }) {
       <span
         className={cn(
           "grid size-10 shrink-0 place-items-center rounded-xl",
-          last ? "bg-success/12 text-success-ink" : "bg-muted text-muted-foreground",
+          last
+            ? "bg-success/12 text-success-ink"
+            : "bg-muted text-muted-foreground",
         )}
       >
         {last ? (
@@ -249,7 +283,9 @@ function FinishedRow({ item }: { item: DashboardItem }) {
       </div>
       <div className="flex items-center gap-3">
         {last ? (
-          last.resultsVisible && last.score != null && last.gradingStatus !== "pending" ? (
+          last.resultsVisible &&
+          last.score != null &&
+          last.gradingStatus !== "pending" ? (
             <span className="flex items-baseline gap-2 tabular-nums">
               <span className="text-sm text-muted-foreground">
                 {formatNumber(last.score)}/{formatNumber(last.maxScore)}
@@ -285,7 +321,9 @@ function FinishedRow({ item }: { item: DashboardItem }) {
           {content}
         </Link>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">{content}</div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
+          {content}
+        </div>
       )}
     </li>
   );
@@ -294,7 +332,9 @@ function FinishedRow({ item }: { item: DashboardItem }) {
 export function StudentDashboard() {
   const user = useCurrentUser();
   const trpc = useTRPC();
-  const query = useQuery(trpc.portal.dashboard.queryOptions(undefined, { refetchInterval: 30_000 }));
+  const query = useQuery(
+    trpc.portal.dashboard.queryOptions(undefined, { refetchInterval: 30_000 }),
+  );
 
   const greeting = (
     <header className="flex flex-col gap-1.5">

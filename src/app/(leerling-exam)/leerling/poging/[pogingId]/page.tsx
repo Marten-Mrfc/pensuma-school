@@ -2,7 +2,11 @@ import { Suspense } from "react";
 import { LoadingState } from "@/components/app/states";
 import { ExamPage } from "@/components/leerling/exam/exam-runner";
 
-export default function PogingPage({ params }: { params: Promise<{ pogingId: string }> }) {
+export default function PogingPage({
+  params,
+}: {
+  params: Promise<{ pogingId: string }>;
+}) {
   return (
     <Suspense
       fallback={

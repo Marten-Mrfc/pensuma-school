@@ -1,7 +1,13 @@
 import { cn } from "@/lib/utils";
 
 /** Pill: Actief / Gedeactiveerd. */
-export function StudentStatus({ banned, className }: { banned: boolean; className?: string }) {
+export function StudentStatus({
+  banned,
+  className,
+}: {
+  banned: boolean;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
@@ -12,7 +18,13 @@ export function StudentStatus({ banned, className }: { banned: boolean; classNam
         className,
       )}
     >
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", banned ? "bg-destructive" : "bg-success")} />
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-1.5 rounded-full",
+          banned ? "bg-destructive" : "bg-success",
+        )}
+      />
       {banned ? "Gedeactiveerd" : "Actief"}
     </span>
   );

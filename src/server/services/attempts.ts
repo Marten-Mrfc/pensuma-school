@@ -14,6 +14,7 @@ import {
 import {
   computeAttemptDeadline,
   DEADLINE_GRACE_MS,
+  effectiveAssignmentStatus,
   isPastDeadline,
   parseAssignmentSettings,
 } from "@/server/services/assignment-status";
@@ -156,13 +157,31 @@ export async function submitAttempt(
   return true;
 }
 
-/** Auto-submit when the attempt is in progress and its deadline (+ grace) has passed. */
+type AssignmentWindow = Pick<Assignment, "status" | "opensAt" | "closesAt">;
+
+/**
+ * An in-progress attempt is over when its deadline (+ grace) has passed, or,
+ * without a deadline, when the assignment has been closed.
+ */
+export function isAttemptExpired(
+  attempt: Pick<Attempt, "status" | "deadlineAt">,
+  assignment?: AssignmentWindow | null,
+  now = new Date(),
+): boolean {
+  if (attempt.status !== "in_progress") return false;
+  if (attempt.deadlineAt) return isPastDeadline(attempt.deadlineAt, now);
+  return (
+    !!assignment && effectiveAssignmentStatus(assignment, now) === "closed"
+  );
+}
+
+/** Auto-submit an in-progress attempt that is over (see `isAttemptExpired`). */
 export async function autoSubmitIfExpired(
   attempt: Pick<Attempt, "id" | "status" | "deadlineAt">,
+  assignment?: AssignmentWindow | null,
   now = new Date(),
 ): Promise<boolean> {
-  if (attempt.status !== "in_progress") return false;
-  if (!isPastDeadline(attempt.deadlineAt, now)) return false;
+  if (!isAttemptExpired(attempt, assignment, now)) return false;
   return submitAttempt(attempt.id, { auto: true, by: "server" });
 }
 
@@ -220,12 +239,12 @@ async function findInProgressAttempt(assignmentId: string, userId: string) {
  * continued. An expired one is auto-submitted first (and not returned).
  */
 export async function findResumableAttempt(
-  assignmentId: string,
+  assignment: Pick<Assignment, "id"> & AssignmentWindow,
   userId: string,
 ): Promise<{ id: string; deadlineAt: Date | null } | null> {
-  const row = await findInProgressAttempt(assignmentId, userId);
+  const row = await findInProgressAttempt(assignment.id, userId);
   if (!row) return null;
-  if (await autoSubmitIfExpired(row)) return null;
+  if (await autoSubmitIfExpired(row, assignment)) return null;
   return { id: row.id, deadlineAt: row.deadlineAt };
 }
 
@@ -246,13 +265,19 @@ export class AttemptStartError extends Error {
 export async function createOrResumeAttempt(
   assignment: Pick<
     Assignment,
-    "id" | "testId" | "timeLimitMinutes" | "closesAt" | "settings"
+    | "id"
+    | "testId"
+    | "timeLimitMinutes"
+    | "status"
+    | "opensAt"
+    | "closesAt"
+    | "settings"
   >,
   userId: string,
 ): Promise<{ attemptId: string; resumed: boolean }> {
   const settings = parseAssignmentSettings(assignment.settings);
 
-  const existing = await findResumableAttempt(assignment.id, userId);
+  const existing = await findResumableAttempt(assignment, userId);
   if (existing) {
     await logServerEvent(existing.id, "resumed");
     return { attemptId: existing.id, resumed: true };

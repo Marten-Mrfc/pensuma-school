@@ -16,7 +16,12 @@ export interface ChoiceQuestionProps {
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** Big selectable option cards (radio or checkbox behaviour). */
-export function ChoiceQuestion({ data, selected, onChange, disabled }: ChoiceQuestionProps) {
+export function ChoiceQuestion({
+  data,
+  selected,
+  onChange,
+  disabled,
+}: ChoiceQuestionProps) {
   const name = useId();
   const chosen = new Set(selected);
 
@@ -67,7 +72,11 @@ export function ChoiceQuestion({ data, selected, onChange, disabled }: ChoiceQue
                   : "border-border bg-background text-muted-foreground group-hover:border-primary/50",
               )}
             >
-              {isChosen ? <Check className="size-4" strokeWidth={3} /> : LETTERS[index]}
+              {isChosen ? (
+                <Check className="size-4" strokeWidth={3} />
+              ) : (
+                LETTERS[index]
+              )}
             </span>
             <div className="min-w-0 flex-1 pt-1 text-[0.95rem] [&_p]:my-0 [&_pre]:my-2">
               <Markdown>{option.text || "_(leeg)_"}</Markdown>

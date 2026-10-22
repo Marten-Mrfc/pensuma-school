@@ -58,9 +58,15 @@ function FactTile({
         <Icon className="size-[18px]" aria-hidden="true" />
       </span>
       <div className="flex min-w-0 flex-col">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="font-display text-lg leading-tight font-semibold">{value}</span>
-        {hint ? <span className="mt-0.5 text-xs text-muted-foreground">{hint}</span> : null}
+        <span className="text-xs font-medium text-muted-foreground">
+          {label}
+        </span>
+        <span className="font-display text-lg leading-tight font-semibold">
+          {value}
+        </span>
+        {hint ? (
+          <span className="mt-0.5 text-xs text-muted-foreground">{hint}</span>
+        ) : null}
       </div>
     </div>
   );
@@ -80,7 +86,9 @@ function Rule({
       <span
         className={cn(
           "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg",
-          tone === "warning" ? "bg-warning/15 text-warning-ink" : "bg-muted text-muted-foreground",
+          tone === "warning"
+            ? "bg-warning/15 text-warning-ink"
+            : "bg-muted text-muted-foreground",
         )}
       >
         <Icon className="size-4" aria-hidden="true" />
@@ -99,7 +107,8 @@ function typeBreakdown(types: AssignmentInfo["questionTypes"]) {
 }
 
 async function enterFullscreen(): Promise<boolean> {
-  if (typeof document === "undefined" || document.fullscreenElement) return false;
+  if (typeof document === "undefined" || document.fullscreenElement)
+    return false;
   try {
     await document.documentElement.requestFullscreen({ navigationUI: "hide" });
     return true;
@@ -128,7 +137,9 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
       return;
     }
     // Must run inside the click/submit gesture, before any await.
-    const fullscreenPromise = info.settings.requireFullscreen ? enterFullscreen() : null;
+    const fullscreenPromise = info.settings.requireFullscreen
+      ? enterFullscreen()
+      : null;
     try {
       const result = await start.mutateAsync({
         assignmentId: info.id,
@@ -140,7 +151,9 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
       if ((await fullscreenPromise) && document.fullscreenElement) {
         await document.exitFullscreen().catch(() => {});
       }
-      setError(getErrorMessage(err, "Starten lukte niet. Probeer het opnieuw."));
+      setError(
+        getErrorMessage(err, "Starten lukte niet. Probeer het opnieuw."),
+      );
     }
   };
 
@@ -154,8 +167,14 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
       text = info.opensAt
         ? `Deze toets opent ${formatMoment(info.opensAt)}.`
         : "Deze toets is nog niet geopend.";
-    } else if (info.status === "open" && info.attemptsUsed >= info.maxAttempts) {
-      title = info.maxAttempts === 1 ? "Je hebt deze toets al gemaakt" : "Alle pogingen gebruikt";
+    } else if (
+      info.status === "open" &&
+      info.attemptsUsed >= info.maxAttempts
+    ) {
+      title =
+        info.maxAttempts === 1
+          ? "Je hebt deze toets al gemaakt"
+          : "Alle pogingen gebruikt";
       text =
         info.maxAttempts === 1
           ? "Goed gedaan! Je kunt deze toets maar één keer maken."
@@ -186,7 +205,11 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
     >
       <div className="flex flex-col gap-1">
         <h2 className="font-display text-lg font-semibold">
-          {resuming ? "Ga verder waar je was" : exam ? "Klaar om te beginnen?" : "Zin om te oefenen?"}
+          {resuming
+            ? "Ga verder waar je was"
+            : exam
+              ? "Klaar om te beginnen?"
+              : "Zin om te oefenen?"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {resuming
@@ -203,8 +226,14 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
 
       {needsCode ? (
         <div className="flex flex-col gap-2">
-          <label htmlFor="toegangscode" className="flex items-center gap-2 text-sm font-medium">
-            <KeyRound className="size-4 text-muted-foreground" aria-hidden="true" />
+          <label
+            htmlFor="toegangscode"
+            className="flex items-center gap-2 text-sm font-medium"
+          >
+            <KeyRound
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             Toegangscode
           </label>
           <input
@@ -225,7 +254,8 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
             aria-describedby="toegangscode-hint"
             className={cn(
               "h-16 w-full rounded-xl border-2 border-input bg-background px-4 text-center font-mono text-3xl font-semibold tracking-[0.35em] uppercase shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
-              error && "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
+              error &&
+                "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
             )}
           />
           <p id="toegangscode-hint" className="text-xs text-muted-foreground">
@@ -235,12 +265,20 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
       ) : null}
 
       {error ? (
-        <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-ink">
+        <p
+          role="alert"
+          className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-ink"
+        >
           {error}
         </p>
       ) : null}
 
-      <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={busy}>
+      <Button
+        type="submit"
+        size="lg"
+        className="h-12 w-full text-base"
+        disabled={busy}
+      >
         {busy ? (
           <Loader2 className="animate-spin" aria-hidden="true" />
         ) : resuming ? (
@@ -248,8 +286,14 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
         ) : info.attemptsUsed > 0 ? (
           <RotateCcw aria-hidden="true" />
         ) : null}
-        {resuming ? "Verdergaan" : info.attemptsUsed > 0 ? "Opnieuw proberen" : "Start toets"}
-        {!busy && !resuming && info.attemptsUsed === 0 ? <ArrowRight aria-hidden="true" /> : null}
+        {resuming
+          ? "Verdergaan"
+          : info.attemptsUsed > 0
+            ? "Opnieuw proberen"
+            : "Start toets"}
+        {!busy && !resuming && info.attemptsUsed === 0 ? (
+          <ArrowRight aria-hidden="true" />
+        ) : null}
       </Button>
       {info.settings.requireFullscreen ? (
         <p className="-mt-2 text-center text-xs text-muted-foreground">
@@ -278,13 +322,14 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
       <ul className="flex flex-col gap-3">
         {s.logFocusEvents ? (
           <Rule icon={Eye} tone="warning">
-            Deze toets registreert wanneer je het venster of tabblad verlaat. Je docent kan dat zien.
+            Deze toets registreert wanneer je het venster of tabblad verlaat. Je
+            docent kan dat zien.
           </Rule>
         ) : null}
         {s.requireFullscreen ? (
           <Rule icon={Maximize} tone="warning">
-            De toets draait in <strong>volledig scherm</strong>. Ga je eruit, dan wordt dat ook
-            geregistreerd.
+            De toets draait in <strong>volledig scherm</strong>. Ga je eruit,
+            dan wordt dat ook geregistreerd.
           </Rule>
         ) : null}
         {s.blockPaste ? (
@@ -294,12 +339,13 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
         ) : null}
         {info.timeLimitMinutes ? (
           <Rule icon={Clock3}>
-            De tijd loopt door, ook als je het venster sluit. Is de tijd om, dan wordt je werk
-            automatisch ingeleverd.
+            De tijd loopt door, ook als je het venster sluit. Is de tijd om, dan
+            wordt je werk automatisch ingeleverd.
           </Rule>
         ) : null}
         <Rule icon={Save}>
-          Je antwoorden worden automatisch opgeslagen. Je kunt tussendoor gerust van vraag wisselen.
+          Je antwoorden worden automatisch opgeslagen. Je kunt tussendoor gerust
+          van vraag wisselen.
         </Rule>
         {info.questionTypes.code ? (
           <Rule icon={Code2}>
@@ -314,7 +360,8 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
         ) : null}
         {!exam ? (
           <Rule icon={Sparkles}>
-            Dit is een oefening: fouten maken mag! Na het inleveren zie je meteen wat goed ging
+            Dit is een oefening: fouten maken mag! Na het inleveren zie je
+            meteen wat goed ging
             {info.maxAttempts > 1 ? " en kun je het opnieuw proberen." : "."}
           </Rule>
         ) : null}
@@ -331,7 +378,11 @@ function StartScreenContent({ id }: { id: string }) {
   if (query.isError) {
     return (
       <>
-        <PageHeader title="Toets" backHref={routes.leerling.dashboard} backLabel="Mijn toetsen" />
+        <PageHeader
+          title="Toets"
+          backHref={routes.leerling.dashboard}
+          backLabel="Mijn toetsen"
+        />
         <ErrorState
           title="Deze toets kon niet worden geladen"
           error={query.error}
@@ -365,16 +416,24 @@ function StartScreenContent({ id }: { id: string }) {
             value={info.questionCount}
             hint={typeBreakdown(info.questionTypes)}
           />
-          <FactTile icon={Trophy} label="Punten" value={formatNumber(info.totalPoints)} />
+          <FactTile
+            icon={Trophy}
+            label="Punten"
+            value={formatNumber(info.totalPoints)}
+          />
           <FactTile
             icon={Clock3}
             label="Tijdslimiet"
-            value={info.timeLimitMinutes ? `${info.timeLimitMinutes} min` : "Geen"}
+            value={
+              info.timeLimitMinutes ? `${info.timeLimitMinutes} min` : "Geen"
+            }
           />
           <FactTile
             icon={CalendarClock}
             label="Sluit"
-            value={info.closesAt ? formatMoment(info.closesAt) : "Geen deadline"}
+            value={
+              info.closesAt ? formatMoment(info.closesAt) : "Geen deadline"
+            }
             hint={
               info.maxAttempts > 1
                 ? `${pluralize(info.maxAttempts, "poging", "pogingen")}, ${info.attemptsUsed} gebruikt`
@@ -401,7 +460,11 @@ function StartScreenContent({ id }: { id: string }) {
   );
 }
 
-export function StartScreen({ params }: { params: Promise<{ afnameId: string }> }) {
+export function StartScreen({
+  params,
+}: {
+  params: Promise<{ afnameId: string }>;
+}) {
   const { afnameId } = use(params);
   return <StartScreenContent id={afnameId} />;
 }
