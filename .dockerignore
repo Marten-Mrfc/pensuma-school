@@ -1,0 +1,10 @@
+.git
+.next
+.next-*
+node_modules
+public/pyodide
+.env
+.env.*
+!.env.example
+*.log
+coverage

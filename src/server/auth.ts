@@ -27,7 +27,15 @@ export const auth = betterAuth({
   appName: "Pensuma",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.BETTER_AUTH_URL],
+  trustedOrigins: async (request) => {
+    const origins = [env.BETTER_AUTH_URL];
+    // In development, allow any localhost port (several dev servers run side by side).
+    const origin = request?.headers.get("origin");
+    if (env.NODE_ENV !== "production" && origin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      origins.push(origin);
+    }
+    return origins;
+  },
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,
