@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, use } from "react";
-import { CodeEditor } from "@/components/app/code-editor";
+import { HighlightedCode } from "@/components/app/highlighted-code";
 import { Markdown } from "@/components/app/markdown";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingState } from "@/components/app/states";
@@ -294,11 +294,10 @@ function QuestionReview({ q }: { q: ResultQuestion }) {
           <div className="flex flex-col gap-2">
             <h4 className="text-sm font-semibold">Jouw code</h4>
             {response && "code" in response && response.code.trim() ? (
-              <CodeEditor
-                value={response.code}
-                readOnly
-                minHeight={80}
-                maxHeight={420}
+              <HighlightedCode
+                code={response.code}
+                language="python"
+                showLineNumbers
               />
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -519,6 +518,8 @@ function ResultContent({ attemptId }: { attemptId: string }) {
   }
 
   if (r.gradingStatus === "pending") {
+    const { done, total } = r.gradingProgress;
+    const pct = total ? Math.round((done / total) * 100) : 0;
     return (
       <>
         {header(r.title, <ModeBadge mode={r.mode} />)}
@@ -530,10 +531,31 @@ function ResultContent({ attemptId }: { attemptId: string }) {
           <h2 className="font-display text-2xl font-bold tracking-tight">
             Je antwoorden worden nagekeken…
           </h2>
-          <p className="text-muted-foreground" aria-live="polite">
-            Dit duurt meestal maar een paar seconden. Je code wordt getest met
-            alle testgevallen.
+          <p className="text-muted-foreground">
+            Je code wordt getest met alle testgevallen, ook de verborgen. Dit
+            duurt meestal minder dan een halve minuut.
           </p>
+          <div
+            className="flex w-full max-w-xs flex-col gap-1.5"
+            aria-live="polite"
+          >
+            <div
+              className="h-2 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={done}
+              aria-label="Voortgang van het nakijken"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-700"
+                style={{ width: `${Math.max(4, pct)}%` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {done} van {total} vragen nagekeken
+            </span>
+          </div>
         </Centered>
       </>
     );

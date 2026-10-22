@@ -45,11 +45,13 @@ const TABS: { value: Tab; label: string }[] = [
 const EMPTY: Record<Tab, { title: string; description: string }> = {
   open: {
     title: "Er is nu geen afname open",
-    description: "Plan een afname of open een geplande afname om leerlingen te laten beginnen.",
+    description:
+      "Plan een afname of open een geplande afname om leerlingen te laten beginnen.",
   },
   planned: {
     title: "Geen geplande afnames",
-    description: "Plan een toets vooruit, dan gaat hij vanzelf open op het gekozen moment.",
+    description:
+      "Plan een toets vooruit, dan gaat hij vanzelf open op het gekozen moment.",
   },
   closed: {
     title: "Nog geen gesloten afnames",
@@ -62,7 +64,9 @@ export function AssignmentList() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const query = useQuery(trpc.assignment.list.queryOptions(undefined, { refetchInterval: 15_000 }));
+  const query = useQuery(
+    trpc.assignment.list.queryOptions(undefined, { refetchInterval: 15_000 }),
+  );
 
   const rows = query.data ?? [];
   const counts: Record<Tab, number> = {
@@ -109,7 +113,9 @@ export function AssignmentList() {
               <span
                 className={cn(
                   "min-w-5 rounded-full px-1.5 text-[11px] leading-5 font-semibold tabular-nums",
-                  t.value === tab ? "bg-primary/10 text-primary" : "bg-background/70 text-muted-foreground",
+                  t.value === tab
+                    ? "bg-primary/10 text-primary"
+                    : "bg-background/70 text-muted-foreground",
                 )}
               >
                 {counts[t.value]}
@@ -125,7 +131,13 @@ export function AssignmentList() {
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
       ) : visible.length === 0 ? (
         <EmptyBlock
-          icon={tab === "open" ? Radio : tab === "planned" ? CalendarClock : NotebookPen}
+          icon={
+            tab === "open"
+              ? Radio
+              : tab === "planned"
+                ? CalendarClock
+                : NotebookPen
+          }
           title={EMPTY[tab].title}
           description={EMPTY[tab].description}
           action={
@@ -150,7 +162,8 @@ export function AssignmentList() {
 
 function AssignmentRow({ row }: { row: Row }) {
   const href = routes.docent.assignment(row.id);
-  const showProgress = row.effectiveStatus !== "planned" || row.counts.started > 0;
+  const showProgress =
+    row.effectiveStatus !== "planned" || row.counts.started > 0;
   return (
     <li className="group relative flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:border-primary/40 sm:p-5 lg:flex-row lg:items-center">
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -200,7 +213,11 @@ function AssignmentRow({ row }: { row: Row }) {
         <div className="relative z-10 flex items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={`Acties voor ${row.title}`}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Acties voor ${row.title}`}
+              >
                 <MoreHorizontal aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
@@ -225,7 +242,12 @@ function AssignmentRow({ row }: { row: Row }) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href={routes.docent.newAssignment({ testId: row.testId, classId: row.classId })}>
+                <Link
+                  href={routes.docent.newAssignment({
+                    testId: row.testId,
+                    classId: row.classId,
+                  })}
+                >
                   <CalendarPlus aria-hidden="true" />
                   Opnieuw plannen
                 </Link>

@@ -48,18 +48,25 @@ export function ClassStudentsTable({
         </span>
       ),
       className: "w-24",
+      hideBelow: "sm",
     },
     {
       key: "name",
       header: "Naam",
       sortValue: (m) => m.name,
       cell: (m) => (
-        <Link
-          href={routes.docent.student(m.id)}
-          className="font-medium underline-offset-4 outline-none hover:underline focus-visible:underline"
-        >
-          {m.name}
-        </Link>
+        <div className="flex min-w-0 flex-col">
+          <Link
+            href={routes.docent.student(m.id)}
+            className="font-medium underline-offset-4 outline-none hover:underline focus-visible:underline"
+          >
+            {m.name}
+          </Link>
+          <span className="font-mono text-xs text-muted-foreground sm:hidden">
+            {m.studentNumber}
+            {m.banned ? " · gedeactiveerd" : ""}
+          </span>
+        </div>
       ),
     },
     {

@@ -19,7 +19,11 @@ import { toast } from "sonner";
 import { CodeEditor } from "@/components/app/code-editor";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
-import type { CodeGradingResult, CodeQuestionData, TestResult } from "@/lib/questions/schema";
+import type {
+  CodeGradingResult,
+  CodeQuestionData,
+  TestResult,
+} from "@/lib/questions/schema";
 import {
   type QuestionIssue,
   type SolutionCheck,
@@ -47,7 +51,11 @@ export interface CodeQuestionEditorProps {
   onSolutionChecked: (check: SolutionCheck) => void;
 }
 
-type LastRun = { result: CodeGradingResult; hash: string; source: "server" | "browser" };
+type LastRun = {
+  result: CodeGradingResult;
+  hash: string;
+  source: "server" | "browser";
+};
 
 export function CodeQuestionEditor({
   questionId,
@@ -64,10 +72,15 @@ export function CodeQuestionEditor({
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
   const [browserChecking, setBrowserChecking] = useState(false);
 
-  const serverCheck = useMutation(trpc.question.checkSolution.mutationOptions());
-  const recordCheck = useMutation(trpc.question.recordSolutionCheck.mutationOptions());
+  const serverCheck = useMutation(
+    trpc.question.checkSolution.mutationOptions(),
+  );
+  const recordCheck = useMutation(
+    trpc.question.recordSolutionCheck.mutationOptions(),
+  );
 
-  const set = (patch: Partial<CodeQuestionData>) => onChange({ ...data, ...patch });
+  const set = (patch: Partial<CodeQuestionData>) =>
+    onChange({ ...data, ...patch });
   const hash = solutionFingerprint(data);
   const fresh = lastRun && lastRun.hash === hash ? lastRun : null;
   const resultsById: Map<string, TestResult> | null = fresh
@@ -79,23 +92,34 @@ export function CodeQuestionEditor({
 
   async function checkOnServer() {
     if (!(await onFlush())) {
-      toast.error("De vraag kon niet worden opgeslagen. Los eerst de melding bij het opslaan op.");
+      toast.error(
+        "De vraag kon niet worden opgeslagen. Los eerst de melding bij het opslaan op.",
+      );
       return;
     }
     try {
-      const { result, check } = await serverCheck.mutateAsync({ id: questionId });
+      const { result, check } = await serverCheck.mutateAsync({
+        id: questionId,
+      });
       setLastRun({ result, hash: check.hash, source: "server" });
       onSolutionChecked(check);
       if (check.passed) toast.success("Modeloplossing slaagt voor alle tests.");
-      else toast.error(`Modeloplossing slaagt voor ${check.passedTests} van ${check.totalTests} tests.`);
+      else
+        toast.error(
+          `Modeloplossing slaagt voor ${check.passedTests} van ${check.totalTests} tests.`,
+        );
     } catch (error) {
-      toast.error(getErrorMessage(error, "Controleren op de server lukte niet."));
+      toast.error(
+        getErrorMessage(error, "Controleren op de server lukte niet."),
+      );
     }
   }
 
   async function checkInBrowser() {
     if (!(await onFlush())) {
-      toast.error("De vraag kon niet worden opgeslagen. Los eerst de melding bij het opslaan op.");
+      toast.error(
+        "De vraag kon niet worden opgeslagen. Los eerst de melding bij het opslaan op.",
+      );
       return;
     }
     setBrowserChecking(true);
@@ -119,11 +143,20 @@ export function CodeQuestionEditor({
         passedTests,
         totalTests: data.tests.length,
       });
-      if (recorded.recorded && recorded.check) onSolutionChecked(recorded.check);
-      if (passed) toast.success("Modeloplossing slaagt voor alle tests (gecontroleerd in je browser).");
-      else toast.error(`Modeloplossing slaagt voor ${passedTests} van ${data.tests.length} tests.`);
+      if (recorded.recorded && recorded.check)
+        onSolutionChecked(recorded.check);
+      if (passed)
+        toast.success(
+          "Modeloplossing slaagt voor alle tests (gecontroleerd in je browser).",
+        );
+      else
+        toast.error(
+          `Modeloplossing slaagt voor ${passedTests} van ${data.tests.length} tests.`,
+        );
     } catch (error) {
-      toast.error(getErrorMessage(error, "Controleren in de browser lukte niet."));
+      toast.error(
+        getErrorMessage(error, "Controleren in de browser lukte niet."),
+      );
     } finally {
       setBrowserChecking(false);
     }
@@ -132,7 +165,9 @@ export function CodeQuestionEditor({
   const codeIssues = issues.filter(
     (i) => i.target?.field === "solution" || i.target?.field === "starterCode",
   );
-  const testIssues = issues.filter((i) => i.target?.field === "test" || i.target?.field === "tests");
+  const testIssues = issues.filter(
+    (i) => i.target?.field === "test" || i.target?.field === "tests",
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -161,19 +196,29 @@ export function CodeQuestionEditor({
             minHeight={160}
             maxHeight={520}
             autocomplete
-            placeholder={'naam = input("Hoe heet je? ")\nprint("Hallo " + naam)'}
+            placeholder={
+              'naam = input("Hoe heet je? ")\nprint("Hallo " + naam)'
+            }
           />
           <IssueList issues={codeIssues} />
         </div>
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Modeloplossing uitproberen</span>
-          <CodeRunPanel code={data.solution} timeLimitMs={data.timeLimitMs} disabled={!data.solution.trim()} />
+          <span className="text-sm font-medium">
+            Modeloplossing uitproberen
+          </span>
+          <CodeRunPanel
+            code={data.solution}
+            timeLimitMs={data.timeLimitMs}
+            disabled={!data.solution.trim()}
+          />
         </div>
       </EditorSection>
 
       <EditorSection
         title="Tests"
-        description={'Hiermee wordt de code van de leerling automatisch nagekeken. De tekst in input("…") telt nooit mee.'}
+        description={
+          'Hiermee wordt de code van de leerling automatisch nagekeken. De tekst in input("…") telt nooit mee.'
+        }
         icon={<FlaskConical />}
       >
         <TestCaseEditor
@@ -186,7 +231,10 @@ export function CodeQuestionEditor({
         />
         <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <Timer className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Timer
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             <label htmlFor={`${id}-time`} className="text-sm font-medium">
               Tijdslimiet per test
             </label>
@@ -200,9 +248,13 @@ export function CodeQuestionEditor({
               step={0.5}
               suffix="sec"
               className="w-28"
-              onChange={(v) => v !== undefined && set({ timeLimitMs: Math.round(v * 1000) })}
+              onChange={(v) =>
+                v !== undefined && set({ timeLimitMs: Math.round(v * 1000) })
+              }
             />
-            <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:inline">0,5 – 30 seconden</span>
+            <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:inline">
+              0,5 – 30 seconden
+            </span>
           </div>
         </div>
       </EditorSection>
@@ -214,9 +266,15 @@ export function CodeQuestionEditor({
         actions={<CheckStateBadge state={state} check={solutionCheck} />}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => void checkOnServer()} disabled={!canCheck || checking}>
+          <Button
+            onClick={() => void checkOnServer()}
+            disabled={!canCheck || checking}
+          >
             {serverCheck.isPending ? (
-              <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
             ) : state === "passed" || state === "failed" ? (
               <RefreshCw aria-hidden="true" />
             ) : (
@@ -224,22 +282,32 @@ export function CodeQuestionEditor({
             )}
             Vraag controleren
           </Button>
-          <Button variant="outline" onClick={() => void checkInBrowser()} disabled={!canCheck || checking}>
+          <Button
+            variant="outline"
+            onClick={() => void checkInBrowser()}
+            disabled={!canCheck || checking}
+          >
             {browserChecking ? (
-              <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <Monitor aria-hidden="true" />
             )}
             Snel controleren in browser
           </Button>
           {!canCheck ? (
-            <span className="text-xs text-muted-foreground">Voeg eerst een modeloplossing en minstens één test toe.</span>
+            <span className="text-xs text-muted-foreground">
+              Voeg eerst een modeloplossing en minstens één test toe.
+            </span>
           ) : null}
         </div>
         {lastRun ? (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">
-              Resultaat van de laatste controle ({lastRun.source === "server" ? "server" : "in je browser"})
+              Resultaat van de laatste controle (
+              {lastRun.source === "server" ? "server" : "in je browser"})
               {fresh ? "" : " — let op: de vraag is daarna gewijzigd"}
             </p>
             <TestResultsList result={lastRun.result} />
@@ -252,7 +320,10 @@ export function CodeQuestionEditor({
         description="Optioneel: controleer of de leerling bepaalde onderdelen wel of juist niet gebruikt."
         icon={<ShieldCheck />}
       >
-        <ChecksEditor checks={data.checks} onChange={(checks) => set({ checks })} />
+        <ChecksEditor
+          checks={data.checks}
+          onChange={(checks) => set({ checks })}
+        />
       </EditorSection>
     </div>
   );
@@ -272,35 +343,66 @@ export function CheckStateBadge({
   switch (state) {
     case "passed":
       return (
-        <span className={cn(base, "bg-success/10 text-success-ink ring-success/25", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-success/10 text-success-ink ring-success/25",
+            className,
+          )}
+        >
           <CircleCheck className="size-3.5" aria-hidden="true" />
           Modeloplossing slaagt voor alle tests
         </span>
       );
     case "failed":
       return (
-        <span className={cn(base, "bg-destructive/10 text-destructive-ink ring-destructive/25", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-destructive/10 text-destructive-ink ring-destructive/25",
+            className,
+          )}
+        >
           <CircleX className="size-3.5" aria-hidden="true" />
-          Slaagt voor {check?.passedTests ?? 0} van {check?.totalTests ?? 0} tests
+          Slaagt voor {check?.passedTests ?? 0} van {check?.totalTests ?? 0}{" "}
+          tests
         </span>
       );
     case "stale":
       return (
-        <span className={cn(base, "bg-warning/12 text-warning-ink ring-warning/30", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-warning/12 text-warning-ink ring-warning/30",
+            className,
+          )}
+        >
           <RefreshCw className="size-3.5" aria-hidden="true" />
           Gewijzigd sinds de laatste controle
         </span>
       );
     case "unchecked":
       return (
-        <span className={cn(base, "bg-warning/12 text-warning-ink ring-warning/30", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-warning/12 text-warning-ink ring-warning/30",
+            className,
+          )}
+        >
           <CircleDashed className="size-3.5" aria-hidden="true" />
           Nog niet gecontroleerd
         </span>
       );
     default:
       return (
-        <span className={cn(base, "bg-muted/60 text-muted-foreground ring-border", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-muted/60 text-muted-foreground ring-border",
+            className,
+          )}
+        >
           <CircleDashed className="size-3.5" aria-hidden="true" />
           Niets om te controleren
         </span>

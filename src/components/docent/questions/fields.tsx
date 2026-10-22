@@ -2,9 +2,19 @@
 
 import { CircleHelp } from "lucide-react";
 import type React from "react";
-import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +45,10 @@ export function EditorSection({
   return (
     <section
       id={id}
-      className={cn("rounded-xl border bg-card text-card-foreground shadow-xs", className)}
+      className={cn(
+        "rounded-xl border bg-card text-card-foreground shadow-xs",
+        className,
+      )}
     >
       <header className="flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-start gap-3">
@@ -45,7 +58,9 @@ export function EditorSection({
             </span>
           ) : null}
           <div className="flex min-w-0 flex-col gap-0.5">
-            <h2 className="text-[0.95rem] leading-snug font-semibold">{title}</h2>
+            <h2 className="text-[0.95rem] leading-snug font-semibold">
+              {title}
+            </h2>
             {description ? (
               <p className="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-[0.8rem]">
                 {description}
@@ -53,9 +68,15 @@ export function EditorSection({
             ) : null}
           </div>
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions}
+          </div>
+        ) : null}
       </header>
-      <div className="flex flex-col gap-5 px-4 py-4 sm:px-5 sm:py-5">{children}</div>
+      <div className="flex flex-col gap-5 px-4 py-4 sm:px-5 sm:py-5">
+        {children}
+      </div>
     </section>
   );
 }
@@ -129,7 +150,11 @@ export function NumberInput({
       inputMode="decimal"
       value={shown}
       placeholder={placeholder}
-      suffix={suffix ? <span className="pr-1 text-xs text-muted-foreground">{suffix}</span> : undefined}
+      suffix={
+        suffix ? (
+          <span className="pr-1 text-xs text-muted-foreground">{suffix}</span>
+        ) : undefined
+      }
       onFocus={() => {
         setText(format(value));
         setFocused(true);
@@ -146,8 +171,13 @@ export function NumberInput({
         if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
         e.preventDefault();
         const base = value ?? min ?? 0;
-        const next = Math.round((base + (e.key === "ArrowUp" ? step : -step)) * 1000) / 1000;
-        const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, next));
+        const next =
+          Math.round((base + (e.key === "ArrowUp" ? step : -step)) * 1000) /
+          1000;
+        const clamped = Math.min(
+          max ?? Infinity,
+          Math.max(min ?? -Infinity, next),
+        );
         setText(String(clamped));
         onChange(clamped);
       }}
@@ -190,7 +220,10 @@ export function SwitchField({
           {label}
         </label>
         {description ? (
-          <p id={`${id}-d`} className="text-xs leading-relaxed text-muted-foreground">
+          <p
+            id={`${id}-d`}
+            className="text-xs leading-relaxed text-muted-foreground"
+          >
             {description}
           </p>
         ) : null}
@@ -254,8 +287,16 @@ export function FieldLabel({
   className?: string;
 }) {
   return (
-    <div className={cn("flex min-h-5 items-center justify-between gap-2", className)}>
-      <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-sm leading-none font-medium">
+    <div
+      className={cn(
+        "flex min-h-5 items-center justify-between gap-2",
+        className,
+      )}
+    >
+      <label
+        htmlFor={htmlFor}
+        className="flex items-center gap-1.5 text-sm leading-none font-medium"
+      >
         {children}
       </label>
       {extra}
@@ -268,7 +309,10 @@ export function FieldLabel({
 /* -------------------------------------------------------------------------- */
 
 export interface AutoTextareaProps
-  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
+  extends Omit<
+    React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+    "onChange" | "value"
+  > {
   value: string;
   onValueChange: (value: string) => void;
   /** Monospace (code / program output). */
@@ -302,7 +346,8 @@ export function AutoTextarea({
       spellCheck={mono ? false : undefined}
       className={cn(
         "block w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30",
-        mono && "bg-[var(--code-bg)] font-mono text-[0.8rem] leading-6 dark:bg-[var(--code-bg)]",
+        mono &&
+          "bg-[var(--code-bg)] font-mono text-[0.8rem] leading-6 dark:bg-[var(--code-bg)]",
         className,
       )}
       {...props}

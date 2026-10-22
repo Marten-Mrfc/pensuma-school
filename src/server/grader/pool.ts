@@ -9,8 +9,10 @@
  * - At most `maxConcurrency` jobs run at once; others wait in a FIFO queue
  *   (up to `queueTimeoutMs`).
  */
+import fs from "node:fs";
 import { type GraderConfig, graderConfig } from "./config";
 import { SandboxProcess } from "./sandbox-process";
+import { makeSnapshot } from "./snapshot";
 
 export class QueueTimeoutError extends Error {
   constructor() {
@@ -62,6 +64,8 @@ export class SandboxPool {
   private recentFailures: number[] = [];
   private refillTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
+  private snapshotPath: string | null = null;
+  private snapshotState: "none" | "making" | "ready" | "failed" = "none";
 
   constructor(readonly config: GraderConfig = graderConfig()) {}
 
@@ -76,8 +80,46 @@ export class SandboxPool {
     };
   }
 
+  /** Make the start-up snapshot once, in the background (see snapshot.ts). */
+  private ensureSnapshot(): void {
+    if (this.snapshotState !== "none" || process.env.GRADER_SNAPSHOT === "0")
+      return;
+    this.snapshotState = "making";
+    makeSnapshot(this.config)
+      .then((file) => {
+        if (this.closed) {
+          fs.rmSync(file, { force: true });
+          return;
+        }
+        this.snapshotPath = file;
+        this.snapshotState = "ready";
+        const cleanup = () => {
+          try {
+            fs.rmSync(file, { force: true });
+          } catch {
+            // ignore
+          }
+        };
+        process.once("exit", cleanup);
+        // Replace warm sandboxes that are still loading the slow way? No:
+        // they finish soon; new ones use the snapshot.
+      })
+      .catch((e) => {
+        this.snapshotState = "failed";
+        console.warn(
+          `[grader] snapshot unavailable, using normal start-up: ${e instanceof Error ? e.message : e}`,
+        );
+      });
+  }
+
+  /** Path of the start-up snapshot, once available. */
+  get snapshot(): string | null {
+    return this.snapshotPath;
+  }
+
   private spawnOne(): SandboxProcess {
-    const proc = new SandboxProcess(this.config);
+    this.ensureSnapshot();
+    const proc = new SandboxProcess(this.config, this.snapshotPath);
     this.spawned++;
     proc.ready.catch(() => {
       this.startupFailures++;
@@ -178,6 +220,8 @@ export class SandboxPool {
     for (const p of this.warm) p.kill("killed", "pool closed");
     this.warm = [];
     if (this.refillTimer) clearTimeout(this.refillTimer);
+    if (this.snapshotPath) fs.rmSync(this.snapshotPath, { force: true });
+    this.snapshotPath = null;
   }
 }
 

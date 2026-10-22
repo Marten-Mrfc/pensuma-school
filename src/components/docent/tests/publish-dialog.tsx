@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowRight, CircleAlert, Loader2, Rocket, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  CircleAlert,
+  Loader2,
+  Rocket,
+  TriangleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,7 +46,9 @@ export function PublishDialog({
             <span
               className={cn(
                 "grid size-10 shrink-0 place-items-center rounded-full",
-                blocked ? "bg-destructive/10 text-destructive" : "bg-warning/15 text-warning-ink",
+                blocked
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-warning/15 text-warning-ink",
               )}
             >
               {blocked ? (
@@ -51,7 +59,9 @@ export function PublishDialog({
             </span>
             <div className="flex flex-col gap-1.5 pt-0.5">
               <DialogTitle className="text-base leading-snug">
-                {blocked ? "De toets kan nog niet gepubliceerd worden" : "Wil je de toets toch publiceren?"}
+                {blocked
+                  ? "De toets kan nog niet gepubliceerd worden"
+                  : "Wil je de toets toch publiceren?"}
               </DialogTitle>
               <DialogDescription>
                 {blocked
@@ -64,10 +74,20 @@ export function PublishDialog({
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
           {problems.length > 0 ? (
-            <ProblemGroup title="Problemen" severity="error" items={problems} onSelect={onSelectQuestion} />
+            <ProblemGroup
+              title="Problemen"
+              severity="error"
+              items={problems}
+              onSelect={onSelectQuestion}
+            />
           ) : null}
           {warnings.length > 0 ? (
-            <ProblemGroup title="Aandachtspunten" severity="warning" items={warnings} onSelect={onSelectQuestion} />
+            <ProblemGroup
+              title="Aandachtspunten"
+              severity="warning"
+              items={warnings}
+              onSelect={onSelectQuestion}
+            />
           ) : null}
         </div>
 
@@ -78,7 +98,10 @@ export function PublishDialog({
           {!blocked ? (
             <Button onClick={onPublishAnyway} disabled={pending}>
               {pending ? (
-                <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
               ) : (
                 <Rocket aria-hidden="true" />
               )}
@@ -122,7 +145,9 @@ function ProblemGroup({
               )}
             >
               <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1 text-foreground">{item.message}</span>
+              <span className="min-w-0 flex-1 text-foreground">
+                {item.message}
+              </span>
               <ArrowRight
                 className="mt-0.5 size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-70 group-focus-visible:opacity-70"
                 aria-hidden="true"

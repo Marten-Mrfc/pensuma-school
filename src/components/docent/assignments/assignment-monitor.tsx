@@ -44,18 +44,27 @@ import { SHOW_RESULTS_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { AccessCodePresenter } from "./access-code-presenter";
+import { AssignmentNav, useNow } from "./assignment-nav";
 import { formatMinutes, formatMoment, formatWindow } from "./format";
 import { MonitorTable } from "./monitor-table";
 import { SettingsSheet } from "./settings-sheet";
-import { AssignmentNav, useNow } from "./assignment-nav";
 import { InfoItem, ModeBadge } from "./shared";
 
 type Assignment = RouterOutputs["assignment"]["get"];
 
-export function AssignmentMonitor({ params }: { params: Promise<{ afnameId: string }> }) {
+export function AssignmentMonitor({
+  params,
+}: {
+  params: Promise<{ afnameId: string }>;
+}) {
   const { afnameId } = use(params);
   const trpc = useTRPC();
-  const assignment = useQuery(trpc.assignment.get.queryOptions({ id: afnameId }, { refetchInterval: 15_000 }));
+  const assignment = useQuery(
+    trpc.assignment.get.queryOptions(
+      { id: afnameId },
+      { refetchInterval: 15_000 },
+    ),
+  );
   const monitor = useQuery(
     trpc.assignment.monitor.queryOptions(
       { id: afnameId },
@@ -66,17 +75,35 @@ export function AssignmentMonitor({ params }: { params: Promise<{ afnameId: stri
 
   if (assignment.isPending) return <LoadingState />;
   if (assignment.isError) {
-    return <ErrorState title="Deze afname kon niet worden geladen" error={assignment.error} onRetry={() => assignment.refetch()} />;
+    return (
+      <ErrorState
+        title="Deze afname kon niet worden geladen"
+        error={assignment.error}
+        onRetry={() => assignment.refetch()}
+      />
+    );
   }
   const a = assignment.data;
-  const serverOffsetMs = monitor.data ? new Date(monitor.data.serverTime).getTime() - monitor.dataUpdatedAt : 0;
+  const serverOffsetMs = monitor.data
+    ? new Date(monitor.data.serverTime).getTime() - monitor.dataUpdatedAt
+    : 0;
 
   return (
     <div className="flex flex-col gap-6">
-      <MonitorHeader assignment={a} monitorStarted={monitor.data ? monitor.data.students.length - monitor.data.summary.notStarted : a.counts.started} />
+      <MonitorHeader
+        assignment={a}
+        monitorStarted={
+          monitor.data
+            ? monitor.data.students.length - monitor.data.summary.notStarted
+            : a.counts.started
+        }
+      />
       <AssignmentNav assignmentId={a.id} active="monitor" />
 
-      <StatusBanner assignment={a} inProgress={monitor.data?.summary.inProgress ?? a.counts.inProgress} />
+      <StatusBanner
+        assignment={a}
+        inProgress={monitor.data?.summary.inProgress ?? a.counts.inProgress}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -85,14 +112,32 @@ export function AssignmentMonitor({ params }: { params: Promise<{ afnameId: stri
           icon={UserRoundX}
           hint={`van ${monitor.data?.summary.students ?? a.counts.students} leerlingen`}
         />
-        <StatCard label="Bezig" value={monitor.data?.summary.inProgress ?? "–"} icon={Users} tone="warning" />
-        <StatCard label="Ingeleverd" value={monitor.data?.summary.submitted ?? "–"} icon={CheckCircle2} tone="success" />
+        <StatCard
+          label="Bezig"
+          value={monitor.data?.summary.inProgress ?? "–"}
+          icon={Users}
+          tone="warning"
+        />
+        <StatCard
+          label="Ingeleverd"
+          value={monitor.data?.summary.submitted ?? "–"}
+          icon={CheckCircle2}
+          tone="success"
+        />
         <StatCard
           label="Vensterwissels"
           value={monitor.data?.summary.focusWarnings ?? "–"}
           icon={MonitorX}
-          tone={(monitor.data?.summary.focusWarnings ?? 0) > 0 ? "destructive" : "default"}
-          hint={a.settings.logFocusEvents ? "leerlingen met minstens één wissel" : "registreren staat uit"}
+          tone={
+            (monitor.data?.summary.focusWarnings ?? 0) > 0
+              ? "destructive"
+              : "default"
+          }
+          hint={
+            a.settings.logFocusEvents
+              ? "leerlingen met minstens één wissel"
+              : "registreren staat uit"
+          }
         />
       </div>
 
@@ -103,7 +148,12 @@ export function AssignmentMonitor({ params }: { params: Promise<{ afnameId: stri
       ) : monitor.isError ? (
         <ErrorState error={monitor.error} onRetry={() => monitor.refetch()} />
       ) : (
-        <MonitorTable assignmentId={a.id} data={monitor.data} now={now} serverOffsetMs={serverOffsetMs} />
+        <MonitorTable
+          assignmentId={a.id}
+          data={monitor.data}
+          now={now}
+          serverOffsetMs={serverOffsetMs}
+        />
       )}
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -119,7 +169,9 @@ function useAssignmentMutations(assignment: Assignment) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: trpc.assignment.pathKey() });
+    await queryClient.invalidateQueries({
+      queryKey: trpc.assignment.pathKey(),
+    });
     await queryClient.invalidateQueries({ queryKey: trpc.dashboard.pathKey() });
   };
   const onError = (err: unknown) => toast.error(getErrorMessage(err));
@@ -129,7 +181,9 @@ function useAssignmentMutations(assignment: Assignment) {
         onSuccess: async () => {
           await invalidate();
           toast.success("De afname is open", {
-            description: assignment.accessCode ? `Toegangscode: ${assignment.accessCode}` : "Leerlingen kunnen beginnen.",
+            description: assignment.accessCode
+              ? `Toegangscode: ${assignment.accessCode}`
+              : "Leerlingen kunnen beginnen.",
           });
         },
         onError,
@@ -152,11 +206,19 @@ function useAssignmentMutations(assignment: Assignment) {
   };
 }
 
-function MonitorHeader({ assignment: a, monitorStarted }: { assignment: Assignment; monitorStarted: number }) {
+function MonitorHeader({
+  assignment: a,
+  monitorStarted,
+}: {
+  assignment: Assignment;
+  monitorStarted: number;
+}) {
   const m = useAssignmentMutations(a);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
-  const [confirm, setConfirm] = useState<"close" | "reopen" | "delete" | null>(null);
+  const [confirm, setConfirm] = useState<"close" | "reopen" | "delete" | null>(
+    null,
+  );
   const status = a.effectiveStatus;
 
   return (
@@ -178,37 +240,58 @@ function MonitorHeader({ assignment: a, monitorStarted }: { assignment: Assignme
               {a.class.name}
             </span>
             <span>
-              {a.test.title} · {a.test.questionCount} vragen · {a.test.totalPoints.toLocaleString("nl-NL")} punten
+              {a.test.title} · {a.test.questionCount} vragen ·{" "}
+              {a.test.totalPoints.toLocaleString("nl-NL")} punten
             </span>
           </span>
         }
         actions={
           <>
             {a.accessCode && status !== "closed" ? (
-              <Button variant="outline" size="lg" onClick={() => setPresenting(true)}>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setPresenting(true)}
+              >
                 <Presentation aria-hidden="true" />
                 Toon toegangscode
               </Button>
             ) : null}
             {status === "planned" ? (
-              <Button size="lg" onClick={() => m.open.mutate({ id: a.id })} disabled={m.open.isPending}>
+              <Button
+                size="lg"
+                onClick={() => m.open.mutate({ id: a.id })}
+                disabled={m.open.isPending}
+              >
                 <Play aria-hidden="true" />
                 Nu openen
               </Button>
             ) : status === "open" ? (
-              <Button size="lg" variant="destructive" onClick={() => setConfirm("close")}>
+              <Button
+                size="lg"
+                variant="destructive"
+                onClick={() => setConfirm("close")}
+              >
                 <Lock aria-hidden="true" />
                 Sluiten
               </Button>
             ) : (
-              <Button size="lg" variant="outline" onClick={() => setConfirm("reopen")}>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setConfirm("reopen")}
+              >
                 <RotateCcw aria-hidden="true" />
                 Heropenen
               </Button>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon-lg" aria-label="Meer acties">
+                <Button
+                  variant="outline"
+                  size="icon-lg"
+                  aria-label="Meer acties"
+                >
                   <MoreHorizontal aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
@@ -223,7 +306,9 @@ function MonitorHeader({ assignment: a, monitorStarted }: { assignment: Assignme
                     Toegangscode presenteren
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={() => m.regenerate.mutate({ id: a.id })}>
+                <DropdownMenuItem
+                  onSelect={() => m.regenerate.mutate({ id: a.id })}
+                >
                   <KeyRound aria-hidden="true" />
                   {a.accessCode ? "Nieuwe toegangscode" : "Toegangscode maken"}
                 </DropdownMenuItem>
@@ -235,7 +320,12 @@ function MonitorHeader({ assignment: a, monitorStarted }: { assignment: Assignme
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={routes.docent.newAssignment({ testId: a.test.id, classId: a.class.id })}>
+                  <Link
+                    href={routes.docent.newAssignment({
+                      testId: a.test.id,
+                      classId: a.class.id,
+                    })}
+                  >
                     <CalendarPlus aria-hidden="true" />
                     Opnieuw plannen
                   </Link>
@@ -306,7 +396,11 @@ function MonitorHeader({ assignment: a, monitorStarted }: { assignment: Assignme
         }}
       />
 
-      <SettingsSheet assignment={a} open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsSheet
+        assignment={a}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
       {presenting && a.accessCode ? (
         <AccessCodePresenter
           code={a.accessCode}
@@ -321,19 +415,31 @@ function MonitorHeader({ assignment: a, monitorStarted }: { assignment: Assignme
   );
 }
 
-function StatusBanner({ assignment: a, inProgress }: { assignment: Assignment; inProgress: number }) {
+function StatusBanner({
+  assignment: a,
+  inProgress,
+}: {
+  assignment: Assignment;
+  inProgress: number;
+}) {
   if (a.effectiveStatus === "planned") {
     return (
       <div className="flex items-start gap-3 rounded-xl border border-info/25 bg-info/[0.06] p-4 text-sm">
-        <CalendarClock className="mt-0.5 size-5 shrink-0 text-info-ink" aria-hidden="true" />
+        <CalendarClock
+          className="mt-0.5 size-5 shrink-0 text-info-ink"
+          aria-hidden="true"
+        />
         <p>
           {a.opensAt ? (
             <>
-              Deze afname gaat <strong>{formatMoment(a.opensAt)}</strong> vanzelf open. Tot die tijd zien leerlingen
-              hem nog niet.
+              Deze afname gaat <strong>{formatMoment(a.opensAt)}</strong>{" "}
+              vanzelf open. Tot die tijd zien leerlingen hem nog niet.
             </>
           ) : (
-            <>Leerlingen zien deze afname nog niet. Klik op ‘Nu openen’ als de klas klaar is om te beginnen.</>
+            <>
+              Leerlingen zien deze afname nog niet. Klik op ‘Nu openen’ als de
+              klas klaar is om te beginnen.
+            </>
           )}
         </p>
       </div>
@@ -342,10 +448,14 @@ function StatusBanner({ assignment: a, inProgress }: { assignment: Assignment; i
   if (a.effectiveStatus === "closed") {
     return (
       <div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-4 text-sm sm:flex-row sm:items-center">
-        <Lock className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <Lock
+          className="size-5 shrink-0 text-muted-foreground"
+          aria-hidden="true"
+        />
         <p className="flex-1">
-          Deze afname is gesloten{a.closesAt ? ` (${formatMoment(a.closesAt)})` : ""}. Bekijk de resultaten of kijk
-          de open vragen na.
+          Deze afname is gesloten
+          {a.closesAt ? ` (${formatMoment(a.closesAt)})` : ""}. Bekijk de
+          resultaten of kijk de open vragen na.
         </p>
         <div className="flex gap-2">
           <Button asChild size="sm" variant="outline">
@@ -361,10 +471,16 @@ function StatusBanner({ assignment: a, inProgress }: { assignment: Assignment; i
   if (a.closesAt) {
     return (
       <div className="flex items-start gap-3 rounded-xl border border-success/25 bg-success/[0.06] p-4 text-sm">
-        <Clock className="mt-0.5 size-5 shrink-0 text-success-ink" aria-hidden="true" />
+        <Clock
+          className="mt-0.5 size-5 shrink-0 text-success-ink"
+          aria-hidden="true"
+        />
         <p>
-          De afname sluit automatisch <strong>{formatMoment(a.closesAt)}</strong>.
-          {inProgress > 0 ? " Wie dan nog bezig is, levert automatisch in." : ""}
+          De afname sluit automatisch{" "}
+          <strong>{formatMoment(a.closesAt)}</strong>.
+          {inProgress > 0
+            ? " Wie dan nog bezig is, levert automatisch in."
+            : ""}
         </p>
       </div>
     );
@@ -377,7 +493,10 @@ function InfoStrip({ assignment: a }: { assignment: Assignment }) {
     <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border bg-card p-4 shadow-xs sm:grid-cols-3 lg:grid-cols-5">
       <InfoItem label="Tijdvak">
         <span className="inline-flex items-center gap-1.5">
-          <CalendarClock className="size-4 text-muted-foreground" aria-hidden="true" />
+          <CalendarClock
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
           {formatWindow(a.opensAt, a.closesAt)}
         </span>
       </InfoItem>
@@ -390,18 +509,28 @@ function InfoStrip({ assignment: a }: { assignment: Assignment }) {
       <InfoItem label="Toegangscode">
         {a.accessCode ? (
           <span className="inline-flex items-center gap-1">
-            <span className="font-mono text-base font-bold tracking-widest">{a.accessCode}</span>
-            <CopyButton value={a.accessCode} size="icon-xs" successMessage="Code gekopieerd" />
+            <span className="font-mono text-base font-bold tracking-widest">
+              {a.accessCode}
+            </span>
+            <CopyButton
+              value={a.accessCode}
+              size="icon-xs"
+              successMessage="Code gekopieerd"
+            />
           </span>
         ) : (
           <span className="text-muted-foreground">Geen</span>
         )}
       </InfoItem>
-      <InfoItem label="Resultaten tonen">{SHOW_RESULTS_LABELS[a.settings.showResults]}</InfoItem>
+      <InfoItem label="Resultaten tonen">
+        {SHOW_RESULTS_LABELS[a.settings.showResults]}
+      </InfoItem>
       <InfoItem label="Pogingen">
         <span className="inline-flex items-center gap-1.5">
           <Repeat className="size-4 text-muted-foreground" aria-hidden="true" />
-          {a.settings.maxAttempts === 1 ? "1 poging" : `max. ${a.settings.maxAttempts}`}
+          {a.settings.maxAttempts === 1
+            ? "1 poging"
+            : `max. ${a.settings.maxAttempts}`}
         </span>
       </InfoItem>
     </div>

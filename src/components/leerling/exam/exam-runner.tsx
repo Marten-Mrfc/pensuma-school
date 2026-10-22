@@ -280,7 +280,10 @@ function ExamRunner({
     await logger.flush();
     for (let attempt = 0; ; attempt++) {
       try {
-        await trpcClient.portal.submitAttempt.mutate({ attemptId });
+        await trpcClient.portal.submitAttempt.mutate({
+          attemptId,
+          auto: mode === "auto",
+        });
         break;
       } catch (err) {
         const code = (err as { data?: { code?: string } }).data?.code;
@@ -311,7 +314,10 @@ function ExamRunner({
   });
 
   // Push restored local changes to the server once.
+  const restoredPushed = useRef(false);
   useEffect(() => {
+    if (restoredPushed.current) return;
+    restoredPushed.current = true;
     for (const questionId of init.restored) {
       const r = init.responses[questionId];
       if (r) saver.update(questionId, r, { backup: false });
@@ -326,7 +332,7 @@ function ExamRunner({
     return () => {
       void saver.flush();
       void logger.flush();
-      logger.stop();
+      logger.pause();
       saver.dispose();
     };
   }, [logger, saver]);

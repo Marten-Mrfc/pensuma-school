@@ -45,7 +45,8 @@ export function useGenerateExpected() {
     });
     return tests.map((_, i) => {
       const r = results[i];
-      if (!r) return { ok: false, error: null, message: "Geen resultaat ontvangen." };
+      if (!r)
+        return { ok: false, error: null, message: "Geen resultaat ontvangen." };
       if (r.error) {
         return {
           ok: false,
@@ -74,7 +75,8 @@ export function useGenerateExpected() {
     );
     return results.map((list) => {
       const r = list[0];
-      if (!r) return { ok: false, error: null, message: "Geen resultaat ontvangen." };
+      if (!r)
+        return { ok: false, error: null, message: "Geen resultaat ontvangen." };
       if (r.error) {
         return {
           ok: false,
@@ -83,8 +85,16 @@ export function useGenerateExpected() {
         };
       }
       const idx = r.stdout.lastIndexOf(VALUE_MARKER);
-      if (idx < 0) return { ok: false, error: null, message: "Geen returnwaarde gevonden." };
-      return { ok: true, value: r.stdout.slice(idx + VALUE_MARKER.length).trim() };
+      if (idx < 0)
+        return {
+          ok: false,
+          error: null,
+          message: "Geen returnwaarde gevonden.",
+        };
+      return {
+        ok: true,
+        value: r.stdout.slice(idx + VALUE_MARKER.length).trim(),
+      };
     });
   }
 

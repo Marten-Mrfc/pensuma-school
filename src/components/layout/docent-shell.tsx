@@ -94,10 +94,12 @@ function CurrentSection() {
   const item = DOCENT_NAV.flatMap((g) => g.items).find((i) =>
     isNavActive(i, pathname),
   );
-  if (!item) return null;
+  const label =
+    item?.label ?? (pathname?.startsWith("/docent/account") ? "Account" : null);
+  if (!label) return null;
   return (
     <span className="truncate text-sm font-medium text-foreground">
-      {item.label}
+      {label}
     </span>
   );
 }

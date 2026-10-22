@@ -7,14 +7,26 @@
  */
 import { CircleCheck, CircleX, FlaskConical, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { CodeCheck, CodeGradingResult, CodeTest } from "@/lib/questions/schema";
 import type { PythonRunner } from "@/lib/python/types";
+import type {
+  CodeCheck,
+  CodeGradingResult,
+  CodeTest,
+} from "@/lib/questions/schema";
 
 export function usePythonRunner(): PythonRunner {
   const unavailable = async (): Promise<never> => {
     throw new Error("Python in de browser is nog niet beschikbaar.");
   };
-  return { status: "idle", preload: () => {}, run: unavailable, grade: unavailable, stop: () => {} };
+  return {
+    status: "idle",
+    interactive: false,
+    loadError: null,
+    preload: () => {},
+    run: unavailable,
+    grade: unavailable,
+    stop: () => {},
+  };
 }
 
 export function CodeRunPanel(_props: {
@@ -49,18 +61,31 @@ export function SelfTestButton(_props: {
   );
 }
 
-export function TestResultsList({ result }: { result: CodeGradingResult; compact?: boolean }) {
+export function TestResultsList({
+  result,
+}: {
+  result: CodeGradingResult;
+  compact?: boolean;
+}) {
   return (
     <ul className="flex flex-col gap-1.5">
       {result.tests.map((t) => (
         <li key={t.testId} className="flex items-center gap-2 text-sm">
           {t.passed ? (
-            <CircleCheck className="size-4 text-success-ink" aria-hidden="true" />
+            <CircleCheck
+              className="size-4 text-success-ink"
+              aria-hidden="true"
+            />
           ) : (
-            <CircleX className="size-4 text-destructive-ink" aria-hidden="true" />
+            <CircleX
+              className="size-4 text-destructive-ink"
+              aria-hidden="true"
+            />
           )}
           {t.name || t.testId}
-          {t.feedback ? <span className="text-muted-foreground">— {t.feedback}</span> : null}
+          {t.feedback ? (
+            <span className="text-muted-foreground">— {t.feedback}</span>
+          ) : null}
         </li>
       ))}
     </ul>

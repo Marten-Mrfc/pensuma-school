@@ -125,8 +125,12 @@ import json as _json
 import linecache as _linecache
 import math as _math
 import os as _os
+import random as _random
 import sys as _sys
 import traceback as _traceback
+
+# Interpreters may start from a memory snapshot: give each one fresh randomness.
+_random.seed()
 
 _STUDENT_FILE = "main.py"
 _TEST_FILE = "<test>"

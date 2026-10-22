@@ -50,11 +50,18 @@ function withSep(dir: string): string {
   return dir.endsWith(path.sep) ? dir : dir + path.sep;
 }
 
-export function sandboxArgs(config: GraderConfig): string[] {
-  return [
+export function sandboxArgs(
+  config: GraderConfig,
+  options: { snapshotPath?: string | null; makeSnapshot?: boolean } = {},
+): string[] {
+  const args = [
     "--permission",
     `--allow-fs-read=${withSep(config.pyodideDir)}`,
     `--allow-fs-read=${withSep(config.sandboxDir)}`,
+  ];
+  if (options.snapshotPath)
+    args.push(`--allow-fs-read=${options.snapshotPath}`);
+  args.push(
     "--disallow-code-generation-from-strings",
     `--max-old-space-size=${config.jsHeapMb}`,
     "--no-addons",
@@ -65,7 +72,11 @@ export function sandboxArgs(config: GraderConfig): string[] {
     config.sandboxScript,
     config.pyodideDir,
     String(config.wasmMemoryMb),
-  ];
+  );
+  if (options.makeSnapshot) args.push("--make-snapshot");
+  else if (options.snapshotPath)
+    args.push(`--snapshot=${options.snapshotPath}`);
+  return args;
 }
 
 export class SandboxProcess {
@@ -75,6 +86,7 @@ export class SandboxProcess {
   readonly ready: Promise<void>;
   isReady = false;
   loadMs = 0;
+  fromSnapshot = false;
   peakRssBytes = 0;
   deathReason: SandboxFailure | null = null;
   deathMessage = "";
@@ -94,7 +106,10 @@ export class SandboxProcess {
   private rejectReady!: (e: Error) => void;
   private readyTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly config: GraderConfig) {
+  constructor(
+    private readonly config: GraderConfig,
+    snapshotPath: string | null = null,
+  ) {
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
@@ -102,7 +117,7 @@ export class SandboxProcess {
     // Avoid unhandled rejections when nobody awaits a failed warm process.
     this.ready.catch(() => {});
 
-    this.child = spawn(config.nodePath, sandboxArgs(config), {
+    this.child = spawn(config.nodePath, sandboxArgs(config, { snapshotPath }), {
       cwd: config.sandboxDir,
       // No inherited variables at all: the sandbox must not see any secret.
       env: {} as NodeJS.ProcessEnv,
@@ -212,6 +227,7 @@ export class SandboxProcess {
     }
     if (msg.t === "ready" && !this.isReady) {
       this.isReady = true;
+      this.fromSnapshot = msg.fromSnapshot === true;
       this.loadMs =
         typeof msg.loadMs === "number"
           ? msg.loadMs

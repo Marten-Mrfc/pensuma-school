@@ -30,7 +30,10 @@ import { getErrorMessage } from "@/components/app/get-error-message";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { IssueDot } from "@/components/docent/questions/issue-list";
-import { type QuestionDraft, QuestionEditor } from "@/components/docent/questions/question-editor";
+import {
+  type QuestionDraft,
+  QuestionEditor,
+} from "@/components/docent/questions/question-editor";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,7 +42,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { QuestionType } from "@/lib/questions/schema";
 import type { QuestionTemplate } from "@/lib/questions/templates";
 import {
@@ -57,16 +64,24 @@ import { CopyToTestDialog } from "./copy-to-test-dialog";
 import { downloadTestJson } from "./download";
 import { PreviewSheet } from "./preview-sheet";
 import { PublishDialog } from "./publish-dialog";
-import { type BuilderSelection, formatPoints, QuestionList } from "./question-list";
+import {
+  type BuilderSelection,
+  formatPoints,
+  QuestionList,
+} from "./question-list";
 import { SaveIndicator } from "./save-indicator";
-import { type TestSettingsDraft, TestSettingsEditor } from "./test-settings-editor";
+import {
+  type TestSettingsDraft,
+  TestSettingsEditor,
+} from "./test-settings-editor";
 import { useAutosave } from "./use-autosave";
 
 type BuilderTest = RouterOutputs["test"]["get"];
 type BuilderQuestion = BuilderTest["questions"][number];
 type DraftValue = TestSettingsDraft | QuestionDraft;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TEST_KEY = "test";
 const qKey = (id: string) => `q:${id}`;
 
@@ -74,7 +89,11 @@ const qKey = (id: string) => `q:${id}`;
 /*                                  Loader                                    */
 /* -------------------------------------------------------------------------- */
 
-export function TestBuilder({ params }: { params: Promise<{ toetsId: string }> }) {
+export function TestBuilder({
+  params,
+}: {
+  params: Promise<{ toetsId: string }>;
+}) {
   const { toetsId } = use(params);
   const trpc = useTRPC();
   const valid = UUID_RE.test(toetsId);
@@ -90,7 +109,13 @@ export function TestBuilder({ params }: { params: Promise<{ toetsId: string }> }
   if (query.isPending) return <LoadingState label="Toets laden…" />;
   if (query.isError) {
     if (query.error.data?.code === "NOT_FOUND") return <MissingTest />;
-    return <ErrorState title="De toets kon niet worden geladen" error={query.error} onRetry={() => query.refetch()} />;
+    return (
+      <ErrorState
+        title="De toets kon niet worden geladen"
+        error={query.error}
+        onRetry={() => query.refetch()}
+      />
+    );
   }
   return <Builder test={query.data} />;
 }
@@ -124,16 +149,19 @@ function Builder({ test }: { test: BuilderTest }) {
   const [selection, setSelection] = useState<BuilderSelection>(() => {
     const fromUrl = searchParams.get("vraag");
     if (fromUrl === "instellingen") return { kind: "settings" };
-    if (fromUrl && test.questions.some((q) => q.id === fromUrl)) return { kind: "question", id: fromUrl };
-    if (test.questions[0]) return { kind: "question", id: test.questions[0].id };
+    if (fromUrl && test.questions.some((q) => q.id === fromUrl))
+      return { kind: "question", id: fromUrl };
+    if (test.questions[0])
+      return { kind: "question", id: test.questions[0].id };
     return { kind: "settings" };
   });
   const [listOpen, setListOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
-  const [publishResult, setPublishResult] = useState<{ problems: TestProblem[]; warnings: TestProblem[] } | null>(
-    null,
-  );
+  const [publishResult, setPublishResult] = useState<{
+    problems: TestProblem[];
+    warnings: TestProblem[];
+  } | null>(null);
   const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null);
   const [copyQuestionId, setCopyQuestionId] = useState<string | null>(null);
   const [deleteTestOpen, setDeleteTestOpen] = useState(false);
@@ -146,7 +174,9 @@ function Builder({ test }: { test: BuilderTest }) {
   const createQuestion = useMutation(trpc.question.create.mutationOptions());
   const deleteQuestion = useMutation(trpc.question.delete.mutationOptions());
   const reorderQuestions = useMutation(trpc.question.reorder.mutationOptions());
-  const duplicateQuestion = useMutation(trpc.question.duplicate.mutationOptions());
+  const duplicateQuestion = useMutation(
+    trpc.question.duplicate.mutationOptions(),
+  );
   const setStatus = useMutation(trpc.test.setStatus.mutationOptions());
   const duplicateTest = useMutation(trpc.test.duplicate.mutationOptions());
   const deleteTest = useMutation(trpc.test.delete.mutationOptions());
@@ -181,14 +211,19 @@ function Builder({ test }: { test: BuilderTest }) {
         return null;
       }
       const v = value as QuestionDraft;
-      const question = queryClient.getQueryData(testKey)?.questions.find((q) => qKey(q.id) === key);
+      const question = queryClient
+        .getQueryData(testKey)
+        ?.questions.find((q) => qKey(q.id) === key);
       if (!question) return null;
       if (!(v.points >= 0 && v.points <= MAX_POINTS_PER_QUESTION)) {
         return `Punten moeten tussen 0 en ${MAX_POINTS_PER_QUESTION} liggen.`;
       }
       const parsed = safeParseQuestionData(question.type, v.data);
       if (!parsed.success) {
-        const number = (queryClient.getQueryData(testKey)?.questions.findIndex((q) => q.id === question.id) ?? 0) + 1;
+        const number =
+          (queryClient
+            .getQueryData(testKey)
+            ?.questions.findIndex((q) => q.id === question.id) ?? 0) + 1;
         return `Vraag ${number}: ${parsed.messages[0] ?? "ongeldige instellingen"}.`;
       }
       return null;
@@ -245,7 +280,9 @@ function Builder({ test }: { test: BuilderTest }) {
 
   /* ----------------------------- Derived data ---------------------------- */
 
-  const settings: TestSettingsDraft = (drafts[TEST_KEY] as TestSettingsDraft | undefined) ?? {
+  const settings: TestSettingsDraft = (drafts[TEST_KEY] as
+    | TestSettingsDraft
+    | undefined) ?? {
     title: test.title,
     topic: test.topic ?? "",
     description: test.description,
@@ -268,7 +305,9 @@ function Builder({ test }: { test: BuilderTest }) {
   });
   const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
   const selectedIndex =
-    selection.kind === "question" ? questions.findIndex((q) => q.id === selection.id) : -1;
+    selection.kind === "question"
+      ? questions.findIndex((q) => q.id === selection.id)
+      : -1;
   const selectedQuestion = selectedIndex >= 0 ? questions[selectedIndex] : null;
 
   /* ------------------------------ Selection ------------------------------ */
@@ -280,19 +319,31 @@ function Builder({ test }: { test: BuilderTest }) {
     setListOpen(false);
     const params = new URLSearchParams(window.location.search);
     params.set("vraag", next.kind === "settings" ? "instellingen" : next.id);
-    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
     if (opts.scroll !== false) {
       requestAnimationFrame(() => {
         const el = editorRef.current;
-        if (el && el.getBoundingClientRect().top < 64) el.scrollIntoView({ block: "start" });
+        if (el && el.getBoundingClientRect().top < 64)
+          el.scrollIntoView({ block: "start" });
       });
     }
   }
 
   // Keep the selection valid when questions disappear (deleted elsewhere / refetch).
   useEffect(() => {
-    if (selection.kind === "question" && !test.questions.some((q) => q.id === selection.id)) {
-      setSelection(test.questions[0] ? { kind: "question", id: test.questions[0].id } : { kind: "settings" });
+    if (
+      selection.kind === "question" &&
+      !test.questions.some((q) => q.id === selection.id)
+    ) {
+      setSelection(
+        test.questions[0]
+          ? { kind: "question", id: test.questions[0].id }
+          : { kind: "settings" },
+      );
     }
   }, [selection, test.questions]);
 
@@ -304,26 +355,44 @@ function Builder({ test }: { test: BuilderTest }) {
     }
     const target = selectedIndex + delta;
     if (target < 0) select({ kind: "settings" });
-    else if (target < questions.length) select({ kind: "question", id: questions[target].id });
+    else if (target < questions.length)
+      select({ kind: "question", id: questions[target].id });
   }
 
   /* --------------------------- Global listeners -------------------------- */
 
-  const listenerState = useRef({ flush, selectRelative, hasUnsaved: autosave.hasUnsaved });
+  const listenerState = useRef({
+    flush,
+    selectRelative,
+    hasUnsaved: autosave.hasUnsaved,
+  });
   useEffect(() => {
-    listenerState.current = { flush, selectRelative, hasUnsaved: autosave.hasUnsaved };
+    listenerState.current = {
+      flush,
+      selectRelative,
+      hasUnsaved: autosave.hasUnsaved,
+    };
   });
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s") {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        e.key.toLowerCase() === "s"
+      ) {
         e.preventDefault();
         void listenerState.current.flush().then((ok) => {
           if (ok) toast.success("Opgeslagen", { duration: 1500 });
         });
         return;
       }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      if (
+        e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        (e.key === "ArrowUp" || e.key === "ArrowDown")
+      ) {
         const target = e.target as HTMLElement | null;
         if (e.defaultPrevented || target?.closest(".cm-editor")) return;
         e.preventDefault();
@@ -338,7 +407,8 @@ function Builder({ test }: { test: BuilderTest }) {
       }
     }
     function onVisibility() {
-      if (document.visibilityState === "hidden") void listenerState.current.flush();
+      if (document.visibilityState === "hidden")
+        void listenerState.current.flush();
     }
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -349,14 +419,20 @@ function Builder({ test }: { test: BuilderTest }) {
       document.removeEventListener("visibilitychange", onVisibility);
       // Leaving the builder (client navigation): save what is pending.
       void listenerState.current.flush().then((ok) => {
-        if (!ok) toast.error("Niet alles kon worden opgeslagen. Open de toets opnieuw om het te controleren.");
+        if (!ok)
+          toast.error(
+            "Niet alles kon worden opgeslagen. Open de toets opnieuw om het te controleren.",
+          );
       });
     };
   }, []);
 
   /* ------------------------------ Actions -------------------------------- */
 
-  function editQuestion(question: BuilderQuestion, patch: Partial<QuestionDraft>) {
+  function editQuestion(
+    question: BuilderQuestion,
+    patch: Partial<QuestionDraft>,
+  ) {
     autosave.update(qKey(question.id), {
       title: question.title,
       prompt: question.prompt,
@@ -413,9 +489,14 @@ function Builder({ test }: { test: BuilderTest }) {
       };
     });
     try {
-      const res = await reorderQuestions.mutateAsync({ testId: test.id, orderedIds });
+      const res = await reorderQuestions.mutateAsync({
+        testId: test.id,
+        orderedIds,
+      });
       noteAttempts(res.hasAttempts);
-      void queryClient.invalidateQueries({ queryKey: trpc.test.list.pathKey() });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.test.list.pathKey(),
+      });
     } catch (error) {
       if (previous) queryClient.setQueryData(testKey, previous);
       toast.error(getErrorMessage(error));
@@ -443,9 +524,15 @@ function Builder({ test }: { test: BuilderTest }) {
     autosave.discard(qKey(id));
     await deleteQuestion.mutateAsync({ id, force: test.hasAttempts });
     const remaining = questions.filter((q) => q.id !== id);
-    patchCache((old) => ({ ...old, questions: old.questions.filter((q) => q.id !== id) }));
+    patchCache((old) => ({
+      ...old,
+      questions: old.questions.filter((q) => q.id !== id),
+    }));
     const neighbour = remaining[Math.min(index, remaining.length - 1)];
-    select(neighbour ? { kind: "question", id: neighbour.id } : { kind: "settings" }, { scroll: false });
+    select(
+      neighbour ? { kind: "question", id: neighbour.id } : { kind: "settings" },
+      { scroll: false },
+    );
     void invalidateAll();
     toast.success("Vraag verwijderd.");
   }
@@ -453,11 +540,17 @@ function Builder({ test }: { test: BuilderTest }) {
   async function publish(acknowledgeWarnings = false) {
     const saved = await flush();
     if (!saved) {
-      toast.error("Eerst moeten alle wijzigingen opgeslagen zijn. Bekijk de melding bij het opslaan.");
+      toast.error(
+        "Eerst moeten alle wijzigingen opgeslagen zijn. Bekijk de melding bij het opslaan.",
+      );
       return;
     }
     try {
-      const res = await setStatus.mutateAsync({ id: test.id, status: "published", acknowledgeWarnings });
+      const res = await setStatus.mutateAsync({
+        id: test.id,
+        status: "published",
+        acknowledgeWarnings,
+      });
       if (!res.changed) {
         setPublishResult({ problems: res.problems, warnings: res.warnings });
         return;
@@ -465,12 +558,16 @@ function Builder({ test }: { test: BuilderTest }) {
       setPublishResult(null);
       patchCache((old) => ({ ...old, status: "published" }));
       void invalidateAll();
-      toast.success("De toets is gepubliceerd. Je kunt nu een afname plannen.", {
-        action: {
-          label: "Afname plannen",
-          onClick: () => router.push(routes.docent.newAssignment({ testId: test.id })),
+      toast.success(
+        "De toets is gepubliceerd. Je kunt nu een afname plannen.",
+        {
+          action: {
+            label: "Afname plannen",
+            onClick: () =>
+              router.push(routes.docent.newAssignment({ testId: test.id })),
+          },
         },
-      });
+      );
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -482,7 +579,11 @@ function Builder({ test }: { test: BuilderTest }) {
       await setStatus.mutateAsync({ id: test.id, status });
       patchCache((old) => ({ ...old, status }));
       void invalidateAll();
-      toast.success(status === "draft" ? "De toets is weer een concept." : "De toets is gearchiveerd.");
+      toast.success(
+        status === "draft"
+          ? "De toets is weer een concept."
+          : "De toets is gearchiveerd.",
+      );
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -506,7 +607,9 @@ function Builder({ test }: { test: BuilderTest }) {
     try {
       await flush();
       const res = await duplicateTest.mutateAsync({ id: test.id });
-      void queryClient.invalidateQueries({ queryKey: trpc.test.list.pathKey() });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.test.list.pathKey(),
+      });
       toast.success("Kopie gemaakt. Je bewerkt nu de kopie.");
       router.push(routes.docent.test(res.id));
     } catch (error) {
@@ -531,17 +634,25 @@ function Builder({ test }: { test: BuilderTest }) {
   function onSolutionChecked(questionId: string, check: SolutionCheck) {
     patchCache((old) => ({
       ...old,
-      questions: old.questions.map((q) => (q.id === questionId ? { ...q, solutionCheck: check } : q)),
+      questions: old.questions.map((q) =>
+        q.id === questionId ? { ...q, solutionCheck: check } : q,
+      ),
     }));
   }
 
   /* ------------------------------- Render -------------------------------- */
 
   const status = test.status;
-  const saveIndicator = <SaveIndicator state={autosave.state} onRetry={() => void flush()} />;
-  const deletingQuestion = questions.find((q) => q.id === deleteQuestionId) ?? null;
-  const copyingQuestion = questions.find((q) => q.id === copyQuestionId) ?? null;
-  const settingsHasIssue = validation.errors.some((e) => e.code === "test.no_title");
+  const saveIndicator = (
+    <SaveIndicator state={autosave.state} onRetry={() => void flush()} />
+  );
+  const deletingQuestion =
+    questions.find((q) => q.id === deleteQuestionId) ?? null;
+  const copyingQuestion =
+    questions.find((q) => q.id === copyQuestionId) ?? null;
+  const settingsHasIssue = validation.errors.some(
+    (e) => e.code === "test.no_title",
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -575,8 +686,13 @@ function Builder({ test }: { test: BuilderTest }) {
               <StatusBadge kind="test" status={status} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {settings.topic ? <span className="font-medium text-foreground/80">{settings.topic} · </span> : null}
-              {questions.length} {questions.length === 1 ? "vraag" : "vragen"} · {formatPoints(totalPoints)}{" "}
+              {settings.topic ? (
+                <span className="font-medium text-foreground/80">
+                  {settings.topic} ·{" "}
+                </span>
+              ) : null}
+              {questions.length} {questions.length === 1 ? "vraag" : "vragen"} ·{" "}
+              {formatPoints(totalPoints)}{" "}
               {totalPoints === 1 ? "punt" : "punten"}
               {test.assignmentCount > 0
                 ? ` · ${test.assignmentCount} ${test.assignmentCount === 1 ? "afname" : "afnames"}`
@@ -584,7 +700,12 @@ function Builder({ test }: { test: BuilderTest }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={openPreview} disabled={questions.length === 0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openPreview}
+              disabled={questions.length === 0}
+            >
               <Eye aria-hidden="true" />
               Voorbeeld
             </Button>
@@ -609,9 +730,16 @@ function Builder({ test }: { test: BuilderTest }) {
               </Tooltip>
             )}
             {status === "draft" ? (
-              <Button size="sm" onClick={() => void publish(false)} disabled={setStatus.isPending}>
+              <Button
+                size="sm"
+                onClick={() => void publish(false)}
+                disabled={setStatus.isPending}
+              >
                 {setStatus.isPending ? (
-                  <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+                  <Loader2
+                    className="motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
                 ) : (
                   <Rocket aria-hidden="true" />
                 )}
@@ -623,12 +751,20 @@ function Builder({ test }: { test: BuilderTest }) {
                 ) : null}
               </Button>
             ) : status === "published" ? (
-              <Button size="sm" variant="secondary" onClick={() => void changeStatus("draft")}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void changeStatus("draft")}
+              >
                 <Undo2 aria-hidden="true" />
                 Terug naar concept
               </Button>
             ) : (
-              <Button size="sm" variant="secondary" onClick={() => void changeStatus("draft")}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void changeStatus("draft")}
+              >
                 <ArchiveRestore aria-hidden="true" />
                 Dearchiveren
               </Button>
@@ -649,7 +785,9 @@ function Builder({ test }: { test: BuilderTest }) {
                   Exporteren (JSON)
                 </DropdownMenuItem>
                 {status !== "archived" ? (
-                  <DropdownMenuItem onSelect={() => void changeStatus("archived")}>
+                  <DropdownMenuItem
+                    onSelect={() => void changeStatus("archived")}
+                  >
                     <Archive aria-hidden="true" />
                     Archiveren
                   </DropdownMenuItem>
@@ -673,11 +811,20 @@ function Builder({ test }: { test: BuilderTest }) {
           role="note"
           className="flex items-start gap-3 rounded-xl border border-warning/35 bg-warning/10 px-4 py-3 text-sm"
         >
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning-ink" aria-hidden="true" />
+          <TriangleAlert
+            className="mt-0.5 size-4 shrink-0 text-warning-ink"
+            aria-hidden="true"
+          />
           <p className="text-pretty">
-            <span className="font-medium text-warning-ink">Deze toets is al gemaakt ({test.attemptCount} pogingen).</span>{" "}
-            Je kunt hem nog aanpassen. {EDIT_WITH_ATTEMPTS_WARNING.replace("Er zijn al pogingen; l", "L")}{" "}
-            <Link href={routes.docent.assignments} className="font-medium text-foreground underline underline-offset-4">
+            <span className="font-medium text-warning-ink">
+              Deze toets is al gemaakt ({test.attemptCount} pogingen).
+            </span>{" "}
+            Je kunt hem nog aanpassen.{" "}
+            {EDIT_WITH_ATTEMPTS_WARNING.replace("Er zijn al pogingen; l", "L")}{" "}
+            <Link
+              href={routes.docent.assignments}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
               Naar afnames
             </Link>
           </p>
@@ -696,7 +843,10 @@ function Builder({ test }: { test: BuilderTest }) {
             onClick={() => setListOpen((o) => !o)}
             className="flex items-center gap-3 rounded-xl border bg-card px-3.5 py-3 text-left shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
           >
-            <ListOrdered className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <ListOrdered
+              className="size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="text-xs text-muted-foreground">
                 {selection.kind === "settings"
@@ -704,7 +854,9 @@ function Builder({ test }: { test: BuilderTest }) {
                   : `Vraag ${selectedIndex + 1} van ${questions.length}`}
               </span>
               <span className="truncate text-sm font-medium">
-                {selection.kind === "settings" ? settings.title || "Naamloze toets" : selectedQuestion?.title || "Naamloze vraag"}
+                {selection.kind === "settings"
+                  ? settings.title || "Naamloze toets"
+                  : selectedQuestion?.title || "Naamloze vraag"}
               </span>
             </span>
             {validation.errors.length > 0 ? (
@@ -713,7 +865,10 @@ function Builder({ test }: { test: BuilderTest }) {
               </span>
             ) : null}
             <ChevronDown
-              className={cn("size-4 shrink-0 text-muted-foreground transition-transform", listOpen && "rotate-180")}
+              className={cn(
+                "size-4 shrink-0 text-muted-foreground transition-transform",
+                listOpen && "rotate-180",
+              )}
               aria-hidden="true"
             />
           </button>
@@ -734,9 +889,62 @@ function Builder({ test }: { test: BuilderTest }) {
         </aside>
 
         {/* Right: editor */}
-        <section ref={editorRef} aria-label="Editor" className="flex min-w-0 scroll-mt-20 flex-col gap-5">
+        <section
+          ref={editorRef}
+          aria-label="Editor"
+          className="flex min-w-0 scroll-mt-20 flex-col gap-5"
+        >
+          {autosave.state.status === "invalid" ||
+          autosave.state.status === "error" ? (
+            <div
+              role="alert"
+              className={cn(
+                "flex items-start gap-3 rounded-xl border px-4 py-3 text-sm",
+                autosave.state.status === "error"
+                  ? "border-destructive/30 bg-destructive/[0.06]"
+                  : "border-warning/35 bg-warning/10",
+              )}
+            >
+              <TriangleAlert
+                className={cn(
+                  "mt-0.5 size-4 shrink-0",
+                  autosave.state.status === "error"
+                    ? "text-destructive-ink"
+                    : "text-warning-ink",
+                )}
+                aria-hidden="true"
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <p className="font-medium">
+                  {autosave.state.status === "error"
+                    ? "Opslaan lukte niet"
+                    : "Deze wijziging is nog niet opgeslagen"}
+                </p>
+                <p className="text-pretty text-muted-foreground">
+                  {autosave.state.message}
+                  {autosave.state.status === "invalid"
+                    ? " Pas dit aan; daarna wordt alles automatisch opgeslagen."
+                    : ""}
+                </p>
+              </div>
+              {autosave.state.status === "error" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void flush()}
+                >
+                  Opnieuw proberen
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
           {selection.kind === "settings" ? (
-            <TestSettingsEditor value={settings} onChange={editSettings} status={saveIndicator} />
+            <TestSettingsEditor
+              value={settings}
+              onChange={editSettings}
+              status={saveIndicator}
+            />
           ) : selectedQuestion ? (
             <QuestionEditor
               key={selectedQuestion.id}
@@ -747,14 +955,17 @@ function Builder({ test }: { test: BuilderTest }) {
                 prompt: selectedQuestion.prompt,
                 points: selectedQuestion.points,
                 data: selectedQuestion.data,
-                solutionCheck: selectedQuestion.solutionCheck as SolutionCheck | null,
+                solutionCheck:
+                  selectedQuestion.solutionCheck as SolutionCheck | null,
               }}
               number={selectedIndex + 1}
               total={questions.length}
               issues={validation.byQuestion[selectedQuestion.id] ?? []}
               onChange={(patch) => editQuestion(selectedQuestion, patch)}
               onFlush={() => flush(qKey(selectedQuestion.id))}
-              onSolutionChecked={(check) => onSolutionChecked(selectedQuestion.id, check)}
+              onSolutionChecked={(check) =>
+                onSolutionChecked(selectedQuestion.id, check)
+              }
               status={saveIndicator}
               actions={
                 <>
@@ -766,25 +977,35 @@ function Builder({ test }: { test: BuilderTest }) {
                     variant="ghost"
                     size="sm"
                     onClick={() => void duplicate(selectedQuestion.id)}
-                    disabled={duplicateQuestion.isPending || questions.length >= 50}
+                    disabled={
+                      duplicateQuestion.isPending || questions.length >= 50
+                    }
                   >
                     <Copy aria-hidden="true" />
                     <span className="hidden sm:inline">Dupliceren</span>
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" aria-label="Meer acties voor deze vraag">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Meer acties voor deze vraag"
+                      >
                         <Ellipsis aria-hidden="true" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onSelect={() => setCopyQuestionId(selectedQuestion.id)}>
+                      <DropdownMenuItem
+                        onSelect={() => setCopyQuestionId(selectedQuestion.id)}
+                      >
                         <FolderInput aria-hidden="true" />
                         Kopiëren naar andere toets
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onSelect={() => setDeleteQuestionId(selectedQuestion.id)}
+                        onSelect={() =>
+                          setDeleteQuestionId(selectedQuestion.id)
+                        }
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 aria-hidden="true" />
@@ -804,7 +1025,10 @@ function Builder({ test }: { test: BuilderTest }) {
           )}
 
           {questions.length > 0 ? (
-            <nav aria-label="Vorige en volgende vraag" className="flex items-center justify-between gap-2 pt-1">
+            <nav
+              aria-label="Vorige en volgende vraag"
+              className="flex items-center justify-between gap-2 pt-1"
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -816,7 +1040,9 @@ function Builder({ test }: { test: BuilderTest }) {
               </Button>
               {selectedQuestion ? (
                 <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <IssueDot issues={validation.byQuestion[selectedQuestion.id] ?? []} />
+                  <IssueDot
+                    issues={validation.byQuestion[selectedQuestion.id] ?? []}
+                  />
                   {selectedIndex + 1} / {questions.length}
                 </span>
               ) : null}
@@ -826,7 +1052,9 @@ function Builder({ test }: { test: BuilderTest }) {
                 onClick={() => selectRelative(1)}
                 disabled={selectedIndex >= questions.length - 1}
               >
-                {selection.kind === "settings" ? "Vraag 1" : `Vraag ${selectedIndex + 2}`}
+                {selection.kind === "settings"
+                  ? "Vraag 1"
+                  : `Vraag ${selectedIndex + 2}`}
                 <ChevronRight aria-hidden="true" />
               </Button>
             </nav>
@@ -878,7 +1106,11 @@ function Builder({ test }: { test: BuilderTest }) {
         open={deleteTestOpen}
         onOpenChange={setDeleteTestOpen}
         destructive={!test.hasAttempts}
-        title={test.hasAttempts ? "Archiveren in plaats van verwijderen?" : "Toets verwijderen?"}
+        title={
+          test.hasAttempts
+            ? "Archiveren in plaats van verwijderen?"
+            : "Toets verwijderen?"
+        }
         description={
           test.hasAttempts
             ? `Deze toets is al ${test.attemptCount} keer gemaakt door leerlingen en kan daarom niet worden verwijderd. Archiveer hem; dan verdwijnt hij uit je lijst en blijven alle resultaten bewaard.`
@@ -887,7 +1119,9 @@ function Builder({ test }: { test: BuilderTest }) {
               : `“${settings.title}” en ${questions.length === 1 ? "de vraag" : `alle ${questions.length} vragen`} worden definitief verwijderd.`
         }
         confirmLabel={test.hasAttempts ? "Archiveren" : "Verwijderen"}
-        onConfirm={test.hasAttempts ? () => changeStatus("archived") : confirmDeleteTest}
+        onConfirm={
+          test.hasAttempts ? () => changeStatus("archived") : confirmDeleteTest
+        }
       />
 
       <CopyToTestDialog
@@ -898,7 +1132,9 @@ function Builder({ test }: { test: BuilderTest }) {
         questionId={copyQuestionId}
         questionTitle={copyingQuestion?.title ?? ""}
         currentTestId={test.id}
-        beforeCopy={() => (copyQuestionId ? flush(qKey(copyQuestionId)) : Promise.resolve(true))}
+        beforeCopy={() =>
+          copyQuestionId ? flush(qKey(copyQuestionId)) : Promise.resolve(true)
+        }
       />
     </div>
   );

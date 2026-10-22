@@ -27,10 +27,18 @@ import { StatCard } from "@/components/app/stat-card";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { AssignmentNav } from "@/components/docent/assignments/assignment-nav";
-import { formatGrade, formatNumber, formatPercent } from "@/components/docent/assignments/format";
+import {
+  formatGrade,
+  formatNumber,
+  formatPercent,
+} from "@/components/docent/assignments/format";
 import { ModeBadge } from "@/components/docent/assignments/shared";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { downloadTextFile } from "@/lib/export/download";
 import { QUESTION_TYPE_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
@@ -44,7 +52,9 @@ type Cell = NonNullable<Row["perQuestion"][string]>;
 type SortKey = "name" | "number" | "total" | "grade" | `q:${string}`;
 
 /** Background/text classes for a score cell (0 → red … full marks → green). */
-export function scoreTone(cell: Pick<Cell, "score" | "maxScore" | "status" | "manualScore">) {
+export function scoreTone(
+  cell: Pick<Cell, "score" | "maxScore" | "status" | "manualScore">,
+) {
   if (cell.status === "needs_review" && cell.manualScore == null) {
     return "bg-warning/15 text-warning-ink ring-1 ring-inset ring-warning/40";
   }
@@ -55,13 +65,25 @@ export function scoreTone(cell: Pick<Cell, "score" | "maxScore" | "status" | "ma
   return "bg-destructive/10 text-destructive-ink";
 }
 
-export function ResultsView({ params }: { params: Promise<{ afnameId: string }> }) {
+export function ResultsView({
+  params,
+}: {
+  params: Promise<{ afnameId: string }>;
+}) {
   const { afnameId } = use(params);
   const trpc = useTRPC();
-  const results = useQuery(trpc.review.results.queryOptions({ assignmentId: afnameId }, { refetchInterval: 20_000 }));
+  const results = useQuery(
+    trpc.review.results.queryOptions(
+      { assignmentId: afnameId },
+      { refetchInterval: 20_000 },
+    ),
+  );
 
   if (results.isPending) return <LoadingState />;
-  if (results.isError) return <ErrorState error={results.error} onRetry={() => results.refetch()} />;
+  if (results.isError)
+    return (
+      <ErrorState error={results.error} onRetry={() => results.refetch()} />
+    );
   return <ResultsContent data={results.data} />;
 }
 
@@ -70,10 +92,14 @@ function ResultsContent({ data }: { data: Results }) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const a = data.assignment;
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({
+    key: "name",
+    dir: 1,
+  });
   const [confirmRegrade, setConfirmRegrade] = useState(false);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: trpc.review.pathKey() });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: trpc.review.pathKey() });
   const exportCsv = useMutation(
     trpc.review.exportCsv.mutationOptions({
       onSuccess: (res) => {
@@ -87,10 +113,17 @@ function ResultsContent({ data }: { data: Results }) {
     trpc.assignment.setResultsReleased.mutationOptions({
       onSuccess: async (res) => {
         await invalidate();
-        await queryClient.invalidateQueries({ queryKey: trpc.assignment.pathKey() });
-        toast.success(res.released ? "Resultaten vrijgegeven" : "Vrijgave ingetrokken", {
-          description: res.released ? "Leerlingen zien nu hun score en feedback." : "Leerlingen zien hun score niet meer.",
+        await queryClient.invalidateQueries({
+          queryKey: trpc.assignment.pathKey(),
         });
+        toast.success(
+          res.released ? "Resultaten vrijgegeven" : "Vrijgave ingetrokken",
+          {
+            description: res.released
+              ? "Leerlingen zien nu hun score en feedback."
+              : "Leerlingen zien hun score niet meer.",
+          },
+        );
       },
       onError: (err) => toast.error(getErrorMessage(err)),
     }),
@@ -98,7 +131,8 @@ function ResultsContent({ data }: { data: Results }) {
   const regrade = useMutation(trpc.review.regradeAssignment.mutationOptions());
 
   const canRelease =
-    a.showResults === "manual" || (a.showResults === "after_close" && a.effectiveStatus !== "closed");
+    a.showResults === "manual" ||
+    (a.showResults === "after_close" && a.effectiveStatus !== "closed");
 
   const questionIndex = new Map(data.questions.map((q, i) => [q.id, i]));
   const sorted = [...data.rows].sort((x, y) => {
@@ -114,17 +148,27 @@ function ResultsContent({ data }: { data: Results }) {
     };
     const vx = val(x);
     const vy = val(y);
-    if (vx == null && vy == null) return x.student.name.localeCompare(y.student.name, "nl");
+    if (vx == null && vy == null)
+      return x.student.name.localeCompare(y.student.name, "nl");
     if (vx == null) return 1;
     if (vy == null) return -1;
-    const c = typeof vx === "number" && typeof vy === "number" ? vx - vy : String(vx).localeCompare(String(vy), "nl");
+    const c =
+      typeof vx === "number" && typeof vy === "number"
+        ? vx - vy
+        : String(vx).localeCompare(String(vy), "nl");
     return c * dir || x.student.name.localeCompare(y.student.name, "nl");
   });
 
   const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "name" || key === "number" ? 1 : -1 }));
+    setSort((s) =>
+      s.key === key
+        ? { key, dir: s.dir === 1 ? -1 : 1 }
+        : { key, dir: key === "name" || key === "number" ? 1 : -1 },
+    );
 
-  const statsByQuestion = new Map(data.stats.perQuestion.map((s) => [s.questionId, s]));
+  const statsByQuestion = new Map(
+    data.stats.perQuestion.map((s) => [s.questionId, s]),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,7 +185,11 @@ function ResultsContent({ data }: { data: Results }) {
         description={`${a.className} · ${a.testTitle} · ${data.questions.length} vragen · ${formatNumber(a.totalPoints)} punten`}
         actions={
           <>
-            <Button variant="outline" onClick={() => setConfirmRegrade(true)} disabled={data.stats.submitted === 0}>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmRegrade(true)}
+              disabled={data.stats.submitted === 0}
+            >
               <RefreshCw aria-hidden="true" />
               Opnieuw nakijken
             </Button>
@@ -149,15 +197,29 @@ function ResultsContent({ data }: { data: Results }) {
               <Button
                 variant={a.resultsReleased ? "outline" : "default"}
                 disabled={release.isPending}
-                onClick={() => release.mutate({ id: a.id, released: !a.resultsReleased })}
+                onClick={() =>
+                  release.mutate({ id: a.id, released: !a.resultsReleased })
+                }
               >
-                {a.resultsReleased ? <EyeOff aria-hidden="true" /> : <Send aria-hidden="true" />}
-                {a.resultsReleased ? "Vrijgave intrekken" : "Resultaten vrijgeven"}
+                {a.resultsReleased ? (
+                  <EyeOff aria-hidden="true" />
+                ) : (
+                  <Send aria-hidden="true" />
+                )}
+                {a.resultsReleased
+                  ? "Vrijgave intrekken"
+                  : "Resultaten vrijgeven"}
               </Button>
             ) : null}
-            <Button onClick={() => exportCsv.mutate({ assignmentId: a.id })} disabled={exportCsv.isPending}>
+            <Button
+              onClick={() => exportCsv.mutate({ assignmentId: a.id })}
+              disabled={exportCsv.isPending}
+            >
               {exportCsv.isPending ? (
-                <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
               ) : (
                 <Download aria-hidden="true" />
               )}
@@ -166,7 +228,11 @@ function ResultsContent({ data }: { data: Results }) {
           </>
         }
       />
-      <AssignmentNav assignmentId={a.id} active="results" needsReview={data.stats.needsReview} />
+      <AssignmentNav
+        assignmentId={a.id}
+        active="results"
+        needsReview={data.stats.needsReview}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -174,11 +240,19 @@ function ResultsContent({ data }: { data: Results }) {
           value={formatGrade(data.stats.averageGrade)}
           icon={Award}
           tone="primary"
-          hint={data.stats.averagePercentage != null ? `${formatPercent(data.stats.averagePercentage)} van de punten` : "Nog geen inleveringen"}
+          hint={
+            data.stats.averagePercentage != null
+              ? `${formatPercent(data.stats.averagePercentage)} van de punten`
+              : "Nog geen inleveringen"
+          }
         />
         <StatCard
           label="Voldoendes"
-          value={data.stats.submitted ? `${data.stats.passed}/${data.stats.submitted}` : "–"}
+          value={
+            data.stats.submitted
+              ? `${data.stats.passed}/${data.stats.submitted}`
+              : "–"
+          }
           icon={CheckCircle2}
           tone="success"
           hint="cijfer 5,5 of hoger"
@@ -200,7 +274,10 @@ function ResultsContent({ data }: { data: Results }) {
           tone={data.stats.needsReview ? "warning" : "default"}
           hint={
             data.stats.needsReview ? (
-              <Link href={routes.docent.assignmentGrading(a.id)} className="font-medium text-primary hover:underline">
+              <Link
+                href={routes.docent.assignmentGrading(a.id)}
+                className="font-medium text-primary hover:underline"
+              >
                 Naar nakijken →
               </Link>
             ) : (
@@ -220,7 +297,8 @@ function ResultsContent({ data }: { data: Results }) {
                 Scores per vraag
               </h2>
               <p className="text-sm text-muted-foreground">
-                Klik op een score om de poging te bekijken en na te kijken. Klik op een kolomkop om te sorteren.
+                Klik op een score om de poging te bekijken en na te kijken. Klik
+                op een kolomkop om te sorteren.
               </p>
             </div>
             <Legend />
@@ -229,13 +307,24 @@ function ResultsContent({ data }: { data: Results }) {
             <table className="w-full border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-xs text-muted-foreground">
-                  <th scope="col" className="sticky left-0 z-20 min-w-48 border-b bg-card px-4 py-2 text-left font-medium">
-                    <SortButton active={sort.key === "name"} dir={sort.dir} onClick={() => toggleSort("name")}>
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-20 min-w-48 border-b bg-card px-4 py-2 text-left font-medium"
+                  >
+                    <SortButton
+                      active={sort.key === "name"}
+                      dir={sort.dir}
+                      onClick={() => toggleSort("name")}
+                    >
                       Leerling
                     </SortButton>
                   </th>
                   {data.questions.map((q, i) => (
-                    <th key={q.id} scope="col" className="min-w-14 border-b bg-muted/30 px-1 py-2 text-center font-medium">
+                    <th
+                      key={q.id}
+                      scope="col"
+                      className="min-w-14 border-b bg-muted/30 px-1 py-2 text-center font-medium"
+                    >
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span>
@@ -252,7 +341,8 @@ function ResultsContent({ data }: { data: Results }) {
                         <TooltipContent>
                           <span className="font-medium">{q.title}</span>
                           <span className="block text-xs opacity-80">
-                            {QUESTION_TYPE_LABELS[q.type]} · {formatNumber(q.points)} pt
+                            {QUESTION_TYPE_LABELS[q.type]} ·{" "}
+                            {formatNumber(q.points)} pt
                           </span>
                         </TooltipContent>
                       </Tooltip>
@@ -261,13 +351,29 @@ function ResultsContent({ data }: { data: Results }) {
                       </span>
                     </th>
                   ))}
-                  <th scope="col" className="min-w-20 border-b border-l px-3 py-2 text-right font-medium">
-                    <SortButton active={sort.key === "total"} dir={sort.dir} onClick={() => toggleSort("total")} className="justify-end">
+                  <th
+                    scope="col"
+                    className="min-w-20 border-b border-l px-3 py-2 text-right font-medium"
+                  >
+                    <SortButton
+                      active={sort.key === "total"}
+                      dir={sort.dir}
+                      onClick={() => toggleSort("total")}
+                      className="justify-end"
+                    >
                       Totaal
                     </SortButton>
                   </th>
-                  <th scope="col" className="min-w-20 border-b px-3 py-2 text-right font-medium">
-                    <SortButton active={sort.key === "grade"} dir={sort.dir} onClick={() => toggleSort("grade")} className="justify-end">
+                  <th
+                    scope="col"
+                    className="min-w-20 border-b px-3 py-2 text-right font-medium"
+                  >
+                    <SortButton
+                      active={sort.key === "grade"}
+                      dir={sort.dir}
+                      onClick={() => toggleSort("grade")}
+                      className="justify-end"
+                    >
                       Cijfer
                     </SortButton>
                   </th>
@@ -275,19 +381,30 @@ function ResultsContent({ data }: { data: Results }) {
               </thead>
               <tbody>
                 {sorted.map((row) => (
-                  <ResultRow key={row.student.id} row={row} data={data} onOpen={(href) => router.push(href)} />
+                  <ResultRow
+                    key={row.student.id}
+                    row={row}
+                    data={data}
+                    onOpen={(href) => router.push(href)}
+                  />
                 ))}
               </tbody>
               {data.stats.submitted > 0 ? (
                 <tfoot>
                   <tr className="text-xs text-muted-foreground">
-                    <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-medium">
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-medium"
+                    >
                       Gemiddeld
                     </th>
                     {data.questions.map((q) => {
                       const s = statsByQuestion.get(q.id);
                       return (
-                        <td key={q.id} className="bg-muted/30 px-1 py-2.5 text-center font-medium tabular-nums">
+                        <td
+                          key={q.id}
+                          className="bg-muted/30 px-1 py-2.5 text-center font-medium tabular-nums"
+                        >
                           {formatPercent(s?.averagePercentage)}
                         </td>
                       );
@@ -311,27 +428,36 @@ function ResultsContent({ data }: { data: Results }) {
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-xs">
             <h2 className="flex items-center gap-2 font-semibold">
-              <Gauge className="size-4 text-muted-foreground" aria-hidden="true" />
+              <Gauge
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               Gemiddelde score per vraag
             </h2>
             <p className="text-xs text-muted-foreground">
-              Percentage van de punten, gemiddeld over {data.stats.submitted} ingeleverde pogingen. Rood = minder dan 50%.
+              Percentage van de punten, gemiddeld over {data.stats.submitted}{" "}
+              ingeleverde pogingen. Rood = minder dan 50%.
             </p>
             <QuestionAverageChart
               items={data.questions.map((q, i) => ({
                 label: `V${i + 1}`,
                 title: q.title,
-                percentage: statsByQuestion.get(q.id)?.averagePercentage ?? null,
+                percentage:
+                  statsByQuestion.get(q.id)?.averagePercentage ?? null,
               }))}
             />
           </section>
           <section className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-xs">
             <h2 className="flex items-center gap-2 font-semibold">
-              <Award className="size-4 text-muted-foreground" aria-hidden="true" />
+              <Award
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               Cijferverdeling
             </h2>
             <p className="text-xs text-muted-foreground">
-              Aantal leerlingen per cijfer (1 + 9 × score/max). Rood = lager dan 5.
+              Aantal leerlingen per cijfer (1 + 9 × score/max). Rood = lager dan
+              5.
             </p>
             <GradeDistributionChart bins={data.stats.distribution} />
           </section>
@@ -349,13 +475,21 @@ function ResultsContent({ data }: { data: Results }) {
         onConfirm={async () => {
           const res = await regrade.mutateAsync({ assignmentId: a.id });
           await invalidate();
-          await queryClient.invalidateQueries({ queryKey: trpc.assignment.pathKey() });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.assignment.pathKey(),
+          });
           if (res.failed) {
-            toast.warning(`${res.graded} pogingen nagekeken, ${res.failed} mislukt`, {
-              description: "Probeer het later nog eens voor de mislukte pogingen.",
-            });
+            toast.warning(
+              `${res.graded} pogingen nagekeken, ${res.failed} mislukt`,
+              {
+                description:
+                  "Probeer het later nog eens voor de mislukte pogingen.",
+              },
+            );
           } else {
-            toast.success(`${res.graded} ${res.graded === 1 ? "poging" : "pogingen"} opnieuw nagekeken`);
+            toast.success(
+              `${res.graded} ${res.graded === 1 ? "poging" : "pogingen"} opnieuw nagekeken`,
+            );
           }
         }}
       />
@@ -363,9 +497,19 @@ function ResultsContent({ data }: { data: Results }) {
   );
 }
 
-function ResultRow({ row, data, onOpen }: { row: Row; data: Results; onOpen: (href: string) => void }) {
+function ResultRow({
+  row,
+  data,
+  onOpen,
+}: {
+  row: Row;
+  data: Results;
+  onOpen: (href: string) => void;
+}) {
   const at = row.attempt;
-  const attemptHref = at ? routes.docent.attempt(data.assignment.id, at.id) : null;
+  const attemptHref = at
+    ? routes.docent.attempt(data.assignment.id, at.id)
+    : null;
   return (
     <tr className="group">
       <th
@@ -373,25 +517,42 @@ function ResultRow({ row, data, onOpen }: { row: Row; data: Results; onOpen: (hr
         className="sticky left-0 z-10 border-b bg-card px-4 py-2 text-left font-normal group-hover:bg-muted/40"
       >
         {attemptHref ? (
-          <Link href={attemptHref} className="flex flex-col rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            <span className="font-medium text-foreground hover:text-primary">{row.student.name}</span>
+          <Link
+            href={attemptHref}
+            className="flex flex-col rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <span className="font-medium text-foreground hover:text-primary">
+              {row.student.name}
+            </span>
             <span className="text-xs text-muted-foreground tabular-nums">
               {row.student.studentNumber}
-              {row.attemptCount > 1 ? ` · poging ${at?.attemptNumber} van ${row.attemptCount}` : ""}
+              {row.attemptCount > 1
+                ? ` · poging ${at?.attemptNumber} van ${row.attemptCount}`
+                : ""}
             </span>
           </Link>
         ) : (
           <span className="flex flex-col">
-            <span className="font-medium text-muted-foreground">{row.student.name}</span>
-            <span className="text-xs text-muted-foreground tabular-nums">{row.student.studentNumber}</span>
+            <span className="font-medium text-muted-foreground">
+              {row.student.name}
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {row.student.studentNumber}
+            </span>
           </span>
         )}
       </th>
       {!at || at.status !== "submitted" ? (
-        <td colSpan={data.questions.length} className="border-b bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        <td
+          colSpan={data.questions.length}
+          className="border-b bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+        >
           {at ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />
+              <span
+                className="size-1.5 rounded-full bg-warning"
+                aria-hidden="true"
+              />
               Nog bezig met de toets
             </span>
           ) : (
@@ -403,13 +564,17 @@ function ResultRow({ row, data, onOpen }: { row: Row; data: Results; onOpen: (hr
           const cell = row.perQuestion[q.id];
           if (!cell) {
             return (
-              <td key={q.id} className="border-b p-1 text-center text-xs text-muted-foreground">
+              <td
+                key={q.id}
+                className="border-b p-1 text-center text-xs text-muted-foreground"
+              >
                 –
               </td>
             );
           }
           const href = `${attemptHref}#vraag-${q.id}`;
-          const review = cell.status === "needs_review" && cell.manualScore == null;
+          const review =
+            cell.status === "needs_review" && cell.manualScore == null;
           return (
             <td key={q.id} className="border-b p-1 text-center">
               <button
@@ -424,10 +589,16 @@ function ResultRow({ row, data, onOpen }: { row: Row; data: Results; onOpen: (hr
               >
                 {review ? "?" : formatNumber(cell.score, 1)}
                 {cell.manualScore != null ? (
-                  <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                  <span
+                    className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary"
+                    aria-hidden="true"
+                  />
                 ) : null}
                 {cell.hasFeedback ? (
-                  <MessageSquareText className="absolute bottom-0.5 left-0.5 size-2.5 opacity-60" aria-hidden="true" />
+                  <MessageSquareText
+                    className="absolute bottom-0.5 left-0.5 size-2.5 opacity-60"
+                    aria-hidden="true"
+                  />
                 ) : null}
               </button>
             </td>
@@ -438,7 +609,9 @@ function ResultRow({ row, data, onOpen }: { row: Row; data: Results; onOpen: (hr
         {at?.status === "submitted" ? (
           <span>
             {formatNumber(at.score)}
-            <span className="font-normal text-muted-foreground">/{formatNumber(at.maxScore)}</span>
+            <span className="font-normal text-muted-foreground">
+              /{formatNumber(at.maxScore)}
+            </span>
           </span>
         ) : (
           <span className="text-muted-foreground">–</span>
@@ -449,10 +622,16 @@ function ResultRow({ row, data, onOpen }: { row: Row; data: Results; onOpen: (hr
           <span
             className={cn(
               "inline-flex min-w-11 justify-center rounded-md px-2 py-1 text-sm font-bold",
-              at.grade >= 5.5 ? "bg-success/12 text-success-ink" : "bg-destructive/10 text-destructive-ink",
+              at.grade >= 5.5
+                ? "bg-success/12 text-success-ink"
+                : "bg-destructive/10 text-destructive-ink",
               at.provisional && "ring-1 ring-warning/50 ring-inset",
             )}
-            title={at.provisional ? "Voorlopig: er moet nog iets worden nagekeken" : undefined}
+            title={
+              at.provisional
+                ? "Voorlopig: er moet nog iets worden nagekeken"
+                : undefined
+            }
           >
             {formatGrade(at.grade)}
             {at.provisional ? "*" : ""}
@@ -490,7 +669,12 @@ function SortButton({
       )}
     >
       {children}
-      {active ? <Icon className="size-3" aria-label={dir === 1 ? "oplopend" : "aflopend"} /> : null}
+      {active ? (
+        <Icon
+          className="size-3"
+          aria-label={dir === 1 ? "oplopend" : "aflopend"}
+        />
+      ) : null}
     </button>
   );
 }
@@ -498,10 +682,16 @@ function SortButton({
 function Legend() {
   const items = [
     { cls: "bg-success/20", label: "Alles goed" },
-    { cls: "bg-success/8 ring-1 ring-inset ring-border", label: "Meer dan de helft" },
+    {
+      cls: "bg-success/8 ring-1 ring-inset ring-border",
+      label: "Meer dan de helft",
+    },
     { cls: "bg-warning/12", label: "Deels" },
     { cls: "bg-destructive/10", label: "0 punten" },
-    { cls: "bg-warning/15 ring-1 ring-inset ring-warning/40", label: "? Nog nakijken" },
+    {
+      cls: "bg-warning/15 ring-1 ring-inset ring-warning/40",
+      label: "? Nog nakijken",
+    },
   ];
   return (
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -534,16 +724,25 @@ function QuestionStatsTable({ data }: { data: Results }) {
               <th scope="col" className="px-4 py-2.5 font-medium">
                 Vraag
               </th>
-              <th scope="col" className="hidden px-3 py-2.5 font-medium sm:table-cell">
+              <th
+                scope="col"
+                className="hidden px-3 py-2.5 font-medium sm:table-cell"
+              >
                 Soort
               </th>
               <th scope="col" className="px-3 py-2.5 text-right font-medium">
                 Gemiddeld
               </th>
-              <th scope="col" className="hidden px-3 py-2.5 text-right font-medium sm:table-cell">
+              <th
+                scope="col"
+                className="hidden px-3 py-2.5 text-right font-medium sm:table-cell"
+              >
                 Alles goed
               </th>
-              <th scope="col" className="hidden px-3 py-2.5 text-right font-medium md:table-cell">
+              <th
+                scope="col"
+                className="hidden px-3 py-2.5 text-right font-medium md:table-cell"
+              >
                 Beantwoord
               </th>
               <th scope="col" className="px-3 py-2.5 text-right font-medium">
@@ -558,15 +757,24 @@ function QuestionStatsTable({ data }: { data: Results }) {
               return (
                 <tr key={q.id}>
                   <td className="px-4 py-2.5">
-                    <span className="mr-2 text-xs font-semibold text-muted-foreground tabular-nums">V{i + 1}</span>
+                    <span className="mr-2 text-xs font-semibold text-muted-foreground tabular-nums">
+                      V{i + 1}
+                    </span>
                     <span className="font-medium">{q.title}</span>
                   </td>
-                  <td className="hidden px-3 py-2.5 text-muted-foreground sm:table-cell">{QUESTION_TYPE_LABELS[q.type]}</td>
+                  <td className="hidden px-3 py-2.5 text-muted-foreground sm:table-cell">
+                    {QUESTION_TYPE_LABELS[q.type]}
+                  </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">
                     <span className="inline-flex items-center justify-end gap-2">
                       <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-muted sm:inline-block">
                         <span
-                          className={cn("block h-full rounded-full", pct != null && pct < 0.5 ? "bg-destructive" : "bg-primary")}
+                          className={cn(
+                            "block h-full rounded-full",
+                            pct != null && pct < 0.5
+                              ? "bg-destructive"
+                              : "bg-primary",
+                          )}
                           style={{ width: `${Math.round((pct ?? 0) * 100)}%` }}
                         />
                       </span>

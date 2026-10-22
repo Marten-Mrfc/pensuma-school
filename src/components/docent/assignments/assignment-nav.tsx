@@ -27,12 +27,30 @@ export function AssignmentNav({
   needsReview?: number;
 }) {
   const items = [
-    { key: "monitor", label: "Live overzicht", href: routes.docent.assignment(assignmentId), icon: Radio },
-    { key: "results", label: "Resultaten", href: routes.docent.assignmentResults(assignmentId), icon: BarChart3 },
-    { key: "grading", label: "Nakijken", href: routes.docent.assignmentGrading(assignmentId), icon: NotebookPen },
+    {
+      key: "monitor",
+      label: "Live overzicht",
+      href: routes.docent.assignment(assignmentId),
+      icon: Radio,
+    },
+    {
+      key: "results",
+      label: "Resultaten",
+      href: routes.docent.assignmentResults(assignmentId),
+      icon: BarChart3,
+    },
+    {
+      key: "grading",
+      label: "Nakijken",
+      href: routes.docent.assignmentGrading(assignmentId),
+      icon: NotebookPen,
+    },
   ] as const;
   return (
-    <nav aria-label="Onderdelen van deze afname" className="-mx-1 overflow-x-auto px-1">
+    <nav
+      aria-label="Onderdelen van deze afname"
+      className="-mx-1 overflow-x-auto px-1"
+    >
       <ul className="flex w-max min-w-full gap-1 border-b">
         {items.map((item) => {
           const Icon = item.icon;

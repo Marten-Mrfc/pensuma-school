@@ -17,7 +17,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { QUESTION_TYPE_LABELS, type QuestionType } from "@/lib/questions/schema";
+import {
+  QUESTION_TYPE_LABELS,
+  type QuestionType,
+} from "@/lib/questions/schema";
 import { type PortableTest, parsePortableTest } from "@/lib/questions/validate";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -58,7 +61,9 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
     if (!preview) return;
     try {
       const res = await importJson.mutateAsync({ json: text });
-      await queryClient.invalidateQueries({ queryKey: trpc.test.list.pathKey() });
+      await queryClient.invalidateQueries({
+        queryKey: trpc.test.list.pathKey(),
+      });
       toast.success(
         `“${preview.test.title}” geïmporteerd met ${res.questionCount} ${res.questionCount === 1 ? "vraag" : "vragen"}.`,
       );
@@ -97,8 +102,8 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
         <DialogHeader>
           <DialogTitle>Toets importeren</DialogTitle>
           <DialogDescription>
-            Kies een JSON-bestand dat met “Exporteren” uit Pensuma is gemaakt, bijvoorbeeld van een collega. De
-            toets wordt als concept toegevoegd.
+            Kies een JSON-bestand dat met “Exporteren” uit Pensuma is gemaakt,
+            bijvoorbeeld van een collega. De toets wordt als concept toegevoegd.
           </DialogDescription>
         </DialogHeader>
 
@@ -122,8 +127,12 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
             )}
           >
             <FileJson className="size-7 text-primary" aria-hidden="true" />
-            <span className="text-sm font-medium">{fileName ?? "Sleep een bestand hierheen of klik om te kiezen"}</span>
-            <span className="text-xs text-muted-foreground">.json, maximaal 5 MB</span>
+            <span className="text-sm font-medium">
+              {fileName ?? "Sleep een bestand hierheen of klik om te kiezen"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              .json, maximaal 5 MB
+            </span>
             <input
               ref={fileRef}
               id={inputId}
@@ -139,7 +148,9 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
           </label>
 
           <details className="group rounded-lg border px-3 py-2 text-sm">
-            <summary className="cursor-pointer text-muted-foreground select-none">Of plak de JSON-tekst</summary>
+            <summary className="cursor-pointer text-muted-foreground select-none">
+              Of plak de JSON-tekst
+            </summary>
             <textarea
               aria-label="JSON-tekst"
               value={text}
@@ -154,10 +165,18 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
           </details>
 
           {parsed && !parsed.success ? (
-            <div role="alert" className="flex gap-2.5 rounded-lg bg-destructive/[0.07] px-3 py-2.5 text-sm text-destructive-ink">
-              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <div
+              role="alert"
+              className="flex gap-2.5 rounded-lg bg-destructive/[0.07] px-3 py-2.5 text-sm text-destructive-ink"
+            >
+              <CircleAlert
+                className="mt-0.5 size-4 shrink-0"
+                aria-hidden="true"
+              />
               <div className="flex flex-col gap-1">
-                <p className="font-medium">Dit bestand kan niet worden geïmporteerd.</p>
+                <p className="font-medium">
+                  Dit bestand kan niet worden geïmporteerd.
+                </p>
                 <ul className="list-disc pl-4 text-xs text-foreground/80">
                   {parsed.messages.slice(0, 4).map((m) => (
                     <li key={m}>{m}</li>
@@ -170,15 +189,20 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
           {preview ? (
             <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4">
               <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-medium text-muted-foreground">Voorbeeld</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Voorbeeld
+                </span>
                 <span className="font-semibold">{preview.test.title}</span>
                 {preview.test.topic ? (
-                  <span className="text-sm text-muted-foreground">{preview.test.topic}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {preview.test.topic}
+                  </span>
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium ring-1 ring-border">
-                  {preview.questions.length} {preview.questions.length === 1 ? "vraag" : "vragen"} ·{" "}
+                  {preview.questions.length}{" "}
+                  {preview.questions.length === 1 ? "vraag" : "vragen"} ·{" "}
                   {preview.questions.reduce((s, q) => s + q.points, 0)} punten
                 </span>
                 {counts
@@ -190,7 +214,10 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
                         key={type}
                         className="inline-flex items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs ring-1 ring-border"
                       >
-                        <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        <Icon
+                          className="size-3.5 text-muted-foreground"
+                          aria-hidden="true"
+                        />
                         {n}× {QUESTION_TYPE_LABELS[type].toLowerCase()}
                       </span>
                     );
@@ -204,9 +231,15 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
           <Button variant="outline" onClick={() => setOpen(false)}>
             Annuleren
           </Button>
-          <Button onClick={() => void submit()} disabled={!preview || importJson.isPending}>
+          <Button
+            onClick={() => void submit()}
+            disabled={!preview || importJson.isPending}
+          >
             {importJson.isPending ? (
-              <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <Upload aria-hidden="true" />
             )}

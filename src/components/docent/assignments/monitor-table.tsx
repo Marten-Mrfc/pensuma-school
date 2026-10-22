@@ -18,7 +18,12 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,7 +85,12 @@ export function MonitorTable({
   };
   const q = search.trim().toLowerCase();
   const rows = data.students.filter((r) => {
-    if (q && !r.student.name.toLowerCase().includes(q) && !(r.student.studentNumber ?? "").includes(q)) return false;
+    if (
+      q &&
+      !r.student.name.toLowerCase().includes(q) &&
+      !(r.student.studentNumber ?? "").includes(q)
+    )
+      return false;
     switch (filter) {
       case "all":
         return true;
@@ -114,11 +124,14 @@ export function MonitorTable({
               onClick={() => setFilter(f.value)}
               className={cn(
                 "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                filter === f.value && "border-primary bg-primary/10 text-primary hover:bg-primary/15",
+                filter === f.value &&
+                  "border-primary bg-primary/10 text-primary hover:bg-primary/15",
               )}
             >
               {f.label}
-              <span className="text-xs tabular-nums opacity-70">{counts[f.value]}</span>
+              <span className="text-xs tabular-nums opacity-70">
+                {counts[f.value]}
+              </span>
             </button>
           ))}
         </div>
@@ -156,13 +169,19 @@ export function MonitorTable({
                   <th scope="col" className="px-3 py-2.5 font-medium">
                     Tijd over
                   </th>
-                  <th scope="col" className="px-3 py-2.5 text-center font-medium">
+                  <th
+                    scope="col"
+                    className="px-3 py-2.5 text-center font-medium"
+                  >
                     Vensterwissels
                   </th>
                   <th scope="col" className="px-3 py-2.5 font-medium">
                     Laatst actief
                   </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                  <th
+                    scope="col"
+                    className="px-3 py-2.5 text-right font-medium"
+                  >
                     Score
                   </th>
                   <th scope="col" className="w-12 px-2 py-2.5">
@@ -174,7 +193,10 @@ export function MonitorTable({
                 {rows.map((row) => (
                   <tr
                     key={row.student.id}
-                    className={cn("transition-colors hover:bg-muted/30", !row.attempt && "text-muted-foreground")}
+                    className={cn(
+                      "transition-colors hover:bg-muted/30",
+                      !row.attempt && "text-muted-foreground",
+                    )}
                   >
                     <td className="px-4 py-3">
                       <StudentCell row={row} />
@@ -198,7 +220,11 @@ export function MonitorTable({
                       <ScoreCell row={row} />
                     </td>
                     <td className="px-2 py-3 text-right">
-                      <RowActions assignmentId={assignmentId} row={row} onDialog={setDialog} />
+                      <RowActions
+                        assignmentId={assignmentId}
+                        row={row}
+                        onDialog={setDialog}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -209,12 +235,19 @@ export function MonitorTable({
           {/* Phone: cards */}
           <ul className="flex flex-col gap-2 md:hidden">
             {rows.map((row) => (
-              <li key={row.student.id} className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs">
+              <li
+                key={row.student.id}
+                className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <StudentCell row={row} />
                   <div className="flex items-center gap-1">
                     <StatusPill row={row} serverNow={serverNow} />
-                    <RowActions assignmentId={assignmentId} row={row} onDialog={setDialog} />
+                    <RowActions
+                      assignmentId={assignmentId}
+                      row={row}
+                      onDialog={setDialog}
+                    />
                   </div>
                 </div>
                 {row.attempt ? (
@@ -226,7 +259,9 @@ export function MonitorTable({
                         <RemainingCell row={row} serverNow={serverNow} />
                       </div>
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-muted-foreground">Vensterwissels</span>
+                        <span className="text-muted-foreground">
+                          Vensterwissels
+                        </span>
                         <FocusCell row={row} />
                       </div>
                       <div className="flex flex-col gap-0.5 text-right">
@@ -252,7 +287,10 @@ export function MonitorTable({
         assignmentClosed={data.assignment.effectiveStatus === "closed"}
         onClose={() => setDialog(null)}
       />
-      <ResetAttemptDialog row={dialog?.kind === "reset" ? dialog.row : null} onClose={() => setDialog(null)} />
+      <ResetAttemptDialog
+        row={dialog?.kind === "reset" ? dialog.row : null}
+        onClose={() => setDialog(null)}
+      />
     </section>
   );
 }
@@ -265,32 +303,46 @@ function StudentCell({ row }: { row: StudentRow }) {
       <span
         className={cn(
           "grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold",
-          row.attempt ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+          row.attempt
+            ? "bg-primary/10 text-primary"
+            : "bg-muted text-muted-foreground",
         )}
         aria-hidden="true"
       >
         {initials(row.student.name)}
       </span>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate font-medium text-foreground">{row.student.name}</span>
+        <span className="truncate font-medium text-foreground">
+          {row.student.name}
+        </span>
         <span className="text-xs text-muted-foreground tabular-nums">
           {row.student.studentNumber ?? "–"}
           {!row.student.inClass ? " · niet meer in de klas" : ""}
-          {row.attemptCount > 1 ? ` · poging ${row.attempt?.attemptNumber}` : ""}
+          {row.attemptCount > 1
+            ? ` · poging ${row.attempt?.attemptNumber}`
+            : ""}
         </span>
       </div>
     </div>
   );
 }
 
-function StatusPill({ row, serverNow }: { row: StudentRow; serverNow: number }) {
+function StatusPill({
+  row,
+  serverNow,
+}: {
+  row: StudentRow;
+  serverNow: number;
+}) {
   const a = row.attempt;
   let label = "Niet begonnen";
   let cls = "bg-muted/60 text-muted-foreground ring-border/70";
   let dot = "bg-muted-foreground/40";
   let pulse = false;
   if (a?.status === "in_progress") {
-    const inactive = a.lastSeenAt && serverNow - new Date(a.lastSeenAt).getTime() > INACTIVE_MS;
+    const inactive =
+      a.lastSeenAt &&
+      serverNow - new Date(a.lastSeenAt).getTime() > INACTIVE_MS;
     label = inactive ? "Bezig · inactief" : "Bezig";
     cls = "bg-warning/12 text-warning-ink ring-warning/30";
     dot = "bg-warning";
@@ -309,9 +361,16 @@ function StatusPill({ row, serverNow }: { row: StudentRow; serverNow: number }) 
     >
       <span className="relative flex size-1.5" aria-hidden="true">
         {pulse ? (
-          <span className={cn("absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping", dot)} />
+          <span
+            className={cn(
+              "absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping",
+              dot,
+            )}
+          />
         ) : null}
-        <span className={cn("relative inline-flex size-1.5 rounded-full", dot)} />
+        <span
+          className={cn("relative inline-flex size-1.5 rounded-full", dot)}
+        />
       </span>
       {label}
     </span>
@@ -321,7 +380,9 @@ function StatusPill({ row, serverNow }: { row: StudentRow; serverNow: number }) 
 function ProgressCell({ row }: { row: StudentRow }) {
   const a = row.attempt;
   if (!a) return <span className="text-xs">–</span>;
-  const pct = a.totalQuestions ? Math.round((a.answeredCount / a.totalQuestions) * 100) : 0;
+  const pct = a.totalQuestions
+    ? Math.round((a.answeredCount / a.totalQuestions) * 100)
+    : 0;
   return (
     <div className="flex items-center gap-2.5">
       <div
@@ -347,16 +408,28 @@ function ProgressCell({ row }: { row: StudentRow }) {
   );
 }
 
-function RemainingCell({ row, serverNow }: { row: StudentRow; serverNow: number }) {
+function RemainingCell({
+  row,
+  serverNow,
+}: {
+  row: StudentRow;
+  serverNow: number;
+}) {
   const a = row.attempt;
-  if (!a || a.status !== "in_progress") return <span className="text-xs text-muted-foreground">–</span>;
-  if (!a.deadlineAt) return <span className="text-xs text-muted-foreground">Geen limiet</span>;
+  if (!a || a.status !== "in_progress")
+    return <span className="text-xs text-muted-foreground">–</span>;
+  if (!a.deadlineAt)
+    return <span className="text-xs text-muted-foreground">Geen limiet</span>;
   const left = new Date(a.deadlineAt).getTime() - serverNow;
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 font-mono text-sm font-medium tabular-nums",
-        left <= 60_000 ? "text-destructive" : left <= 5 * 60_000 ? "text-warning-ink" : "text-foreground",
+        left <= 60_000
+          ? "text-destructive"
+          : left <= 5 * 60_000
+            ? "text-warning-ink"
+            : "text-foreground",
       )}
     >
       {left <= 0 ? "Tijd om" : formatRemaining(left)}
@@ -371,8 +444,12 @@ function RemainingCell({ row, serverNow }: { row: StudentRow; serverNow: number 
 
 function FocusCell({ row }: { row: StudentRow }) {
   const n = row.attempt?.focusLossCount ?? 0;
-  if (!row.attempt) return <span className="text-xs text-muted-foreground">–</span>;
-  if (n === 0) return <span className="text-xs text-muted-foreground tabular-nums">0</span>;
+  if (!row.attempt)
+    return <span className="text-xs text-muted-foreground">–</span>;
+  if (n === 0)
+    return (
+      <span className="text-xs text-muted-foreground tabular-nums">0</span>
+    );
   return (
     <span
       className={cn(
@@ -389,42 +466,65 @@ function FocusCell({ row }: { row: StudentRow }) {
   );
 }
 
-function LastSeenCell({ row, serverNow }: { row: StudentRow; serverNow: number }) {
+function LastSeenCell({
+  row,
+  serverNow,
+}: {
+  row: StudentRow;
+  serverNow: number;
+}) {
   const a = row.attempt;
-  const at = a?.status === "submitted" ? a.submittedAt : (a?.lastSeenAt ?? a?.startedAt);
+  const at =
+    a?.status === "submitted" ? a.submittedAt : (a?.lastSeenAt ?? a?.startedAt);
   if (!at) return <span className="text-xs text-muted-foreground">–</span>;
-  const inactive = a?.status === "in_progress" && serverNow - new Date(at).getTime() > INACTIVE_MS;
+  const inactive =
+    a?.status === "in_progress" &&
+    serverNow - new Date(at).getTime() > INACTIVE_MS;
   return (
     <RelativeTime
       date={at}
       now={serverNow}
       locale="nl"
       formatStyle="short"
-      className={cn("text-xs", inactive ? "font-medium text-warning-ink" : "text-muted-foreground")}
+      className={cn(
+        "text-xs",
+        inactive ? "font-medium text-warning-ink" : "text-muted-foreground",
+      )}
     />
   );
 }
 
 function ScoreCell({ row }: { row: StudentRow }) {
   const a = row.attempt;
-  if (!a || a.status !== "submitted") return <span className="text-xs text-muted-foreground">–</span>;
+  if (!a || a.status !== "submitted")
+    return <span className="text-xs text-muted-foreground">–</span>;
   if (a.gradingStatus === "pending") {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-info-ink">
-        <Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+        <Loader2
+          className="size-3.5 motion-safe:animate-spin"
+          aria-hidden="true"
+        />
         Nakijken…
       </span>
     );
   }
-  const grade = a.score != null && a.maxScore ? 1 + 9 * Math.max(0, Math.min(1, a.score / a.maxScore)) : null;
+  const grade =
+    a.score != null && a.maxScore
+      ? 1 + 9 * Math.max(0, Math.min(1, a.score / a.maxScore))
+      : null;
   return (
     <span className="inline-flex flex-col items-end leading-tight">
       <span className="font-semibold text-foreground tabular-nums">
         {formatNumber(a.score)}
-        <span className="font-normal text-muted-foreground">/{formatNumber(a.maxScore)}</span>
+        <span className="font-normal text-muted-foreground">
+          /{formatNumber(a.maxScore)}
+        </span>
       </span>
       {a.gradingStatus === "needs_review" ? (
-        <span className="text-[11px] font-medium text-warning-ink">nog nakijken</span>
+        <span className="text-[11px] font-medium text-warning-ink">
+          nog nakijken
+        </span>
       ) : grade != null ? (
         <span className="text-[11px] text-muted-foreground tabular-nums">
           cijfer {formatGrade(Math.round(grade * 10) / 10)}
@@ -447,7 +547,9 @@ function useInvalidateAssignment() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return async () => {
-    await queryClient.invalidateQueries({ queryKey: trpc.assignment.pathKey() });
+    await queryClient.invalidateQueries({
+      queryKey: trpc.assignment.pathKey(),
+    });
     await queryClient.invalidateQueries({ queryKey: trpc.review.pathKey() });
   };
 }
@@ -459,7 +561,10 @@ function RowActions({
 }: {
   assignmentId: string;
   row: StudentRow;
-  onDialog: (d: { kind: "extend" | "reopen" | "reset"; row: StudentRow }) => void;
+  onDialog: (d: {
+    kind: "extend" | "reopen" | "reset";
+    row: StudentRow;
+  }) => void;
 }) {
   const trpc = useTRPC();
   const invalidate = useInvalidateAssignment();
@@ -467,9 +572,12 @@ function RowActions({
     trpc.assignment.extendTime.mutationOptions({
       onSuccess: async (res, vars) => {
         await invalidate();
-        toast.success(`${row.student.name} krijgt ${vars.minutes} minuten extra`, {
-          description: `Totaal ${res.extraMinutes} minuten extra.`,
-        });
+        toast.success(
+          `${row.student.name} krijgt ${vars.minutes} minuten extra`,
+          {
+            description: `Totaal ${res.extraMinutes} minuten extra.`,
+          },
+        );
       },
       onError: (err) => toast.error(getErrorMessage(err)),
     }),
@@ -478,7 +586,12 @@ function RowActions({
   const a = row.attempt;
   if (!a) {
     return (
-      <Button variant="ghost" size="icon-sm" disabled aria-label="Geen acties: nog niet begonnen">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        disabled
+        aria-label="Geen acties: nog niet begonnen"
+      >
         <UserRound className="opacity-40" aria-hidden="true" />
       </Button>
     );
@@ -488,7 +601,11 @@ function RowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={`Acties voor ${row.student.name}`}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Acties voor ${row.student.name}`}
+        >
           {extend.isPending ? (
             <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
           ) : (
@@ -497,7 +614,9 @@ function RowActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate">{row.student.name}</DropdownMenuLabel>
+        <DropdownMenuLabel className="truncate">
+          {row.student.name}
+        </DropdownMenuLabel>
         <DropdownMenuItem asChild>
           <Link href={routes.docent.attempt(assignmentId, a.id)}>
             <Eye aria-hidden="true" />
@@ -512,12 +631,21 @@ function RowActions({
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               {[5, 10, 15].map((m) => (
-                <DropdownMenuItem key={m} onSelect={() => extend.mutate({ attemptId: a.id, minutes: m })}>
+                <DropdownMenuItem
+                  key={m}
+                  onSelect={() =>
+                    extend.mutate({ attemptId: a.id, minutes: m })
+                  }
+                >
                   +{m} minuten
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onDialog({ kind: "extend", row })}>Anders…</DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => onDialog({ kind: "extend", row })}
+              >
+                Anders…
+              </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         ) : null}
@@ -605,7 +733,8 @@ function MinutesDialog({
                   onClick={() => setValue(String(m))}
                   className={cn(
                     "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums hover:bg-accent",
-                    minutes === m && "border-primary bg-primary/10 text-primary",
+                    minutes === m &&
+                      "border-primary bg-primary/10 text-primary",
                   )}
                 >
                   {m} min
@@ -615,16 +744,29 @@ function MinutesDialog({
           </div>
           {children}
           {error ? (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink">
+            <p
+              role="alert"
+              className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
+            >
               {error}
             </p>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={pending}
+            >
               Annuleren
             </Button>
             <Button type="submit" disabled={!valid || pending}>
-              {pending ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : null}
+              {pending ? (
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+              ) : null}
               {confirmLabel}
             </Button>
           </div>
@@ -634,14 +776,22 @@ function MinutesDialog({
   );
 }
 
-function ExtendTimeDialog({ row, onClose }: { row: StudentRow | null; onClose: () => void }) {
+function ExtendTimeDialog({
+  row,
+  onClose,
+}: {
+  row: StudentRow | null;
+  onClose: () => void;
+}) {
   const trpc = useTRPC();
   const invalidate = useInvalidateAssignment();
   const extend = useMutation(
     trpc.assignment.extendTime.mutationOptions({
       onSuccess: async (_res, vars) => {
         await invalidate();
-        toast.success(`${row?.student.name} krijgt ${vars.minutes} minuten extra`);
+        toast.success(
+          `${row?.student.name} krijgt ${vars.minutes} minuten extra`,
+        );
         onClose();
       },
     }),
@@ -656,7 +806,9 @@ function ExtendTimeDialog({ row, onClose }: { row: StudentRow | null; onClose: (
       defaultMinutes={10}
       pending={extend.isPending}
       error={extend.error ? getErrorMessage(extend.error) : null}
-      onConfirm={(minutes) => row?.attempt && extend.mutate({ attemptId: row.attempt.id, minutes })}
+      onConfirm={(minutes) =>
+        row?.attempt && extend.mutate({ attemptId: row.attempt.id, minutes })
+      }
       onClose={() => {
         extend.reset();
         onClose();
@@ -683,7 +835,8 @@ function ReopenAttemptDialog({
       onSuccess: async () => {
         await invalidate();
         toast.success(`De poging van ${row?.student.name} is heropend`, {
-          description: "De leerling kan via ‘Mijn toetsen’ verder waar hij of zij gebleven was.",
+          description:
+            "De leerling kan via ‘Mijn toetsen’ verder waar hij of zij gebleven was.",
         });
         onClose();
       },
@@ -699,7 +852,9 @@ function ReopenAttemptDialog({
       defaultMinutes={Math.min(defaultMinutes, 600)}
       pending={reopen.isPending}
       error={reopen.error ? getErrorMessage(reopen.error) : null}
-      onConfirm={(minutes) => row?.attempt && reopen.mutate({ attemptId: row.attempt.id, minutes })}
+      onConfirm={(minutes) =>
+        row?.attempt && reopen.mutate({ attemptId: row.attempt.id, minutes })
+      }
       onClose={() => {
         reopen.reset();
         onClose();
@@ -707,14 +862,21 @@ function ReopenAttemptDialog({
     >
       {assignmentClosed ? (
         <p className="rounded-md bg-info/10 px-3 py-2 text-sm text-info-ink">
-          De afname is gesloten, maar deze leerling kan toch verder tot de gekozen tijd om is.
+          De afname is gesloten, maar deze leerling kan toch verder tot de
+          gekozen tijd om is.
         </p>
       ) : null}
     </MinutesDialog>
   );
 }
 
-function ResetAttemptDialog({ row, onClose }: { row: StudentRow | null; onClose: () => void }) {
+function ResetAttemptDialog({
+  row,
+  onClose,
+}: {
+  row: StudentRow | null;
+  onClose: () => void;
+}) {
   const trpc = useTRPC();
   const invalidate = useInvalidateAssignment();
   const reset = useMutation(trpc.assignment.resetAttempt.mutationOptions());

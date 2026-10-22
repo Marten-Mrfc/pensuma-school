@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import type { OutputMatchMode } from "@/lib/questions/schema";
-import { compareOutput, compareValues, extractNumbers, normalizeLines } from "./compare";
+import {
+  compareOutput,
+  compareValues,
+  extractNumbers,
+  normalizeLines,
+} from "./compare";
 import { parsePythonLiteral } from "./pyvalue";
 
-function cmp(actual: string, expected: string, match: OutputMatchMode, ignoreCase = true, tolerance = 0.01) {
+function cmp(
+  actual: string,
+  expected: string,
+  match: OutputMatchMode,
+  ignoreCase = true,
+  tolerance = 0.01,
+) {
   return compareOutput(actual, expected, { match, ignoreCase, tolerance });
 }
 
@@ -30,18 +41,30 @@ describe("exact", () => {
   test("feedback names the first differing line", () => {
     const r = cmp("Hoi\nHallo mark!\n", "Hoi\nHallo Mark", "exact", false);
     expect(r.passed).toBe(false);
-    expect(r.feedback).toBe("Regel 2: verwacht `Hallo Mark`, maar je programma printte `Hallo mark!`.");
+    expect(r.feedback).toBe(
+      "Regel 2: verwacht `Hallo Mark`, maar je programma printte `Hallo mark!`.",
+    );
   });
 
   test("hints about spaces and case", () => {
-    expect(cmp("Hallo  Mark", "Hallo Mark", "exact").feedback).toContain("Let op de spaties");
-    expect(cmp("hallo Mark", "Hallo Mark", "exact", false).feedback).toContain("hoofdletters");
+    expect(cmp("Hallo  Mark", "Hallo Mark", "exact").feedback).toContain(
+      "Let op de spaties",
+    );
+    expect(cmp("hallo Mark", "Hallo Mark", "exact", false).feedback).toContain(
+      "hoofdletters",
+    );
   });
 
   test("missing / extra lines and empty output", () => {
-    expect(cmp("a", "a\nb", "exact").feedback).toContain("Regel 2 ontbreekt: `b`");
-    expect(cmp("a\nb\nc", "a\nb", "exact").feedback).toContain("Extra regel 3: `c`");
-    expect(cmp("", "a", "exact").feedback).toContain("Je programma printte niets");
+    expect(cmp("a", "a\nb", "exact").feedback).toContain(
+      "Regel 2 ontbreekt: `b`",
+    );
+    expect(cmp("a\nb\nc", "a\nb", "exact").feedback).toContain(
+      "Extra regel 3: `c`",
+    );
+    expect(cmp("", "a", "exact").feedback).toContain(
+      "Je programma printte niets",
+    );
   });
 
   test("leading empty line matters in exact mode", () => {
@@ -61,19 +84,32 @@ describe("flexible", () => {
   });
 
   test("ignoreCase=false makes it case-sensitive", () => {
-    expect(cmp("hallo mark", "Hallo Mark", "flexible", false).passed).toBe(false);
+    expect(cmp("hallo mark", "Hallo Mark", "flexible", false).passed).toBe(
+      false,
+    );
   });
 
   test("extra labels on the same line are fine", () => {
     expect(cmp("Het antwoord is: 15", "15", "flexible").passed).toBe(true);
-    expect(cmp("Wat is je naam? Hallo Mark", "Hallo Mark", "flexible").passed).toBe(true);
-    expect(cmp("Bedrag in dollar: 108.50", "108.5", "flexible").passed).toBe(true);
+    expect(
+      cmp("Wat is je naam? Hallo Mark", "Hallo Mark", "flexible").passed,
+    ).toBe(true);
+    expect(cmp("Bedrag in dollar: 108.50", "108.5", "flexible").passed).toBe(
+      true,
+    );
   });
 
   test("printed prompts / headings on extra lines are tolerated", () => {
-    expect(cmp("Wat is je naam?\nHallo Mark", "Hallo Mark", "flexible").passed).toBe(true);
-    expect(cmp("Geef een getal:\nGeef nog een getal:\nSom: 7", "7", "flexible").passed).toBe(true);
-    expect(cmp("Even getallen:\n2\n4\n6", "2\n4\n6", "flexible").passed).toBe(true);
+    expect(
+      cmp("Wat is je naam?\nHallo Mark", "Hallo Mark", "flexible").passed,
+    ).toBe(true);
+    expect(
+      cmp("Geef een getal:\nGeef nog een getal:\nSom: 7", "7", "flexible")
+        .passed,
+    ).toBe(true);
+    expect(cmp("Even getallen:\n2\n4\n6", "2\n4\n6", "flexible").passed).toBe(
+      true,
+    );
     expect(cmp("=========\n2\n4", "2\n4", "flexible").passed).toBe(true);
   });
 
@@ -120,14 +156,20 @@ describe("flexible", () => {
     expect(cmp("Hallo Mike", "Hallo Mark", "flexible").feedback).toBe(
       "Regel 1: verwacht `Hallo Mark`, maar je programma printte `Hallo Mike`.",
     );
-    expect(cmp("", "Hallo Mark", "flexible").feedback).toContain("printte niets");
-    expect(cmp("Wat is je naam?", "Hallo Mark", "flexible").feedback).toContain("Hallo Mark");
+    expect(cmp("", "Hallo Mark", "flexible").feedback).toContain(
+      "printte niets",
+    );
+    expect(cmp("Wat is je naam?", "Hallo Mark", "flexible").feedback).toContain(
+      "Hallo Mark",
+    );
   });
 });
 
 describe("contains", () => {
   test("every expected line somewhere, any order", () => {
-    expect(cmp("x\nResultaat: 42\nklaar", "klaar\n42", "contains").passed).toBe(true);
+    expect(cmp("x\nResultaat: 42\nklaar", "klaar\n42", "contains").passed).toBe(
+      true,
+    );
     expect(cmp("Resultaat: 142", "42", "contains").passed).toBe(false);
     expect(cmp("abc", "def", "contains").feedback).toContain("`def`");
   });
@@ -150,9 +192,15 @@ describe("numbers", () => {
 
   test("count and order", () => {
     expect(cmp("1 2 3", "1\n2\n3", "numbers").passed).toBe(true);
-    expect(cmp("1 3 2", "1 2 3", "numbers").feedback).toContain("Getal 2: verwacht 2, maar je programma printte 3");
-    expect(cmp("1 2", "1 2 3", "numbers").feedback).toContain("Getal 3 ontbreekt: 3");
-    expect(cmp("1 2 3 4", "1 2 3", "numbers").feedback).toContain("Extra getal: 4");
+    expect(cmp("1 3 2", "1 2 3", "numbers").feedback).toContain(
+      "Getal 2: verwacht 2, maar je programma printte 3",
+    );
+    expect(cmp("1 2", "1 2 3", "numbers").feedback).toContain(
+      "Getal 3 ontbreekt: 3",
+    );
+    expect(cmp("1 2 3 4", "1 2 3", "numbers").feedback).toContain(
+      "Extra getal: 4",
+    );
     expect(cmp("geen", "7", "numbers").feedback).toContain("geen getallen");
   });
 });
@@ -177,13 +225,16 @@ describe("regex", () => {
   test("search with multiline + ignoreCase", () => {
     expect(cmp("x\nHallo Mark\n", "^hallo \\w+$", "regex").passed).toBe(true);
     expect(cmp("Hallo Mark", "^hallo", "regex", false).passed).toBe(false);
-    expect(cmp("abc", "(", "regex").feedback).toContain("ongeldige reguliere expressie");
+    expect(cmp("abc", "(", "regex").feedback).toContain(
+      "ongeldige reguliere expressie",
+    );
   });
 });
 
 describe("compareValues", () => {
   const v = parsePythonLiteral;
-  const eq = (a: string, e: string, tol = 1e-6) => compareValues(v(a), v(e), tol);
+  const eq = (a: string, e: string, tol = 1e-6) =>
+    compareValues(v(a), v(e), tol);
 
   test("numbers with tolerance, int vs float", () => {
     expect(eq("2", "2.0").equal).toBe(true);
@@ -191,7 +242,9 @@ describe("compareValues", () => {
     expect(eq("2.5", "2.0").equal).toBe(false);
     expect(eq("2.004", "2.0", 0.01).equal).toBe(true);
     expect(eq("float('nan')", "float('nan')").equal).toBe(true);
-    expect(eq("123456789012345678901", "123456789012345678902").equal).toBe(false);
+    expect(eq("123456789012345678901", "123456789012345678902").equal).toBe(
+      false,
+    );
   });
 
   test("types: bool is not int, list is not tuple, str is exact", () => {

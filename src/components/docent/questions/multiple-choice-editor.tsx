@@ -1,11 +1,25 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Check, Eye, ListChecks, Plus, Settings2, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Eye,
+  ListChecks,
+  Plus,
+  Settings2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { MultipleChoiceData } from "@/lib/questions/schema";
 import { newOption } from "@/lib/questions/templates";
 import { optionLetter, type QuestionIssue } from "@/lib/questions/validate";
@@ -30,11 +44,17 @@ export function MultipleChoiceEditor({
   const [showAnswers, setShowAnswers] = useState(false);
   const [previewSelected, setPreviewSelected] = useState<string[]>([]);
   const [focusId, setFocusId] = useState<string | null>(null);
-  const set = (patch: Partial<MultipleChoiceData>) => onChange({ ...data, ...patch });
+  const set = (patch: Partial<MultipleChoiceData>) =>
+    onChange({ ...data, ...patch });
   const options = data.options;
 
-  function setOption(id: string, patch: Partial<MultipleChoiceData["options"][number]>) {
-    set({ options: options.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+  function setOption(
+    id: string,
+    patch: Partial<MultipleChoiceData["options"][number]>,
+  ) {
+    set({
+      options: options.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+    });
   }
 
   function toggleCorrect(id: string) {
@@ -63,7 +83,10 @@ export function MultipleChoiceEditor({
   }
 
   const optionIssues = (id: string) =>
-    issues.filter((i) => i.target?.field === "option" && "id" in i.target && i.target.id === id);
+    issues.filter(
+      (i) =>
+        i.target?.field === "option" && "id" in i.target && i.target.id === id,
+    );
   const generalIssues = issues.filter((i) => i.target?.field === "options");
   const correctCount = options.filter((o) => o.correct).length;
 
@@ -98,12 +121,19 @@ export function MultipleChoiceEditor({
               onText={(text) => setOption(option.id, { text })}
               onToggle={() => toggleCorrect(option.id)}
               onMove={(d) => move(index, d)}
-              onRemove={() => set({ options: options.filter((o) => o.id !== option.id) })}
+              onRemove={() =>
+                set({ options: options.filter((o) => o.id !== option.id) })
+              }
             />
           ))}
         </ol>
         <div>
-          <Button variant="outline" size="sm" onClick={add} disabled={options.length >= MAX_OPTIONS}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={add}
+            disabled={options.length >= MAX_OPTIONS}
+          >
             <Plus aria-hidden="true" />
             Optie toevoegen
           </Button>
@@ -117,7 +147,10 @@ export function MultipleChoiceEditor({
             description="Leerlingen kunnen meer dan één optie aanvinken."
             checked={data.multiple}
             onCheckedChange={(multiple) =>
-              set({ multiple, scoring: multiple ? data.scoring : "all_or_nothing" })
+              set({
+                multiple,
+                scoring: multiple ? data.scoring : "all_or_nothing",
+              })
             }
           />
           <SwitchField
@@ -164,7 +197,9 @@ export function MultipleChoiceEditor({
                   />
                   <span className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium">{label}</span>
-                    <span className="text-xs leading-relaxed text-muted-foreground">{description}</span>
+                    <span className="text-xs leading-relaxed text-muted-foreground">
+                      {description}
+                    </span>
                   </span>
                 </label>
               );
@@ -183,17 +218,24 @@ export function MultipleChoiceEditor({
         description="Live voorbeeld. Je kunt het uitproberen; er wordt niets opgeslagen."
         icon={<Eye />}
         actions={
-          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <Switch size="sm" checked={showAnswers} onCheckedChange={setShowAnswers} />
-            Toon goede antwoorden
-          </label>
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Switch
+              id="mc-show-answers"
+              size="sm"
+              checked={showAnswers}
+              onCheckedChange={setShowAnswers}
+            />
+            <label htmlFor="mc-show-answers">Toon goede antwoorden</label>
+          </div>
         }
       >
         <div className="rounded-xl border bg-background p-4 sm:p-5">
           {prompt.trim() ? (
             <Markdown>{prompt}</Markdown>
           ) : (
-            <p className="text-sm text-muted-foreground italic">Nog geen opdrachttekst.</p>
+            <p className="text-sm text-muted-foreground italic">
+              Nog geen opdrachttekst.
+            </p>
           )}
           <div className="mt-4">
             <ChoiceOptionsView
@@ -205,7 +247,9 @@ export function MultipleChoiceEditor({
             />
           </div>
           {data.shuffle ? (
-            <p className="mt-3 text-xs text-muted-foreground">Leerlingen zien deze opties in willekeurige volgorde.</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Leerlingen zien deze opties in willekeurige volgorde.
+            </p>
           ) : null}
         </div>
       </EditorSection>
@@ -247,7 +291,7 @@ function OptionRow({
   return (
     <li
       className={cn(
-        "flex flex-col gap-2 rounded-lg border bg-background/60 p-2.5 transition-colors sm:flex-row sm:items-start",
+        "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border bg-background/60 p-2.5 transition-colors sm:grid-cols-[auto_minmax(0,1fr)_auto]",
         correct && "border-success/40 bg-success/[0.05]",
       )}
     >
@@ -269,17 +313,23 @@ function OptionRow({
                   : "text-muted-foreground hover:border-foreground/30 hover:text-foreground",
               )}
             >
-              {correct ? <Check className="size-3.5" aria-hidden="true" /> : <X className="size-3.5" aria-hidden="true" />}
+              {correct ? (
+                <Check className="size-3.5" aria-hidden="true" />
+              ) : (
+                <X className="size-3.5" aria-hidden="true" />
+              )}
               {correct ? "Goed" : "Fout"}
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            {multiple ? "Markeer als goed of fout" : "Markeer als hét goede antwoord"}
+            {multiple
+              ? "Markeer als goed of fout"
+              : "Markeer als hét goede antwoord"}
           </TooltipContent>
         </Tooltip>
         <IssueDot issues={issues} className="sm:hidden" />
       </div>
-      <div ref={ref} className="min-w-0 flex-1">
+      <div ref={ref} className="order-last col-span-2 min-w-0 sm:order-none sm:col-span-1">
         <AutoTextarea
           value={text}
           onValueChange={onText}

@@ -1,10 +1,18 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
-import { type PreviewQuestion, StudentQuestionPreview } from "@/components/docent/questions/question-preview";
+import {
+  type PreviewQuestion,
+  StudentQuestionPreview,
+} from "@/components/docent/questions/question-preview";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 /** "Voorbeeld als leerling": the questions exactly as students see them. Nothing is saved. */
 export function PreviewSheet({
@@ -27,17 +35,24 @@ export function PreviewSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-3xl lg:max-w-4xl">
+      <SheetContent
+        side="right"
+        className="w-full gap-0 p-0 sm:max-w-3xl lg:max-w-4xl"
+      >
         <div className="flex flex-col gap-3 border-b bg-card px-4 pt-4 pb-3 pr-12 sm:px-6">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-info/10 px-2.5 py-1 text-xs font-medium text-info-ink">
               <Eye className="size-3.5" aria-hidden="true" />
               Voorbeeld als leerling
             </span>
-            <span className="text-xs text-muted-foreground">Er wordt niets opgeslagen.</span>
+            <span className="text-xs text-muted-foreground">
+              Er wordt niets opgeslagen.
+            </span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <SheetTitle className="truncate font-display text-lg leading-tight">{testTitle || "Naamloze toets"}</SheetTitle>
+            <SheetTitle className="truncate font-display text-lg leading-tight">
+              {testTitle || "Naamloze toets"}
+            </SheetTitle>
             <SheetDescription className="sr-only">
               Bekijk en probeer de vragen uit zoals een leerling ze ziet.
             </SheetDescription>
@@ -79,10 +94,17 @@ export function PreviewSheet({
         <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-6 sm:px-8">
           {current ? (
             <div className="mx-auto w-full max-w-3xl">
-              <StudentQuestionPreview key={current.id} question={current} number={index + 1} total={total} />
+              <StudentQuestionPreview
+                key={current.id}
+                question={current}
+                number={index + 1}
+                total={total}
+              />
             </div>
           ) : (
-            <p className="text-center text-sm text-muted-foreground">Deze toets heeft nog geen vragen.</p>
+            <p className="text-center text-sm text-muted-foreground">
+              Deze toets heeft nog geen vragen.
+            </p>
           )}
         </div>
       </SheetContent>

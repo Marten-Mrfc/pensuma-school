@@ -1,5 +1,9 @@
 import { CircleAlert, TriangleAlert } from "lucide-react";
-import { capitalize, type IssueSeverity, type QuestionIssue } from "@/lib/questions/validate";
+import {
+  capitalize,
+  type IssueSeverity,
+  type QuestionIssue,
+} from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
 
 /** Coloured dot for a list item: red for errors, amber for warnings. */
@@ -26,7 +30,9 @@ export function IssueDot({
   );
 }
 
-export function worstSeverity(issues: readonly QuestionIssue[]): IssueSeverity | null {
+export function worstSeverity(
+  issues: readonly QuestionIssue[],
+): IssueSeverity | null {
   if (issues.some((i) => i.severity === "error")) return "error";
   if (issues.length > 0) return "warning";
   return null;

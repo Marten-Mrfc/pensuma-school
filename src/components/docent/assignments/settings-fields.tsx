@@ -2,8 +2,8 @@
 
 import {
   ClipboardX,
-  Eye,
   Expand,
+  Eye,
   FlaskConical,
   type LucideIcon,
   MonitorSmartphone,
@@ -23,17 +23,26 @@ import {
 import { cn } from "@/lib/utils";
 
 const SHOW_RESULTS_HELP: Record<ShowResults, string> = {
-  immediately: "Leerlingen zien hun score en de zichtbare testresultaten meteen na het inleveren.",
+  immediately:
+    "Leerlingen zien hun score en de zichtbare testresultaten meteen na het inleveren.",
   after_close: "Leerlingen zien hun resultaat pas als de afname gesloten is.",
   manual: "Je geeft de resultaten zelf vrij op de resultatenpagina.",
   never: "Leerlingen zien nooit een score (alleen dat ze hebben ingeleverd).",
 };
 
 type BooleanKey = {
-  [K in keyof AssignmentSettings]: AssignmentSettings[K] extends boolean ? K : never;
+  [K in keyof AssignmentSettings]: AssignmentSettings[K] extends boolean
+    ? K
+    : never;
 }[keyof AssignmentSettings];
 
-const SWITCHES: { key: BooleanKey; label: string; help: string; icon: LucideIcon; group: "work" | "exam" }[] = [
+const SWITCHES: {
+  key: BooleanKey;
+  label: string;
+  help: string;
+  icon: LucideIcon;
+  group: "work" | "exam";
+}[] = [
   {
     key: "shuffleQuestions",
     label: "Vragen husselen",
@@ -91,14 +100,19 @@ export function AssignmentSettingsFields({
   compact?: boolean;
 }) {
   const id = useId();
-  const set = <K extends keyof AssignmentSettings>(key: K, v: AssignmentSettings[K]) =>
-    onChange({ ...value, [key]: v });
+  const set = <K extends keyof AssignmentSettings>(
+    key: K,
+    v: AssignmentSettings[K],
+  ) => onChange({ ...value, [key]: v });
 
   return (
     <div className="flex flex-col gap-6">
       <div className={cn("grid gap-4", !compact && "md:grid-cols-2")}>
         <div className="flex flex-col gap-2">
-          <label htmlFor={`${id}-results`} className="flex items-center gap-2 text-sm font-medium">
+          <label
+            htmlFor={`${id}-results`}
+            className="flex items-center gap-2 text-sm font-medium"
+          >
             <Eye className="size-4 text-muted-foreground" aria-hidden="true" />
             Resultaten tonen
           </label>
@@ -107,16 +121,26 @@ export function AssignmentSettingsFields({
             value={value.showResults}
             disabled={disabled}
             onChange={(e) => set("showResults", e.target.value as ShowResults)}
-            options={(Object.keys(SHOW_RESULTS_LABELS) as ShowResults[]).map((k) => ({
-              value: k,
-              label: SHOW_RESULTS_LABELS[k],
-            }))}
+            options={(Object.keys(SHOW_RESULTS_LABELS) as ShowResults[]).map(
+              (k) => ({
+                value: k,
+                label: SHOW_RESULTS_LABELS[k],
+              }),
+            )}
           />
-          <p className="text-xs text-muted-foreground">{SHOW_RESULTS_HELP[value.showResults]}</p>
+          <p className="text-xs text-muted-foreground">
+            {SHOW_RESULTS_HELP[value.showResults]}
+          </p>
         </div>
         <div className="flex flex-col gap-2">
-          <label htmlFor={`${id}-attempts`} className="flex items-center gap-2 text-sm font-medium">
-            <Repeat className="size-4 text-muted-foreground" aria-hidden="true" />
+          <label
+            htmlFor={`${id}-attempts`}
+            className="flex items-center gap-2 text-sm font-medium"
+          >
+            <Repeat
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             Max. pogingen
           </label>
           <Input
@@ -129,7 +153,10 @@ export function AssignmentSettingsFields({
             value={value.maxAttempts}
             onChange={(e) => {
               const n = Number.parseInt(e.target.value, 10);
-              set("maxAttempts", Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : 1);
+              set(
+                "maxAttempts",
+                Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : 1,
+              );
             }}
           />
           <p className="text-xs text-muted-foreground">
@@ -162,14 +189,18 @@ export function AssignmentSettingsFields({
                   <span
                     className={cn(
                       "mt-0.5 grid size-8 shrink-0 place-items-center rounded-md",
-                      value[s.key] ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                      value[s.key]
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     <Icon className="size-4" aria-hidden="true" />
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="text-sm font-medium">{s.label}</span>
-                    <span className="text-xs leading-relaxed text-muted-foreground">{s.help}</span>
+                    <span className="text-xs leading-relaxed text-muted-foreground">
+                      {s.help}
+                    </span>
                   </span>
                   <Switch
                     id={switchId}

@@ -183,7 +183,7 @@ export function ClassDetailPage({
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard
           label="Leerlingen"
           value={members.length}
@@ -207,6 +207,7 @@ export function ClassDetailPage({
           value={loggedIn}
           icon={LogIn}
           tone="info"
+          className="hidden sm:flex"
           hint={
             members.length > 0
               ? `van de ${members.length} leerlingen (recent)`

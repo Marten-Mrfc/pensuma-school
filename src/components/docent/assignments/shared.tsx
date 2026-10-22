@@ -5,14 +5,22 @@ import { cn } from "@/lib/utils";
 import type { AssignmentMode } from "./defaults";
 
 /** "Toets" / "Oefenen" pill. */
-export function ModeBadge({ mode, className }: { mode: AssignmentMode; className?: string }) {
+export function ModeBadge({
+  mode,
+  className,
+}: {
+  mode: AssignmentMode;
+  className?: string;
+}) {
   const exam = mode === "exam";
   const Icon = exam ? FileCheck2 : Dumbbell;
   return (
     <span
       className={cn(
         "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset",
-        exam ? "bg-primary/10 text-primary ring-primary/20" : "bg-info/10 text-info-ink ring-info/25",
+        exam
+          ? "bg-primary/10 text-primary ring-primary/20"
+          : "bg-info/10 text-info-ink ring-info/25",
         className,
       )}
     >
@@ -52,7 +60,10 @@ export function AssignmentProgress({
   return (
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <div
-        className={cn("flex w-full overflow-hidden rounded-full bg-muted", height)}
+        className={cn(
+          "flex w-full overflow-hidden rounded-full bg-muted",
+          height,
+        )}
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={total}
@@ -74,15 +85,24 @@ export function AssignmentProgress({
       {showLegend ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-success" aria-hidden="true" />
+            <span
+              className="size-2 rounded-full bg-success"
+              aria-hidden="true"
+            />
             {counts.submitted} ingeleverd
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-warning" aria-hidden="true" />
+            <span
+              className="size-2 rounded-full bg-warning"
+              aria-hidden="true"
+            />
             {counts.inProgress} bezig
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-muted-foreground/30" aria-hidden="true" />
+            <span
+              className="size-2 rounded-full bg-muted-foreground/30"
+              aria-hidden="true"
+            />
             {notStarted} niet begonnen
           </span>
         </div>
@@ -104,7 +124,9 @@ export function InfoItem({
   return (
     <div className={cn("flex min-w-0 flex-col gap-0.5", className)}>
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="truncate text-sm font-medium text-foreground">{children}</span>
+      <span className="truncate text-sm font-medium text-foreground">
+        {children}
+      </span>
     </div>
   );
 }

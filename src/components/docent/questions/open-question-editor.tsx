@@ -3,7 +3,10 @@
 import { ClipboardCheck } from "lucide-react";
 import { useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
-import type { OpenQuestionData, QuestionDataByType } from "@/lib/questions/schema";
+import type {
+  OpenQuestionData,
+  QuestionDataByType,
+} from "@/lib/questions/schema";
 import type { QuestionIssue } from "@/lib/questions/validate";
 import { EditorSection, FieldLabel, NumberInput } from "./fields";
 import { IssueList } from "./issue-list";
@@ -18,7 +21,8 @@ export function OpenQuestionEditor({
   issues: readonly QuestionIssue[];
 }) {
   const id = useId();
-  const set = (patch: Partial<OpenQuestionData>) => onChange({ ...data, ...patch });
+  const set = (patch: Partial<OpenQuestionData>) =>
+    onChange({ ...data, ...patch });
 
   return (
     <EditorSection
@@ -58,10 +62,15 @@ export function OpenQuestionEditor({
           step={100}
           placeholder="Geen limiet"
           onChange={(maxLength) =>
-            set({ maxLength: maxLength === undefined ? undefined : Math.round(maxLength) })
+            set({
+              maxLength:
+                maxLength === undefined ? undefined : Math.round(maxLength),
+            })
           }
         />
-        <p className="text-xs text-muted-foreground">Leeg laten voor geen limiet (maximaal 20.000).</p>
+        <p className="text-xs text-muted-foreground">
+          Leeg laten voor geen limiet (maximaal 20.000).
+        </p>
       </div>
     </EditorSection>
   );

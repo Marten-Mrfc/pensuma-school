@@ -13,6 +13,8 @@ import { z } from "zod";
 import {
   type CodeQuestionData,
   codeQuestionDataSchema,
+  functionTestSchema,
+  ioTestSchema,
   type MultipleChoiceData,
   multipleChoiceDataSchema,
   type OpenQuestionData,
@@ -22,6 +24,18 @@ import {
   type QuestionType,
   questionDataSchemas,
 } from "@/lib/questions/schema";
+
+/** Code data where function tests may still have an empty call/expected. */
+const lenientCodeDataSchema = codeQuestionDataSchema.extend({
+  tests: z
+    .array(
+      z.discriminatedUnion("kind", [
+        ioTestSchema,
+        functionTestSchema.extend({ call: z.string(), expected: z.string() }),
+      ]),
+    )
+    .default([]),
+});
 
 /* -------------------------------------------------------------------------- */
 /*                                  Limits                                    */
@@ -494,21 +508,41 @@ export function validateQuestion(
   const parsed = questionDataSchemas[question.type].safeParse(
     question.data ?? {},
   );
-  if (!parsed.success) {
+  // While editing, function tests may have an empty call/expected value (the
+  // strict schema rejects that). Validate leniently so the teacher gets the
+  // specific message ("test 2: vul de aanroep in") instead of a generic one.
+  const lenient =
+    !parsed.success && question.type === "code"
+      ? lenientCodeDataSchema.safeParse(question.data ?? {})
+      : null;
+  if (parsed.success || lenient?.success) {
+    const data = parsed.success ? parsed.data : lenient?.data;
+    const before = issues.length;
+    if (question.type === "code") {
+      issues.push(
+        ...validateCode(data as CodeQuestionData, question.solutionCheck),
+      );
+    } else if (question.type === "multiple_choice") {
+      issues.push(...validateMultipleChoice(data as MultipleChoiceData));
+    } else {
+      issues.push(...validateOpen(data as OpenQuestionData));
+    }
+    const added = issues.slice(before);
+    if (!parsed.success && !added.some((i) => i.severity === "error")) {
+      issues.push({
+        severity: "error",
+        code: "question.invalid_data",
+        message: `de instellingen zijn ongeldig: ${describeDataIssues(parsed.error.issues)[0] ?? "onbekende fout"}`,
+        target: { field: "data" },
+      });
+    }
+  } else if (!parsed.success) {
     issues.push({
       severity: "error",
       code: "question.invalid_data",
       message: `de instellingen zijn ongeldig: ${describeDataIssues(parsed.error.issues)[0] ?? "onbekende fout"}`,
       target: { field: "data" },
     });
-  } else if (question.type === "code") {
-    issues.push(
-      ...validateCode(parsed.data as CodeQuestionData, question.solutionCheck),
-    );
-  } else if (question.type === "multiple_choice") {
-    issues.push(...validateMultipleChoice(parsed.data as MultipleChoiceData));
-  } else {
-    issues.push(...validateOpen(parsed.data as OpenQuestionData));
   }
 
   return [

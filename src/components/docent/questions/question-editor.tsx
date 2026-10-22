@@ -11,7 +11,11 @@ import {
   QUESTION_TYPE_LABELS,
   type QuestionType,
 } from "@/lib/questions/schema";
-import { MAX_POINTS_PER_QUESTION, type QuestionIssue, type SolutionCheck } from "@/lib/questions/validate";
+import {
+  MAX_POINTS_PER_QUESTION,
+  type QuestionIssue,
+  type SolutionCheck,
+} from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
 import { CodeQuestionEditor } from "./code-question-editor";
 import { EditorSection, FieldLabel, NumberInput } from "./fields";
@@ -84,7 +88,9 @@ export function QuestionEditor({
             <span className="text-xs font-medium text-muted-foreground">
               Vraag {number} van {total} · {QUESTION_TYPE_LABELS[question.type]}
             </span>
-            <span className="truncate font-semibold">{question.title || "Naamloze vraag"}</span>
+            <span className="truncate font-semibold">
+              {question.title || "Naamloze vraag"}
+            </span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
@@ -94,16 +100,21 @@ export function QuestionEditor({
       </div>
 
       {issues.length > 0 ? (
-        <div className="flex flex-col gap-1.5" aria-label="Aandachtspunten bij deze vraag">
+        <section
+          className="flex flex-col gap-1.5"
+          aria-label="Aandachtspunten bij deze vraag"
+        >
           <p className="text-xs font-medium text-muted-foreground">
             {errorCount > 0
               ? `${errorCount} ${errorCount === 1 ? "probleem" : "problemen"} om op te lossen voor publiceren`
               : ""}
             {errorCount > 0 && warningCount > 0 ? " · " : ""}
-            {warningCount > 0 ? `${warningCount} ${warningCount === 1 ? "aandachtspunt" : "aandachtspunten"}` : ""}
+            {warningCount > 0
+              ? `${warningCount} ${warningCount === 1 ? "aandachtspunt" : "aandachtspunten"}`
+              : ""}
           </p>
           <IssueList issues={issues} />
-        </div>
+        </section>
       ) : null}
 
       <EditorSection title="Vraag" icon={<FileText />}>
@@ -127,7 +138,9 @@ export function QuestionEditor({
               min={0}
               max={MAX_POINTS_PER_QUESTION}
               step={0.5}
-              onChange={(points) => points !== undefined && onChange({ points })}
+              onChange={(points) =>
+                points !== undefined && onChange({ points })
+              }
               aria-invalid={pointsIssue || undefined}
             />
           </div>

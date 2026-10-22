@@ -95,8 +95,14 @@ function ErrorMessage({ children }: { children: string }) {
 /* Student                                                             */
 /* ------------------------------------------------------------------ */
 
-function StudentLoginForm({ next }: { next: string | null }) {
-  const [studentNumber, setStudentNumber] = useState("");
+function StudentLoginForm({
+  next,
+  initialNumber,
+}: {
+  next: string | null;
+  initialNumber: string;
+}) {
+  const [studentNumber, setStudentNumber] = useState(initialNumber);
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +178,7 @@ function StudentLoginForm({ next }: { next: string | null }) {
           value={studentNumber}
           onChange={(e) => setStudentNumber(e.target.value.replace(/\D/g, ""))}
           status={fieldError.number ? "error" : undefined}
-          autoFocus
+          autoFocus={!initialNumber}
           className="[&_input]:font-mono [&_input]:tracking-wider [&_input]:placeholder:font-sans [&_input]:placeholder:tracking-normal"
         />
       </FormField>
@@ -215,6 +221,7 @@ function StudentLoginForm({ next }: { next: string | null }) {
           pattern={REGEXP_ONLY_DIGITS}
           inputMode="numeric"
           autoComplete="current-password"
+          autoFocus={!!initialNumber}
           mask={!showPin}
           size="lg"
           status={fieldError.pin || error ? "error" : "default"}
@@ -470,6 +477,9 @@ function SignedInNotice({ next }: { next: string | null }) {
 export function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
+  // Login cards link to /inloggen?nummer=17053 (QR code): prefill the number.
+  const nummer = searchParams.get("nummer")?.trim() ?? "";
+  const initialNumber = STUDENT_NUMBER_REGEX.test(nummer) ? nummer : "";
   const initialTab: LoginKind =
     searchParams.get("rol") === "docent" || next?.startsWith(ROUTES.adminHome)
       ? "docent"
@@ -507,7 +517,7 @@ export function LoginForm() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="leerling">
-          <StudentLoginForm next={next} />
+          <StudentLoginForm next={next} initialNumber={initialNumber} />
         </TabsContent>
         <TabsContent value="docent">
           <TeacherLoginForm next={next} />

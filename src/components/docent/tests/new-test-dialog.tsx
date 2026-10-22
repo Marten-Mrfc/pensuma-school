@@ -38,8 +38,13 @@ export function NewTestDialog({ trigger }: { trigger?: ReactNode }) {
       return;
     }
     try {
-      const { id } = await create.mutateAsync({ title: title.trim(), topic: topic.trim() || undefined });
-      await queryClient.invalidateQueries({ queryKey: trpc.test.list.pathKey() });
+      const { id } = await create.mutateAsync({
+        title: title.trim(),
+        topic: topic.trim() || undefined,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: trpc.test.list.pathKey(),
+      });
       toast.success("Toets aangemaakt. Voeg nu je eerste vraag toe.");
       setOpen(false);
       setTitle("");
@@ -71,10 +76,16 @@ export function NewTestDialog({ trigger }: { trigger?: ReactNode }) {
           <DialogHeader>
             <DialogTitle>Nieuwe toets</DialogTitle>
             <DialogDescription>
-              Je begint met een lege toets. Daarna voeg je vragen toe vanuit handige sjablonen.
+              Je begint met een lege toets. Daarna voeg je vragen toe vanuit
+              handige sjablonen.
             </DialogDescription>
           </DialogHeader>
-          <FormField label="Titel" htmlFor="new-test-title" required error={error ?? undefined}>
+          <FormField
+            label="Titel"
+            htmlFor="new-test-title"
+            required
+            error={error ?? undefined}
+          >
             <Input
               id="new-test-title"
               value={title}
@@ -101,11 +112,20 @@ export function NewTestDialog({ trigger }: { trigger?: ReactNode }) {
             />
           </FormField>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Annuleren
             </Button>
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : null}
+              {create.isPending ? (
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+              ) : null}
               Aanmaken
             </Button>
           </DialogFooter>

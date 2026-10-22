@@ -127,7 +127,7 @@ export async function submitAttempt(
   attemptId: string,
   opts: {
     auto?: boolean;
-    by?: "student" | "server" | "teacher";
+    by?: "student" | "timer" | "server" | "teacher";
     grade?: boolean;
   } = {},
 ): Promise<boolean> {

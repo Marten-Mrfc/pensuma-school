@@ -6,7 +6,13 @@ import { useChartTheme } from "@/components/ui/charts/useChartTheme";
 type Bin = { label: string; from: number; to: number; count: number };
 
 /** Number of students per grade bin (1–2 … 9–10); bins below 5 are red. */
-export function GradeDistributionChart({ bins, height = 240 }: { bins: Bin[]; height?: number }) {
+export function GradeDistributionChart({
+  bins,
+  height = 240,
+}: {
+  bins: Bin[];
+  height?: number;
+}) {
   const theme = useChartTheme();
   const data = bins.map((b) => ({ x: b.label, y: b.count, fail: b.to <= 5 }));
   return (
@@ -17,7 +23,11 @@ export function GradeDistributionChart({ bins, height = 240 }: { bins: Bin[]; he
       ariaLabel="Verdeling van de cijfers"
       option={{
         grid: { top: 16, bottom: 8, left: 4, right: 8 },
-        yAxis: { minInterval: 1, name: "", axisLabel: { formatter: (v: number) => String(v) } },
+        yAxis: {
+          minInterval: 1,
+          name: "",
+          axisLabel: { formatter: (v: number) => String(v) },
+        },
         tooltip: {
           trigger: "item",
           formatter: (p: { name: string; value: number }) =>
@@ -27,7 +37,8 @@ export function GradeDistributionChart({ bins, height = 240 }: { bins: Bin[]; he
           {
             barMaxWidth: 40,
             itemStyle: {
-              color: (p: { dataIndex: number }) => (data[p.dataIndex]?.fail ? theme.dangerColor : theme.accentColor),
+              color: (p: { dataIndex: number }) =>
+                data[p.dataIndex]?.fail ? theme.dangerColor : theme.accentColor,
             },
           },
         ],
@@ -45,7 +56,10 @@ export function QuestionAverageChart({
   height?: number;
 }) {
   const theme = useChartTheme();
-  const data = items.map((i) => ({ x: i.label, y: i.percentage == null ? 0 : Math.round(i.percentage * 100) }));
+  const data = items.map((i) => ({
+    x: i.label,
+    y: i.percentage == null ? 0 : Math.round(i.percentage * 100),
+  }));
   return (
     <BarChart
       data={data}
@@ -65,7 +79,9 @@ export function QuestionAverageChart({
             barMaxWidth: 28,
             itemStyle: {
               color: (p: { dataIndex: number }) =>
-                (data[p.dataIndex]?.y ?? 0) < 50 ? theme.dangerColor : theme.accentColor,
+                (data[p.dataIndex]?.y ?? 0) < 50
+                  ? theme.dangerColor
+                  : theme.accentColor,
             },
           },
         ],

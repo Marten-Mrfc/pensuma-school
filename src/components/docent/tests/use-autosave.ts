@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getErrorMessage } from "@/components/app/get-error-message";
 
-export type AutosaveStatus = "idle" | "pending" | "saving" | "saved" | "error" | "invalid";
+export type AutosaveStatus =
+  | "idle"
+  | "pending"
+  | "saving"
+  | "saved"
+  | "error"
+  | "invalid";
 
 export type AutosaveState = {
   status: AutosaveStatus;
@@ -32,7 +38,11 @@ export interface UseAutosaveOptions<T> {
  * - `flush()` saves everything pending now (Ctrl+S, before switching
  *   questions, before publishing) and resolves `false` if anything failed.
  */
-export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptions<T>) {
+export function useAutosave<T>({
+  save,
+  validate,
+  delay = 800,
+}: UseAutosaveOptions<T>) {
   const [drafts, setDrafts] = useState<Record<string, T>>({});
   const [state, setState] = useState<AutosaveState>({ status: "idle" });
 
@@ -47,8 +57,10 @@ export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptio
   });
 
   const refreshState = useCallback((extra?: Partial<AutosaveState>) => {
-    const [invalidKey, invalidMessage] = [...invalidKeys.current.entries()][0] ?? [];
-    const [failedKey, failedMessage] = [...failedKeys.current.entries()][0] ?? [];
+    const [invalidKey, invalidMessage] =
+      [...invalidKeys.current.entries()][0] ?? [];
+    const [failedKey, failedMessage] =
+      [...failedKeys.current.entries()][0] ?? [];
     if (invalidKey) {
       setState({ status: "invalid", message: invalidMessage, key: invalidKey });
     } else if (failedKey) {
@@ -68,7 +80,8 @@ export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptio
 
       const run = async (): Promise<boolean> => {
         const value = pending.current.get(key);
-        if (value === undefined) return !invalidKeys.current.has(key) && !failedKeys.current.has(key);
+        if (value === undefined)
+          return !invalidKeys.current.has(key) && !failedKeys.current.has(key);
         const invalid = options.current.validate?.(key, value) ?? null;
         if (invalid) {
           invalidKeys.current.set(key, invalid);
@@ -92,7 +105,10 @@ export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptio
           return true;
         } catch (error) {
           if (!pending.current.has(key)) pending.current.set(key, value);
-          failedKeys.current.set(key, getErrorMessage(error, "Opslaan lukte niet."));
+          failedKeys.current.set(
+            key,
+            getErrorMessage(error, "Opslaan lukte niet."),
+          );
           refreshState();
           return false;
         }
@@ -111,7 +127,8 @@ export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptio
       pending.current.set(key, value);
       // A new edit may fix the problem; re-validate on save.
       invalidKeys.current.delete(key);
-      if (!failedKeys.current.size) setState((s) => (s.status === "saving" ? s : { status: "pending" }));
+      if (!failedKeys.current.size)
+        setState((s) => (s.status === "saving" ? s : { status: "pending" }));
       const timer = timers.current.get(key);
       if (timer) clearTimeout(timer);
       timers.current.set(
@@ -127,7 +144,13 @@ export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptio
     async (key?: string): Promise<boolean> => {
       const keys = key
         ? [key]
-        : [...new Set([...pending.current.keys(), ...invalidKeys.current.keys(), ...failedKeys.current.keys()])];
+        : [
+            ...new Set([
+              ...pending.current.keys(),
+              ...invalidKeys.current.keys(),
+              ...failedKeys.current.keys(),
+            ]),
+          ];
       if (keys.length === 0) {
         await chain.current.catch(() => undefined);
         return true;
@@ -158,7 +181,10 @@ export function useAutosave<T>({ save, validate, delay = 800 }: UseAutosaveOptio
   );
 
   const hasUnsaved = useCallback(
-    () => pending.current.size > 0 || invalidKeys.current.size > 0 || failedKeys.current.size > 0,
+    () =>
+      pending.current.size > 0 ||
+      invalidKeys.current.size > 0 ||
+      failedKeys.current.size > 0,
     [],
   );
 

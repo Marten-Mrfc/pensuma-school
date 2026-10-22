@@ -106,7 +106,10 @@ describe("parsePythonLiteral", () => {
       ],
     });
     expect(p("set()")).toEqual({ t: "set", v: [] });
-    expect(p("frozenset([1])")).toEqual({ t: "frozenset", v: [{ t: "int", v: "1" }] });
+    expect(p("frozenset([1])")).toEqual({
+      t: "frozenset",
+      v: [{ t: "int", v: "1" }],
+    });
     expect(p("  [\n  1,\n  2  # comment\n]  ")).toEqual({
       t: "list",
       v: [
@@ -117,7 +120,17 @@ describe("parsePythonLiteral", () => {
   });
 
   test("rejects non-literals with a Dutch message", () => {
-    for (const bad of ["abc", "[1, 2", "1 +", "print(1)", "{'a' 1}", "'open", "-'a'", "007", "1 2"]) {
+    for (const bad of [
+      "abc",
+      "[1, 2",
+      "1 +",
+      "print(1)",
+      "{'a' 1}",
+      "'open",
+      "-'a'",
+      "007",
+      "1 2",
+    ]) {
       const r = tryParsePythonLiteral(bad);
       expect(r.ok).toBe(false);
     }

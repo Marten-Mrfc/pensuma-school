@@ -3,10 +3,17 @@
 import { Settings2 } from "lucide-react";
 import { useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
-import { EditorSection, FieldLabel } from "@/components/docent/questions/fields";
+import {
+  EditorSection,
+  FieldLabel,
+} from "@/components/docent/questions/fields";
 import { Input } from "@/components/ui/input";
 
-export type TestSettingsDraft = { title: string; topic: string; description: string };
+export type TestSettingsDraft = {
+  title: string;
+  topic: string;
+  description: string;
+};
 
 export function TestSettingsEditor({
   value,
@@ -38,7 +45,9 @@ export function TestSettingsEditor({
             status={titleMissing ? "error" : undefined}
           />
           {titleMissing ? (
-            <p className="text-xs font-medium text-destructive-ink">Geef de toets een titel.</p>
+            <p className="text-xs font-medium text-destructive-ink">
+              Geef de toets een titel.
+            </p>
           ) : null}
         </div>
         <div className="flex flex-col gap-2">
@@ -53,7 +62,9 @@ export function TestSettingsEditor({
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <FieldLabel htmlFor={`${id}-description`}>Beschrijving voor leerlingen</FieldLabel>
+        <FieldLabel htmlFor={`${id}-description`}>
+          Beschrijving voor leerlingen
+        </FieldLabel>
         <MarkdownEditor
           id={`${id}-description`}
           value={value.description}

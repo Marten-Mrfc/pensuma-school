@@ -64,9 +64,15 @@ export class ActivityLogger {
     }
   }
 
-  stop() {
-    this.stopped = true;
+  /** Stop the periodic flush (can be started again, e.g. React StrictMode remount). */
+  pause() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+  }
+
+  /** Permanently stop logging (attempt submitted / not ours). */
+  stop() {
+    this.stopped = true;
+    this.pause();
   }
 }

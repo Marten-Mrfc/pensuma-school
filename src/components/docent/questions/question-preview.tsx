@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { CodeEditor } from "@/components/app/code-editor";
 import { Markdown } from "@/components/app/markdown";
 import {
@@ -35,49 +35,53 @@ export function ChoiceOptionsView({
 }) {
   function toggle(id: string) {
     if (multiple) {
-      onSelectedChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
+      onSelectedChange(
+        selected.includes(id)
+          ? selected.filter((s) => s !== id)
+          : [...selected, id],
+      );
     } else {
       onSelectedChange([id]);
     }
   }
 
+  const name = useId();
   return (
-    <div
-      role={multiple ? "group" : "radiogroup"}
-      aria-label="Antwoordopties"
-      className="flex flex-col gap-2"
-    >
+    <fieldset className="flex min-w-0 flex-col gap-2">
+      <legend className="sr-only">Antwoordopties</legend>
       {multiple ? (
-        <p className="text-xs font-medium text-muted-foreground">Je mag meerdere antwoorden kiezen.</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          Je mag meerdere antwoorden kiezen.
+        </p>
       ) : null}
       {options.map((option) => {
         const isSelected = selected.includes(option.id);
         return (
-          // biome-ignore lint/a11y/useSemanticElements: custom radio/checkbox card with markdown content
-          <div
+          <label
             key={option.id}
-            role={multiple ? "checkbox" : "radio"}
-            aria-checked={isSelected}
-            tabIndex={0}
-            onClick={() => toggle(option.id)}
-            onKeyDown={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                toggle(option.id);
-              }
-            }}
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border bg-card px-3.5 py-3 text-sm transition-colors outline-none hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/50",
-              isSelected && "border-primary bg-primary/[0.06] ring-1 ring-primary/30",
+              "flex cursor-pointer items-start gap-3 rounded-lg border bg-card px-3.5 py-3 text-sm transition-colors hover:border-primary/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50",
+              isSelected &&
+                "border-primary bg-primary/[0.06] ring-1 ring-primary/30",
               reveal && option.correct && "border-success/60 bg-success/[0.07]",
             )}
           >
+            <input
+              type={multiple ? "checkbox" : "radio"}
+              name={name}
+              value={option.id}
+              checked={isSelected}
+              onChange={() => toggle(option.id)}
+              className="sr-only"
+            />
             <span
               aria-hidden="true"
               className={cn(
                 "mt-0.5 grid size-[1.125rem] shrink-0 place-items-center border-2 transition-colors",
                 multiple ? "rounded-[5px]" : "rounded-full",
-                isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40",
+                isSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/40",
               )}
             >
               {isSelected ? (
@@ -88,22 +92,24 @@ export function ChoiceOptionsView({
                 )
               ) : null}
             </span>
-            <div className="min-w-0 flex-1 [&_p]:my-0">
+            <span className="block min-w-0 flex-1 [&_p]:my-0">
               {option.text.trim() ? (
                 <Markdown>{option.text}</Markdown>
               ) : (
-                <span className="text-muted-foreground italic">(lege optie)</span>
+                <span className="text-muted-foreground italic">
+                  (lege optie)
+                </span>
               )}
-            </div>
+            </span>
             {reveal && option.correct ? (
               <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[0.68rem] font-medium text-success-ink">
                 goed
               </span>
             ) : null}
-          </div>
+          </label>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 
@@ -121,7 +127,9 @@ export type PreviewQuestion = {
 };
 
 function formatPoints(points: number) {
-  const text = Number.isInteger(points) ? String(points) : points.toLocaleString("nl-NL");
+  const text = Number.isInteger(points)
+    ? String(points)
+    : points.toLocaleString("nl-NL");
   return `${text} ${points === 1 ? "punt" : "punten"}`;
 }
 
@@ -156,7 +164,9 @@ export function StudentQuestionPreview({
         {question.prompt.trim() ? (
           <Markdown>{question.prompt}</Markdown>
         ) : (
-          <p className="text-sm text-muted-foreground italic">Nog geen opdrachttekst.</p>
+          <p className="text-sm text-muted-foreground italic">
+            Nog geen opdrachttekst.
+          </p>
         )}
       </div>
       <PreviewAnswer key={question.id} question={question} />
@@ -165,9 +175,15 @@ export function StudentQuestionPreview({
 }
 
 function PreviewAnswer({ question }: { question: PreviewQuestion }) {
-  const parsed = questionDataSchemas[question.type].safeParse(question.data ?? {});
+  const parsed = questionDataSchemas[question.type].safeParse(
+    question.data ?? {},
+  );
   if (!parsed.success) {
-    return <p className="text-sm text-destructive-ink">De instellingen van deze vraag zijn ongeldig.</p>;
+    return (
+      <p className="text-sm text-destructive-ink">
+        De instellingen van deze vraag zijn ongeldig.
+      </p>
+    );
   }
   switch (question.type) {
     case "code":
@@ -204,7 +220,9 @@ function CodeAnswerPreview({ data }: { data: CodeQuestionData }) {
           disabled={visibleTests.length === 0 && data.checks.length === 0}
         />
         <p className="text-xs text-muted-foreground">
-          {visibleTests.length === 1 ? "1 zichtbare test" : `${visibleTests.length} zichtbare tests`}
+          {visibleTests.length === 1
+            ? "1 zichtbare test"
+            : `${visibleTests.length} zichtbare tests`}
           {hiddenCount > 0
             ? ` · ${hiddenCount} verborgen ${hiddenCount === 1 ? "test telt" : "tests tellen"} alleen mee bij het nakijken`
             : ""}

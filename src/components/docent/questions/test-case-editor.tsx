@@ -10,7 +10,6 @@ import {
   EyeOff,
   FlaskConical,
   Loader2,
-  Plus,
   SquareFunction,
   Terminal,
   Trash2,
@@ -20,10 +19,18 @@ import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   type CodeTest,
   type FunctionTest,
@@ -32,15 +39,30 @@ import {
   type OutputMatchMode,
   type TestResult,
 } from "@/lib/questions/schema";
-import { cloneTest, newFunctionTest, newIoTest } from "@/lib/questions/templates";
+import {
+  cloneTest,
+  newFunctionTest,
+  newIoTest,
+} from "@/lib/questions/templates";
 import type { QuestionIssue } from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
-import { AutoTextarea, FieldLabel, HelpPopover, NumberInput, SwitchField } from "./fields";
+import {
+  AutoTextarea,
+  FieldLabel,
+  HelpPopover,
+  NumberInput,
+  SwitchField,
+} from "./fields";
 import { IssueDot, IssueList } from "./issue-list";
 import { MATCH_MODE_HELP, MatchModeHelpContent } from "./match-mode-help";
-import { type GeneratedValue, useGenerateExpected } from "./use-generate-expected";
+import {
+  type GeneratedValue,
+  useGenerateExpected,
+} from "./use-generate-expected";
 
-const MATCH_OPTIONS = (Object.keys(OUTPUT_MATCH_MODE_LABELS) as OutputMatchMode[]).map((m) => ({
+const MATCH_OPTIONS = (
+  Object.keys(OUTPUT_MATCH_MODE_LABELS) as OutputMatchMode[]
+).map((m) => ({
   value: m,
   label: OUTPUT_MATCH_MODE_LABELS[m],
 }));
@@ -89,7 +111,9 @@ export function TestCaseEditor({
   });
 
   function setTest(id: string, patch: Partial<IoTest> | Partial<FunctionTest>) {
-    onChange(tests.map((t) => (t.id === id ? ({ ...t, ...patch } as CodeTest) : t)));
+    onChange(
+      tests.map((t) => (t.id === id ? ({ ...t, ...patch } as CodeTest) : t)),
+    );
   }
 
   function add(kind: "io" | "function") {
@@ -123,7 +147,9 @@ export function TestCaseEditor({
         label: "Ongedaan maken",
         onClick: () => {
           // Use the newest list/handler: edits made after deleting are kept.
-          const current = latest.current.tests.filter((t) => t.id !== removed.id);
+          const current = latest.current.tests.filter(
+            (t) => t.id !== removed.id,
+          );
           current.splice(Math.min(index, current.length), 0, removed);
           latest.current.onChange(current);
         },
@@ -159,14 +185,20 @@ export function TestCaseEditor({
     markGenerating(ids, true);
     try {
       const io = targets.filter((t): t is IoTest => t.kind === "io");
-      const fn = targets.filter((t): t is FunctionTest => t.kind === "function");
+      const fn = targets.filter(
+        (t): t is FunctionTest => t.kind === "function",
+      );
       const [ioResults, fnResults] = await Promise.all([
-        io.length ? generate.forIoTests(solution, io, timeLimitMs) : Promise.resolve([]),
-        fn.length ? generate.forFunctionTests(solution, fn, timeLimitMs) : Promise.resolve([]),
+        io.length
+          ? generate.forIoTests(solution, io, timeLimitMs)
+          : Promise.resolve([]),
+        fn.length
+          ? generate.forFunctionTests(solution, fn, timeLimitMs)
+          : Promise.resolve([]),
       ]);
       const byId = new Map<string, GeneratedValue>();
-      io.forEach((t, i) => byId.set(t.id, ioResults[i]));
-      fn.forEach((t, i) => byId.set(t.id, fnResults[i]));
+      for (const [i, t] of io.entries()) byId.set(t.id, ioResults[i]);
+      for (const [i, t] of fn.entries()) byId.set(t.id, fnResults[i]);
 
       const errors: Record<string, string> = {};
       let filled = 0;
@@ -179,7 +211,9 @@ export function TestCaseEditor({
           return t;
         }
         filled++;
-        return t.kind === "io" ? { ...t, expectedOutput: r.value } : { ...t, expected: r.value };
+        return t.kind === "io"
+          ? { ...t, expectedOutput: r.value }
+          : { ...t, expected: r.value };
       });
       latest.current.onChange(next);
       setGenErrors((prev) => {
@@ -201,7 +235,9 @@ export function TestCaseEditor({
         });
       } else if (filled > 0) {
         toast.success(
-          filled === 1 ? "Verwachte uitvoer ingevuld." : `Verwachte uitvoer van ${filled} tests ingevuld.`,
+          filled === 1
+            ? "Verwachte uitvoer ingevuld."
+            : `Verwachte uitvoer van ${filled} tests ingevuld.`,
         );
       }
     } catch (error) {
@@ -212,7 +248,13 @@ export function TestCaseEditor({
   }
 
   const testIssues = (id: string) =>
-    issues.filter((i) => i.target && "id" in i.target && i.target.field === "test" && i.target.id === id);
+    issues.filter(
+      (i) =>
+        i.target &&
+        "id" in i.target &&
+        i.target.field === "test" &&
+        i.target.id === id,
+    );
 
   const generalIssues = issues.filter((i) => i.target?.field === "tests");
   const anyGenerating = generating.size > 0;
@@ -235,11 +277,16 @@ export function TestCaseEditor({
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={tests.length === 0 || !solution.trim() || anyGenerating}
+                  disabled={
+                    tests.length === 0 || !solution.trim() || anyGenerating
+                  }
                   onClick={() => void fill(tests)}
                 >
                   {anyGenerating ? (
-                    <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+                    <Loader2
+                      className="motion-safe:animate-spin"
+                      aria-hidden="true"
+                    />
                   ) : (
                     <WandSparkles aria-hidden="true" />
                   )}
@@ -260,11 +307,15 @@ export function TestCaseEditor({
 
       {tests.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center">
-          <FlaskConical className="size-6 text-muted-foreground" aria-hidden="true" />
+          <FlaskConical
+            className="size-6 text-muted-foreground"
+            aria-hidden="true"
+          />
           <p className="text-sm font-medium">Nog geen tests</p>
           <p className="max-w-sm text-xs text-muted-foreground">
-            Een <strong>uitvoertest</strong> geeft invoer en vergelijkt wat het programma print. Een{" "}
-            <strong>functietest</strong> roept een functie aan en vergelijkt de returnwaarde.
+            Een <strong>uitvoertest</strong> geeft invoer en vergelijkt wat het
+            programma print. Een <strong>functietest</strong> roept een functie
+            aan en vergelijkt de returnwaarde.
           </p>
         </div>
       ) : (
@@ -407,10 +458,17 @@ function TestCard({
               <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted font-mono text-[0.7rem] font-semibold text-muted-foreground tabular-nums">
                 {index + 1}
               </span>
-              <KindIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <KindIcon
+                className="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
-                  {test.name || <span className="font-normal text-muted-foreground italic">{testSummary(test)}</span>}
+                  {test.name || (
+                    <span className="font-normal text-muted-foreground italic">
+                      {testSummary(test)}
+                    </span>
+                  )}
                 </span>
                 {test.name ? (
                   <span className="block truncate font-mono text-[0.7rem] text-muted-foreground">
@@ -441,19 +499,33 @@ function TestCard({
               ) : null}
               {result ? (
                 result.passed ? (
-                  <CircleCheck className="size-4 shrink-0 text-success-ink" aria-label="Modeloplossing slaagt" />
+                  <CircleCheck
+                    className="size-4 shrink-0 text-success-ink"
+                    aria-label="Modeloplossing slaagt"
+                  />
                 ) : (
-                  <CircleX className="size-4 shrink-0 text-destructive-ink" aria-label="Modeloplossing faalt" />
+                  <CircleX
+                    className="size-4 shrink-0 text-destructive-ink"
+                    aria-label="Modeloplossing faalt"
+                  />
                 )
               ) : null}
               <IssueDot issues={issues} />
             </button>
           </CollapsibleTrigger>
           <div className="flex shrink-0 items-center">
-            <IconAction label="Omhoog" onClick={() => onMove(-1)} disabled={index === 0}>
+            <IconAction
+              label="Omhoog"
+              onClick={() => onMove(-1)}
+              disabled={index === 0}
+            >
               <ArrowUp className="size-3.5" aria-hidden="true" />
             </IconAction>
-            <IconAction label="Omlaag" onClick={() => onMove(1)} disabled={index === count - 1}>
+            <IconAction
+              label="Omlaag"
+              onClick={() => onMove(1)}
+              disabled={index === count - 1}
+            >
               <ArrowDown className="size-3.5" aria-hidden="true" />
             </IconAction>
             <IconAction label="Dupliceren" onClick={onDuplicate}>
@@ -473,11 +545,17 @@ function TestCard({
                 role="alert"
                 className="rounded-md border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-[0.8rem]"
               >
-                <p className="font-medium text-destructive-ink">De modeloplossing gaf een fout bij deze test</p>
-                <pre className="mt-1 font-mono text-[0.75rem] whitespace-pre-wrap text-foreground/90">{genError}</pre>
+                <p className="font-medium text-destructive-ink">
+                  De modeloplossing gaf een fout bij deze test
+                </p>
+                <pre className="mt-1 font-mono text-[0.75rem] whitespace-pre-wrap text-foreground/90">
+                  {genError}
+                </pre>
               </div>
             ) : null}
-            {result && !result.passed ? <ResultMismatch result={result} /> : null}
+            {result && !result.passed ? (
+              <ResultMismatch result={result} />
+            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
               <div className="flex flex-col gap-2">
@@ -491,7 +569,10 @@ function TestCard({
                 />
                 <p className="text-xs text-muted-foreground">
                   Leerlingen zien deze naam bij hun testresultaat
-                  {test.hidden ? " (bij verborgen tests alleen “Verborgen test”)" : ""}.
+                  {test.hidden
+                    ? " (bij verborgen tests alleen “Verborgen test”)"
+                    : ""}
+                  .
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -561,7 +642,10 @@ function GenerateButton({
       title={canGenerate ? undefined : "Schrijf eerst een modeloplossing"}
     >
       {generating ? (
-        <Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+        <Loader2
+          className="size-3.5 motion-safe:animate-spin"
+          aria-hidden="true"
+        />
       ) : (
         <WandSparkles className="size-3.5" aria-hidden="true" />
       )}
@@ -610,7 +694,8 @@ function IoFields({
             aria-describedby={`${id}-stdin-help`}
           />
           <p id={`${id}-stdin-help`} className="text-xs text-muted-foreground">
-            Eén regel per <code className="font-mono">input()</code>. Laat leeg als het programma niets vraagt.
+            Eén regel per <code className="font-mono">input()</code>. Laat leeg
+            als het programma niets vraagt.
           </p>
         </div>
         <div className="flex flex-col gap-2">
@@ -625,7 +710,9 @@ function IoFields({
               />
             }
           >
-            {test.match === "regex" ? "Reguliere expressie" : "Verwachte uitvoer"}
+            {test.match === "regex"
+              ? "Reguliere expressie"
+              : "Verwachte uitvoer"}
           </FieldLabel>
           <AutoTextarea
             id={`${id}-expected`}
@@ -636,9 +723,12 @@ function IoFields({
             placeholder={test.match === "regex" ? "^Hallo \\w+$" : "Hallo Mark"}
             aria-describedby={`${id}-expected-help`}
           />
-          <p id={`${id}-expected-help`} className="text-xs text-muted-foreground">
-            Wat het programma moet printen. Vragen uit <code className="font-mono">input("…")</code> horen hier
-            niet bij.
+          <p
+            id={`${id}-expected-help`}
+            className="text-xs text-muted-foreground"
+          >
+            Wat het programma moet printen. Vragen uit{" "}
+            <code className="font-mono">input("…")</code> horen hier niet bij.
           </p>
         </div>
       </div>
@@ -659,7 +749,9 @@ function IoFields({
             id={`${id}-match`}
             value={test.match}
             options={MATCH_OPTIONS}
-            onChange={(e) => onChange({ match: e.target.value as OutputMatchMode })}
+            onChange={(e) =>
+              onChange({ match: e.target.value as OutputMatchMode })
+            }
           />
           <p className="text-xs leading-relaxed text-muted-foreground sm:pt-1">
             {MATCH_MODE_HELP[test.match].summary}
@@ -670,7 +762,11 @@ function IoFields({
       <div className="grid gap-3 sm:grid-cols-2">
         <SwitchField
           label="Hoofdletters negeren"
-          description={test.match === "numbers" ? "Niet van toepassing: alleen getallen tellen." : "“hallo” telt als “Hallo”."}
+          description={
+            test.match === "numbers"
+              ? "Niet van toepassing: alleen getallen tellen."
+              : "“hallo” telt als “Hallo”."
+          }
           checked={test.ignoreCase}
           disabled={test.match === "numbers"}
           onCheckedChange={(ignoreCase) => onChange({ ignoreCase })}
@@ -687,7 +783,8 @@ function IoFields({
               onChange={(v) => v !== undefined && onChange({ tolerance: v })}
             />
             <p className="text-xs text-muted-foreground">
-              Maximaal verschil per getal, bijv. 0.01 zodat 3.333 en 3.33 allebei goed zijn.
+              Maximaal verschil per getal, bijv. 0.01 zodat 3.333 en 3.33
+              allebei goed zijn.
             </p>
           </div>
         ) : null}
@@ -726,8 +823,8 @@ function FunctionFields({
             autoComplete="off"
           />
           <p className="text-xs text-muted-foreground">
-            Een Python-expressie. De code van de leerling wordt eerst uitgevoerd (zonder invoer), daarna deze
-            aanroep.
+            Een Python-expressie. De code van de leerling wordt eerst uitgevoerd
+            (zonder invoer), daarna deze aanroep.
           </p>
         </div>
         <div className="flex flex-col gap-2">
@@ -755,14 +852,18 @@ function FunctionFields({
           />
           <p className="text-xs text-muted-foreground">
             Een Python-waarde, bijv. <code className="font-mono">2.0</code>,{" "}
-            <code className="font-mono">"Hallo"</code>, <code className="font-mono">[1, 2]</code> of{" "}
-            <code className="font-mono">True</code>. Lijsten en dicts worden onderdeel voor onderdeel vergeleken.
+            <code className="font-mono">"Hallo"</code>,{" "}
+            <code className="font-mono">[1, 2]</code> of{" "}
+            <code className="font-mono">True</code>. Lijsten en dicts worden
+            onderdeel voor onderdeel vergeleken.
           </p>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2 rounded-lg border bg-background/60 px-3.5 py-3">
-          <FieldLabel htmlFor={`${id}-tol`}>Tolerantie voor kommagetallen</FieldLabel>
+          <FieldLabel htmlFor={`${id}-tol`}>
+            Tolerantie voor kommagetallen
+          </FieldLabel>
           <NumberInput
             id={`${id}-tol`}
             value={test.tolerance}
@@ -784,7 +885,8 @@ function ResultMismatch({ result }: { result: TestResult }) {
   return (
     <div className="rounded-md border border-destructive/30 bg-destructive/[0.05] px-3 py-2 text-[0.8rem]">
       <p className="font-medium text-destructive-ink">
-        De modeloplossing slaagt niet voor deze test{result.feedback ? `: ${result.feedback}` : "."}
+        De modeloplossing slaagt niet voor deze test
+        {result.feedback ? `: ${result.feedback}` : "."}
       </p>
       {result.error ? (
         <pre className="mt-1 font-mono text-[0.75rem] whitespace-pre-wrap">
@@ -793,7 +895,9 @@ function ResultMismatch({ result }: { result: TestResult }) {
       ) : result.actual !== undefined ? (
         <div className="mt-1.5 grid gap-1 text-xs sm:grid-cols-[auto_1fr]">
           <span className="text-muted-foreground">Kreeg</span>
-          <pre className="font-mono whitespace-pre-wrap">{result.actual || "(niets)"}</pre>
+          <pre className="font-mono whitespace-pre-wrap">
+            {result.actual || "(niets)"}
+          </pre>
         </div>
       ) : null}
     </div>

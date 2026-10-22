@@ -75,12 +75,28 @@ describe("validateQuestion: common fields", () => {
       title: "x",
       prompt: "x",
       points: 1,
+      data: { tests: [{ id: "t1", kind: "io", weight: 0 }] },
+    });
+    expect(issues[0].code).toBe("question.invalid_data");
+    expect(issues[0].message).toContain("test 1, gewicht: moet groter dan 0 zijn");
+  });
+
+  test("an empty function call gets the specific message (lenient parse)", () => {
+    const issues = validateQuestion({
+      type: "code",
+      title: "x",
+      prompt: "x",
+      points: 1,
       data: {
+        solution: "def f():\n    return 1\n",
         tests: [{ id: "t1", kind: "function", call: "", expected: "1" }],
       },
     });
-    expect(issues[0].code).toBe("question.invalid_data");
-    expect(issues[0].message).toContain("test 1, aanroep: mag niet leeg zijn");
+    expect(issues[0]).toMatchObject({
+      code: "code.fn_no_call",
+      target: { field: "test", id: "t1", index: 0 },
+    });
+    expect(issues.some((i) => i.code === "question.invalid_data")).toBe(false);
   });
 });
 

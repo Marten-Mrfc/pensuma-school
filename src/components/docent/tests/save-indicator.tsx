@@ -1,7 +1,11 @@
 "use client";
 
 import { Check, CircleAlert, CloudOff, Loader2, RotateCcw } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { AutosaveState } from "./use-autosave";
 
@@ -24,7 +28,10 @@ export function SaveIndicator({
     case "saving":
       content = (
         <span className={cn(base, "text-muted-foreground")}>
-          <Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+          <Loader2
+            className="size-3.5 motion-safe:animate-spin"
+            aria-hidden="true"
+          />
           Opslaan…
         </span>
       );
@@ -47,7 +54,8 @@ export function SaveIndicator({
             </button>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
-            {state.message ?? "Opslaan lukte niet."} Klik om het opnieuw te proberen.
+            {state.message ?? "Opslaan lukte niet."} Klik om het opnieuw te
+            proberen.
           </TooltipContent>
         </Tooltip>
       );
@@ -56,13 +64,17 @@ export function SaveIndicator({
       content = (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
-              tabIndex={0}
-              className={cn(base, "bg-warning/12 text-warning-ink ring-1 ring-warning/30 ring-inset")}
+            <button
+              type="button"
+              onClick={onRetry}
+              className={cn(
+                base,
+                "bg-warning/12 text-warning-ink ring-1 ring-warning/30 ring-inset outline-none focus-visible:ring-2",
+              )}
             >
               <CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">Niet opgeslagen</span>
-            </span>
+            </button>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">{state.message}</TooltipContent>
         </Tooltip>
@@ -86,8 +98,11 @@ export function SaveIndicator({
   }
 
   return (
-    <div role="status" aria-live="polite" className={cn("flex min-w-0 items-center", className)}>
+    <output
+      aria-live="polite"
+      className={cn("flex min-w-0 items-center", className)}
+    >
       {content}
-    </div>
+    </output>
   );
 }

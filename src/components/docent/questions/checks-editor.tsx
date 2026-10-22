@@ -14,15 +14,28 @@ import { newCheck } from "@/lib/questions/templates";
 import { cn } from "@/lib/utils";
 import { FieldLabel, NumberInput } from "./fields";
 
-const CONSTRUCT_OPTIONS = (Object.keys(CODE_CONSTRUCT_LABELS) as CodeConstruct[]).map((c) => ({
+const CONSTRUCT_OPTIONS = (
+  Object.keys(CODE_CONSTRUCT_LABELS) as CodeConstruct[]
+).map((c) => ({
   value: c,
   label: CODE_CONSTRUCT_LABELS[c],
 }));
 
-const VALUE_HINT: Partial<Record<CodeConstruct, { label: string; placeholder: string }>> = {
-  function_call: { label: "Functienaam", placeholder: "bijv. max (leeg = elke aanroep)" },
-  function_def: { label: "Functienaam", placeholder: "bijv. gemiddelde (leeg = elke def)" },
-  import: { label: "Module", placeholder: "bijv. statistics (leeg = elke import)" },
+const VALUE_HINT: Partial<
+  Record<CodeConstruct, { label: string; placeholder: string }>
+> = {
+  function_call: {
+    label: "Functienaam",
+    placeholder: "bijv. max (leeg = elke aanroep)",
+  },
+  function_def: {
+    label: "Functienaam",
+    placeholder: "bijv. gemiddelde (leeg = elke def)",
+  },
+  import: {
+    label: "Module",
+    placeholder: "bijv. statistics (leeg = elke import)",
+  },
 };
 
 type Example = { label: string; check: Omit<CodeCheck, "id" | "weight"> };
@@ -30,11 +43,19 @@ type Example = { label: string; check: Omit<CodeCheck, "id" | "weight"> };
 const EXAMPLES: Example[] = [
   {
     label: "Leerlingen moeten een for-lus gebruiken",
-    check: { kind: "requires", construct: "for_loop", message: "Gebruik een for-lus." },
+    check: {
+      kind: "requires",
+      construct: "for_loop",
+      message: "Gebruik een for-lus.",
+    },
   },
   {
     label: "while-lus verplicht",
-    check: { kind: "requires", construct: "while_loop", message: "Gebruik een while-lus." },
+    check: {
+      kind: "requires",
+      construct: "while_loop",
+      message: "Gebruik een while-lus.",
+    },
   },
   {
     label: "max() is verboden",
@@ -56,7 +77,11 @@ const EXAMPLES: Example[] = [
   },
   {
     label: "Geen imports",
-    check: { kind: "forbids", construct: "import", message: "Je mag geen modules importeren." },
+    check: {
+      kind: "forbids",
+      construct: "import",
+      message: "Je mag geen modules importeren.",
+    },
   },
 ];
 
@@ -71,7 +96,9 @@ export function describeCheck(check: CodeCheck): string {
         : value && check.construct === "import"
           ? `import ${value}`
           : what;
-  return check.kind === "requires" ? `Verplicht: ${target}` : `Verboden: ${target}`;
+  return check.kind === "requires"
+    ? `Verplicht: ${target}`
+    : `Verboden: ${target}`;
 }
 
 export function ChecksEditor({
@@ -89,8 +116,10 @@ export function ChecksEditor({
     <div className="flex flex-col gap-4">
       {checks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nog geen code-eisen. Met een eis controleer je <em>hoe</em> de leerling het oplost, bijvoorbeeld dat er een
-          lus in zit of dat een functie niet gebruikt wordt. Dat gebeurt door de code te lezen, niet uit te voeren.
+          Nog geen code-eisen. Met een eis controleer je <em>hoe</em> de
+          leerling het oplost, bijvoorbeeld dat er een lus in zit of dat een
+          functie niet gebruikt wordt. Dat gebeurt door de code te lezen, niet
+          uit te voeren.
         </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
@@ -107,9 +136,15 @@ export function ChecksEditor({
       )}
 
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Snel toevoegen</span>
+        <span className="text-xs font-medium text-muted-foreground">
+          Snel toevoegen
+        </span>
         <div className="flex flex-wrap gap-1.5">
-          <Button size="xs" variant="outline" onClick={() => onChange([...checks, newCheck()])}>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => onChange([...checks, newCheck()])}
+          >
             <Plus aria-hidden="true" />
             Lege eis
           </Button>
@@ -154,13 +189,18 @@ function CheckRow({
     <li
       className={cn(
         "flex flex-col gap-3 rounded-lg border bg-background/60 p-3",
-        requires ? "border-l-[3px] border-l-success/70" : "border-l-[3px] border-l-destructive/70",
+        requires
+          ? "border-l-[3px] border-l-success/70"
+          : "border-l-[3px] border-l-destructive/70",
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-medium">
           {requires ? (
-            <ShieldCheck className="size-4 text-success-ink" aria-hidden="true" />
+            <ShieldCheck
+              className="size-4 text-success-ink"
+              aria-hidden="true"
+            />
           ) : (
             <Ban className="size-4 text-destructive-ink" aria-hidden="true" />
           )}
@@ -190,7 +230,9 @@ function CheckRow({
               { value: "requires", label: "Vereist" },
               { value: "forbids", label: "Verboden" },
             ]}
-            onChange={(e) => onChange({ kind: e.target.value as CodeCheck["kind"] })}
+            onChange={(e) =>
+              onChange({ kind: e.target.value as CodeCheck["kind"] })
+            }
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -202,7 +244,9 @@ function CheckRow({
             sizeVariant="sm"
             value={check.construct}
             options={CONSTRUCT_OPTIONS}
-            onChange={(e) => onChange({ construct: e.target.value as CodeConstruct })}
+            onChange={(e) =>
+              onChange({ construct: e.target.value as CodeConstruct })
+            }
           />
         </div>
         {valueHint ? (
@@ -232,7 +276,11 @@ function CheckRow({
             id={`${id}-message`}
             size="small"
             value={check.message ?? ""}
-            placeholder={requires ? "bijv. Gebruik een for-lus." : "bijv. Je mag max() niet gebruiken."}
+            placeholder={
+              requires
+                ? "bijv. Gebruik een for-lus."
+                : "bijv. Je mag max() niet gebruiken."
+            }
             onChange={(e) => onChange({ message: e.target.value || undefined })}
             maxLength={200}
           />

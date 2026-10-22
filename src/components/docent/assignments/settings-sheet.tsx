@@ -7,7 +7,13 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import type { AssignmentSettings } from "@/lib/questions/schema";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { ACCESS_CODE_REGEX, normalizeAccessCode } from "./defaults";
@@ -35,28 +41,47 @@ export function SettingsSheet({
             Wijzigingen gelden meteen, ook voor leerlingen die al bezig zijn.
           </SheetDescription>
         </SheetHeader>
-        {open ? <SettingsForm assignment={assignment} onDone={() => onOpenChange(false)} /> : null}
+        {open ? (
+          <SettingsForm
+            assignment={assignment}
+            onDone={() => onOpenChange(false)}
+          />
+        ) : null}
       </SheetContent>
     </Sheet>
   );
 }
 
-function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: () => void }) {
+function SettingsForm({
+  assignment,
+  onDone,
+}: {
+  assignment: Assignment;
+  onDone: () => void;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const id = useId();
   const [title, setTitle] = useState(assignment.customTitle ?? "");
   const [opensAt, setOpensAt] = useState(toDateTimeLocal(assignment.opensAt));
-  const [closesAt, setClosesAt] = useState(toDateTimeLocal(assignment.closesAt));
-  const [timeLimit, setTimeLimit] = useState(assignment.timeLimitMinutes?.toString() ?? "");
+  const [closesAt, setClosesAt] = useState(
+    toDateTimeLocal(assignment.closesAt),
+  );
+  const [timeLimit, setTimeLimit] = useState(
+    assignment.timeLimitMinutes?.toString() ?? "",
+  );
   const [code, setCode] = useState(assignment.accessCode ?? "");
-  const [settings, setSettings] = useState<AssignmentSettings>(assignment.settings);
+  const [settings, setSettings] = useState<AssignmentSettings>(
+    assignment.settings,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const update = useMutation(
     trpc.assignment.update.mutationOptions({
       onSuccess: async (res) => {
-        await queryClient.invalidateQueries({ queryKey: trpc.assignment.pathKey() });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.assignment.pathKey(),
+        });
         toast.success("Instellingen opgeslagen", {
           description: res.recomputedDeadlines
             ? `De eindtijd van ${res.recomputedDeadlines} lopende poging(en) is bijgewerkt.`
@@ -75,24 +100,34 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
     setError(null);
     const limit = timeLimit.trim() ? Number.parseInt(timeLimit, 10) : null;
     if (timeLimit.trim() && (!limit || limit < 1 || limit > 1440)) {
-      setError("Vul een tijdslimiet in tussen 1 en 1440 minuten, of laat het veld leeg.");
+      setError(
+        "Vul een tijdslimiet in tussen 1 en 1440 minuten, of laat het veld leeg.",
+      );
       return;
     }
     const normalizedCode = code.trim() ? normalizeAccessCode(code) : null;
     if (normalizedCode && !ACCESS_CODE_REGEX.test(normalizedCode)) {
-      setError("Een toegangscode bestaat uit 3 tot 20 letters, cijfers of streepjes.");
+      setError(
+        "Een toegangscode bestaat uit 3 tot 20 letters, cijfers of streepjes.",
+      );
       return;
     }
     const newOpens = fromDateTimeLocal(opensAt);
     const newCloses = fromDateTimeLocal(closesAt);
     // datetime-local has minute precision: only send the times that changed.
-    const minute = (d: Date | null | undefined) => (d ? Math.floor(new Date(d).getTime() / 60_000) : null);
-    const sameTime = (a: Date | null, b: Date | null) => minute(a) === minute(b);
+    const minute = (d: Date | null | undefined) =>
+      d ? Math.floor(new Date(d).getTime() / 60_000) : null;
+    const sameTime = (a: Date | null, b: Date | null) =>
+      minute(a) === minute(b);
     update.mutate({
       id: assignment.id,
       title: title.trim() || null,
-      ...(isPlanned && !sameTime(newOpens, assignment.opensAt) ? { opensAt: newOpens } : {}),
-      ...(!sameTime(newCloses, assignment.closesAt) ? { closesAt: newCloses } : {}),
+      ...(isPlanned && !sameTime(newOpens, assignment.opensAt)
+        ? { opensAt: newOpens }
+        : {}),
+      ...(!sameTime(newCloses, assignment.closesAt)
+        ? { closesAt: newCloses }
+        : {}),
       timeLimitMinutes: limit,
       accessCode: normalizedCode,
       settings,
@@ -103,7 +138,11 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
     <>
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="flex flex-col gap-6">
-          <SheetField label="Titel" htmlFor={`${id}-title`} hint={`Leeg = “${assignment.test.title}”`}>
+          <SheetField
+            label="Titel"
+            htmlFor={`${id}-title`}
+            hint={`Leeg = “${assignment.test.title}”`}
+          >
             <Input
               id={`${id}-title`}
               value={title}
@@ -115,7 +154,11 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
 
           <div className="grid gap-4 sm:grid-cols-2">
             {isPlanned ? (
-              <SheetField label="Opent op" htmlFor={`${id}-opens`} hint="Leeg = jij opent hem zelf.">
+              <SheetField
+                label="Opent op"
+                htmlFor={`${id}-opens`}
+                hint="Leeg = jij opent hem zelf."
+              >
                 <Input
                   id={`${id}-opens`}
                   type="datetime-local"
@@ -127,7 +170,11 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
             <SheetField
               label="Sluit op"
               htmlFor={`${id}-closes`}
-              hint={isClosed ? "Heropen de afname om een nieuwe eindtijd te kiezen." : "Leeg = jij sluit hem zelf."}
+              hint={
+                isClosed
+                  ? "Heropen de afname om een nieuwe eindtijd te kiezen."
+                  : "Leeg = jij sluit hem zelf."
+              }
             >
               <Input
                 id={`${id}-closes`}
@@ -137,7 +184,11 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
                 onChange={(e) => setClosesAt(e.target.value)}
               />
             </SheetField>
-            <SheetField label="Tijdslimiet (minuten)" htmlFor={`${id}-limit`} hint="Leeg = geen limiet.">
+            <SheetField
+              label="Tijdslimiet (minuten)"
+              htmlFor={`${id}-limit`}
+              hint="Leeg = geen limiet."
+            >
               <Input
                 id={`${id}-limit`}
                 type="number"
@@ -149,7 +200,11 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
                 onChange={(e) => setTimeLimit(e.target.value)}
               />
             </SheetField>
-            <SheetField label="Toegangscode" htmlFor={`${id}-code`} hint="Leeg = geen code nodig.">
+            <SheetField
+              label="Toegangscode"
+              htmlFor={`${id}-code`}
+              hint="Leeg = geen code nodig."
+            >
               <Input
                 id={`${id}-code`}
                 value={code}
@@ -161,22 +216,36 @@ function SettingsForm({ assignment, onDone }: { assignment: Assignment; onDone: 
             </SheetField>
           </div>
 
-          <AssignmentSettingsFields value={settings} onChange={setSettings} compact />
+          <AssignmentSettingsFields
+            value={settings}
+            onChange={setSettings}
+            compact
+          />
         </div>
       </div>
       <div className="flex flex-col gap-3 border-t bg-card px-6 py-4">
         {error ? (
-          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink">
+          <p
+            role="alert"
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
+          >
             {error}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onDone} disabled={update.isPending}>
+          <Button
+            variant="outline"
+            onClick={onDone}
+            disabled={update.isPending}
+          >
             Annuleren
           </Button>
           <Button onClick={save} disabled={update.isPending}>
             {update.isPending ? (
-              <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <Save aria-hidden="true" />
             )}

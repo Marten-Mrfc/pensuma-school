@@ -87,7 +87,10 @@ export function formatRemaining(ms: number): string {
 }
 
 /** Number with a decimal comma: 7.5 → "7,5", 3 → "3". */
-export function formatNumber(value: number | null | undefined, maxDecimals = 2): string {
+export function formatNumber(
+  value: number | null | undefined,
+  maxDecimals = 2,
+): string {
   if (value == null || !Number.isFinite(value)) return "–";
   return value.toLocaleString("nl-NL", {
     maximumFractionDigits: maxDecimals,
@@ -110,7 +113,9 @@ export function formatPercent(fraction: number | null | undefined): string {
 }
 
 /** Value for <input type="datetime-local"> in local time. */
-export function toDateTimeLocal(value: Date | string | null | undefined): string {
+export function toDateTimeLocal(
+  value: Date | string | null | undefined,
+): string {
   if (!value) return "";
   const d = toDate(value);
   const pad = (n: number) => n.toString().padStart(2, "0");

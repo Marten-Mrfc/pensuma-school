@@ -165,10 +165,13 @@ export class AnswerSaver {
     return done;
   }
 
+  /** Clear timers (pending changes stay queued; `flush()` restarts them). */
   dispose() {
     this.clearDebounce();
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.listeners.clear();
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
   }
 
   /* -------------------------------- internals ------------------------------- */

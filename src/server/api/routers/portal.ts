@@ -766,13 +766,27 @@ export const portalRouter = createTRPCRouter({
 
   /** Hand in. Grading runs after the response has been sent. */
   submitAttempt: studentProcedure
-    .input(z.object({ attemptId: idSchema }))
+    .input(
+      z.object({
+        attemptId: idSchema,
+        /** Sent by the exam page when the countdown reached zero. */
+        auto: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const { attempt } = await loadOwnedAttempt(ctx.user.id, input.attemptId);
       if (attempt.status === "submitted") {
         return { submittedAt: attempt.submittedAt, alreadySubmitted: true };
       }
-      await submitAttempt(attempt.id, { auto: false, by: "student" });
+      // Only believe "time is up" when the deadline is (nearly) there.
+      const timeUp =
+        !!input.auto &&
+        !!attempt.deadlineAt &&
+        Date.now() >= attempt.deadlineAt.getTime() - 10_000;
+      await submitAttempt(attempt.id, {
+        auto: timeUp,
+        by: timeUp ? "timer" : "student",
+      });
       const [fresh] = await db
         .select({ submittedAt: attempts.submittedAt })
         .from(attempts)
@@ -942,6 +956,15 @@ export const portalRouter = createTRPCRouter({
           attempt.gradingStatus === "pending"
             ? null
             : dutchGrade(score, maxScore),
+        /** While pending: how many answers have been graded so far. */
+        gradingProgress: {
+          done: aRows.filter(
+            (r) =>
+              r.gradedAt != null &&
+              (!attempt.submittedAt || r.gradedAt >= attempt.submittedAt),
+          ).length,
+          total: aRows.length,
+        },
         questions: list,
       };
     }),

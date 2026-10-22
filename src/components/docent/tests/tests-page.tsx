@@ -36,7 +36,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { RelativeTime } from "@/components/ui/relative-time";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
@@ -76,7 +80,9 @@ export function TestsPage() {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(FILTER_STORAGE_KEY) as StatusFilter | null;
+      const saved = window.localStorage.getItem(
+        FILTER_STORAGE_KEY,
+      ) as StatusFilter | null;
       if (saved && FILTERS.some((f) => f.value === saved)) setStatus(saved);
     } catch {
       // ignore
@@ -93,7 +99,10 @@ export function TestsPage() {
   }
 
   const query = useQuery({
-    ...trpc.test.list.queryOptions({ search: deferredSearch || undefined, status }),
+    ...trpc.test.list.queryOptions({
+      search: deferredSearch || undefined,
+      status,
+    }),
     placeholderData: (prev) => prev,
   });
 
@@ -121,7 +130,12 @@ export function TestsPage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Zoek op titel of onderwerp…"
             aria-label="Zoek toetsen"
-            prefixIcon={<Search className="size-4 text-muted-foreground" aria-hidden="true" />}
+            prefixIcon={
+              <Search
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+            }
           />
         </div>
         <div
@@ -151,7 +165,11 @@ export function TestsPage() {
       {query.isPending ? (
         <LoadingState variant="list" label="Toetsen laden…" />
       ) : query.isError ? (
-        <ErrorState title="De toetsen konden niet worden geladen" error={query.error} onRetry={() => query.refetch()} />
+        <ErrorState
+          title="De toetsen konden niet worden geladen"
+          error={query.error}
+          onRetry={() => query.refetch()}
+        />
       ) : rows.length === 0 ? (
         filtering ? (
           <EmptyBlock
@@ -198,7 +216,12 @@ export function TestsPage() {
           />
         )
       ) : (
-        <ul className={cn("grid gap-4 sm:grid-cols-2 xl:grid-cols-3", query.isFetching && "opacity-80")}>
+        <ul
+          className={cn(
+            "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3",
+            query.isFetching && "opacity-80",
+          )}
+        >
           {rows.map((row) => (
             <TestCard key={row.id} test={row} />
           ))}
@@ -208,7 +231,15 @@ export function TestsPage() {
   );
 }
 
-function TypeCount({ icon: Icon, n, label }: { icon: typeof SquareCode; n: number; label: string }) {
+function TypeCount({
+  icon: Icon,
+  n,
+  label,
+}: {
+  icon: typeof SquareCode;
+  n: number;
+  label: string;
+}) {
   if (n === 0) return null;
   return (
     <span className="inline-flex items-center gap-1" title={label}>
@@ -224,14 +255,18 @@ function TestCard({ test }: { test: TestRow }) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: trpc.test.pathKey() });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: trpc.test.pathKey() });
 
   const duplicate = useMutation(
     trpc.test.duplicate.mutationOptions({
       onSuccess: async (res) => {
         await invalidate();
         toast.success(`Kopie van “${test.title}” gemaakt.`, {
-          action: { label: "Openen", onClick: () => router.push(routes.docent.test(res.id)) },
+          action: {
+            label: "Openen",
+            onClick: () => router.push(routes.docent.test(res.id)),
+          },
         });
       },
       onError: (e) => toast.error(getErrorMessage(e)),
@@ -241,7 +276,11 @@ function TestCard({ test }: { test: TestRow }) {
     trpc.test.setStatus.mutationOptions({
       onSuccess: async (res) => {
         await invalidate();
-        toast.success(res.status === "archived" ? "Toets gearchiveerd." : "Toets teruggezet als concept.");
+        toast.success(
+          res.status === "archived"
+            ? "Toets gearchiveerd."
+            : "Toets teruggezet als concept.",
+        );
       },
       onError: (e) => toast.error(getErrorMessage(e)),
     }),
@@ -291,7 +330,9 @@ function TestCard({ test }: { test: TestRow }) {
               <DropdownMenuItem asChild>
                 <Link href={href}>Openen</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => duplicate.mutate({ id: test.id })}>
+              <DropdownMenuItem
+                onSelect={() => duplicate.mutate({ id: test.id })}
+              >
                 <Copy aria-hidden="true" />
                 Dupliceren
               </DropdownMenuItem>
@@ -300,12 +341,20 @@ function TestCard({ test }: { test: TestRow }) {
                 Exporteren (JSON)
               </DropdownMenuItem>
               {test.status === "archived" ? (
-                <DropdownMenuItem onSelect={() => setStatus.mutate({ id: test.id, status: "draft" })}>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setStatus.mutate({ id: test.id, status: "draft" })
+                  }
+                >
                   <ArchiveRestore aria-hidden="true" />
                   Dearchiveren
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onSelect={() => setStatus.mutate({ id: test.id, status: "archived" })}>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setStatus.mutate({ id: test.id, status: "archived" })
+                  }
+                >
                   <Archive aria-hidden="true" />
                   Archiveren
                 </DropdownMenuItem>
@@ -324,14 +373,21 @@ function TestCard({ test }: { test: TestRow }) {
 
         <div className="flex min-w-0 flex-col gap-1.5">
           <h2 className="text-[1.05rem] leading-snug font-semibold text-balance">
-            <Link href={href} className="outline-none after:absolute after:inset-0 after:rounded-xl">
+            <Link
+              href={href}
+              className="outline-none after:absolute after:inset-0 after:rounded-xl"
+            >
               {test.title}
             </Link>
           </h2>
           {description ? (
-            <p className="line-clamp-2 text-sm text-muted-foreground">{description}</p>
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {description}
+            </p>
           ) : (
-            <p className="text-sm text-muted-foreground/70 italic">Geen beschrijving</p>
+            <p className="text-sm text-muted-foreground/70 italic">
+              Geen beschrijving
+            </p>
           )}
         </div>
 
@@ -340,12 +396,25 @@ function TestCard({ test }: { test: TestRow }) {
             {test.questionCount} {test.questionCount === 1 ? "vraag" : "vragen"}
           </span>
           <span className="text-muted-foreground tabular-nums">
-            {formatPoints(test.totalPoints)} {test.totalPoints === 1 ? "punt" : "punten"}
+            {formatPoints(test.totalPoints)}{" "}
+            {test.totalPoints === 1 ? "punt" : "punten"}
           </span>
           <span className="flex items-center gap-2.5 text-xs text-muted-foreground">
-            <TypeCount icon={SquareCode} n={test.codeCount} label="programmeervragen" />
-            <TypeCount icon={ListChecks} n={test.choiceCount} label="meerkeuzevragen" />
-            <TypeCount icon={MessageSquareText} n={test.openCount} label="open vragen" />
+            <TypeCount
+              icon={SquareCode}
+              n={test.codeCount}
+              label="programmeervragen"
+            />
+            <TypeCount
+              icon={ListChecks}
+              n={test.choiceCount}
+              label="meerkeuzevragen"
+            />
+            <TypeCount
+              icon={MessageSquareText}
+              n={test.openCount}
+              label="open vragen"
+            />
           </span>
         </div>
       </div>
@@ -355,11 +424,21 @@ function TestCard({ test }: { test: TestRow }) {
           {test.assignmentCount > 0
             ? `${test.assignmentCount} ${test.assignmentCount === 1 ? "afname" : "afnames"} · `
             : ""}
-          bewerkt <RelativeTime date={test.updatedAt} locale="nl-NL" formatStyle="short" />
+          bewerkt{" "}
+          <RelativeTime
+            date={test.updatedAt}
+            locale="nl-NL"
+            formatStyle="short"
+          />
           {test.createdByName ? ` · ${test.createdByName}` : ""}
         </span>
         {test.status === "published" ? (
-          <Button asChild size="xs" variant="outline" className="relative z-10 shrink-0">
+          <Button
+            asChild
+            size="xs"
+            variant="outline"
+            className="relative z-10 shrink-0"
+          >
             <Link href={routes.docent.newAssignment({ testId: test.id })}>
               <CalendarPlus aria-hidden="true" />
               Afname plannen
@@ -384,7 +463,11 @@ function TestCard({ test }: { test: TestRow }) {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         destructive={!hasAttempts}
-        title={hasAttempts ? "Archiveren in plaats van verwijderen?" : `“${test.title}” verwijderen?`}
+        title={
+          hasAttempts
+            ? "Archiveren in plaats van verwijderen?"
+            : `“${test.title}” verwijderen?`
+        }
         description={
           hasAttempts
             ? `Deze toets is al ${test.attemptCount} keer gemaakt en kan daarom niet worden verwijderd. Archiveer hem; dan blijven alle resultaten bewaard.`

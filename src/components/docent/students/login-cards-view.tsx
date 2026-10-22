@@ -111,7 +111,7 @@ export function LoginCardsView({ classId, ids }: LoginCardsViewProps) {
             </Link>
           </Button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <h1 className="truncate font-display text-lg leading-tight font-bold tracking-tight">
+            <h1 className="line-clamp-2 font-display text-lg leading-tight font-bold tracking-tight">
               Inlogkaarten{className ? ` · ${className}` : ""}
             </h1>
             <p className="text-xs text-muted-foreground">
@@ -129,7 +129,7 @@ export function LoginCardsView({ classId, ids }: LoginCardsViewProps) {
           </Button>
         </div>
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 pb-3 text-xs text-muted-foreground sm:px-6">
-          <p className="flex items-center gap-1.5">
+          <p className="hidden items-center gap-1.5 sm:flex">
             <Scissors className="size-3.5 shrink-0" aria-hidden="true" />
             Kies in het printvenster A4, schaal 100% (ware grootte) en zet kop-
             en voetteksten uit. Knip langs de stippellijnen.
@@ -223,14 +223,14 @@ function LoginCard({
   return (
     <article data-login-card className="login-card login-paper text-foreground">
       <header className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-[1.6mm]">
+        <span className="inline-flex shrink-0 items-center gap-[1.6mm]">
           <LogoMark className="size-[6.5mm]" />
           <span className="font-display-wide text-[4.2mm] leading-none font-bold tracking-tight">
             Pensuma
           </span>
         </span>
-        <span className="truncate text-[2.6mm] font-medium tracking-[0.12em] text-muted-foreground uppercase">
-          {className ? `Inlogkaart · ${className}` : "Inlogkaart"}
+        <span className="min-w-0 truncate text-[2.6mm] font-medium tracking-[0.1em] text-muted-foreground uppercase">
+          {className ?? "Inlogkaart"}
         </span>
       </header>
 

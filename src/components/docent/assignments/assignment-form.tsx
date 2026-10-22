@@ -28,7 +28,10 @@ import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
-import { type AssignmentSettings, SHOW_RESULTS_LABELS } from "@/lib/questions/schema";
+import {
+  type AssignmentSettings,
+  SHOW_RESULTS_LABELS,
+} from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
@@ -38,7 +41,12 @@ import {
   defaultSettingsForMode,
   normalizeAccessCode,
 } from "./defaults";
-import { formatMinutes, formatMoment, fromDateTimeLocal, toDateTimeLocal } from "./format";
+import {
+  formatMinutes,
+  formatMoment,
+  fromDateTimeLocal,
+  toDateTimeLocal,
+} from "./format";
 import { AssignmentSettingsFields } from "./settings-fields";
 
 type StartMode = "now" | "scheduled" | "manual";
@@ -46,7 +54,10 @@ type CodeMode = "generate" | "none" | "custom";
 
 const DURATIONS = [15, 30, 45, 50, 60, 90];
 
-const MODE_INFO: Record<AssignmentMode, { title: string; icon: LucideIcon; points: string[] }> = {
+const MODE_INFO: Record<
+  AssignmentMode,
+  { title: string; icon: LucideIcon; points: string[] }
+> = {
   exam: {
     title: "Toets",
     icon: FileCheck2,
@@ -74,7 +85,10 @@ export function AssignmentForm() {
   const options = useQuery(trpc.assignment.formOptions.queryOptions());
 
   if (options.isPending) return <LoadingState />;
-  if (options.isError) return <ErrorState error={options.error} onRetry={() => options.refetch()} />;
+  if (options.isError)
+    return (
+      <ErrorState error={options.error} onRetry={() => options.refetch()} />
+    );
   return <AssignmentFormInner options={options.data} />;
 }
 
@@ -90,7 +104,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
   const preTest = searchParams.get("toets");
   const preClass = searchParams.get("klas");
   const [testId, setTestId] = useState(
-    options.tests.some((t) => t.id === preTest) ? (preTest as string) : options.tests.length === 1 ? options.tests[0].id : "",
+    options.tests.some((t) => t.id === preTest)
+      ? (preTest as string)
+      : options.tests.length === 1
+        ? options.tests[0].id
+        : "",
   );
   const [classId, setClassId] = useState(
     options.classes.some((c) => c.id === preClass)
@@ -101,7 +119,9 @@ function AssignmentFormInner({ options }: { options: Options }) {
   );
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<AssignmentMode>("exam");
-  const [settings, setSettings] = useState<AssignmentSettings>(() => defaultSettingsForMode("exam"));
+  const [settings, setSettings] = useState<AssignmentSettings>(() =>
+    defaultSettingsForMode("exam"),
+  );
   const [startMode, setStartMode] = useState<StartMode>("now");
   const [opensAt, setOpensAt] = useState("");
   const [closesEnabled, setClosesEnabled] = useState(false);
@@ -117,11 +137,22 @@ function AssignmentFormInner({ options }: { options: Options }) {
   const create = useMutation(
     trpc.assignment.create.mutationOptions({
       onSuccess: async (created) => {
-        await queryClient.invalidateQueries({ queryKey: trpc.assignment.pathKey() });
-        await queryClient.invalidateQueries({ queryKey: trpc.dashboard.pathKey() });
-        toast.success(created.effectiveStatus === "open" ? "De afname is open" : "De afname is gepland", {
-          description: created.accessCode ? `Toegangscode: ${created.accessCode}` : undefined,
+        await queryClient.invalidateQueries({
+          queryKey: trpc.assignment.pathKey(),
         });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.dashboard.pathKey(),
+        });
+        toast.success(
+          created.effectiveStatus === "open"
+            ? "De afname is open"
+            : "De afname is gepland",
+          {
+            description: created.accessCode
+              ? `Toegangscode: ${created.accessCode}`
+              : undefined,
+          },
+        );
         router.push(routes.docent.assignment(created.id));
       },
       onError: (err) => toast.error(getErrorMessage(err)),
@@ -144,18 +175,29 @@ function AssignmentFormInner({ options }: { options: Options }) {
     const open = startMode === "scheduled" ? fromDateTimeLocal(opensAt) : null;
     if (startMode === "scheduled") {
       if (!open) next.opensAt = "Kies een starttijd.";
-      else if (open <= now) next.opensAt = "De starttijd ligt in het verleden. Kies ‘Nu openen’ of een later moment.";
+      else if (open <= now)
+        next.opensAt =
+          "De starttijd ligt in het verleden. Kies ‘Nu openen’ of een later moment.";
     }
     if (closesEnabled) {
       const close = fromDateTimeLocal(closesAt);
-      if (!close) next.closesAt = "Kies een eindtijd of zet automatisch sluiten uit.";
-      else if (close <= now) next.closesAt = "De eindtijd ligt in het verleden.";
-      else if (open && close <= open) next.closesAt = "Het einde moet na de start liggen.";
+      if (!close)
+        next.closesAt = "Kies een eindtijd of zet automatisch sluiten uit.";
+      else if (close <= now)
+        next.closesAt = "De eindtijd ligt in het verleden.";
+      else if (open && close <= open)
+        next.closesAt = "Het einde moet na de start liggen.";
     }
-    if (timeLimit.trim() && (!limitMinutes || limitMinutes < 1 || limitMinutes > 1440)) {
+    if (
+      timeLimit.trim() &&
+      (!limitMinutes || limitMinutes < 1 || limitMinutes > 1440)
+    ) {
       next.timeLimit = "Vul een aantal minuten in tussen 1 en 1440.";
     }
-    if (codeMode === "custom" && !ACCESS_CODE_REGEX.test(normalizeAccessCode(customCode))) {
+    if (
+      codeMode === "custom" &&
+      !ACCESS_CODE_REGEX.test(normalizeAccessCode(customCode))
+    ) {
       next.code = "Gebruik 3 tot 20 letters, cijfers of streepjes.";
     }
     setErrors(next);
@@ -177,7 +219,12 @@ function AssignmentFormInner({ options }: { options: Options }) {
       opensAt: startMode === "scheduled" ? fromDateTimeLocal(opensAt) : null,
       closesAt: closesEnabled ? fromDateTimeLocal(closesAt) : null,
       timeLimitMinutes: limitMinutes,
-      accessCode: codeMode === "custom" ? normalizeAccessCode(customCode) : codeMode === "none" ? null : undefined,
+      accessCode:
+        codeMode === "custom"
+          ? normalizeAccessCode(customCode)
+          : codeMode === "none"
+            ? null
+            : undefined,
       generateAccessCode: codeMode === "generate",
       settings,
     });
@@ -186,7 +233,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
   if (options.tests.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="Afname plannen" backHref={routes.docent.assignments} backLabel="Afnames" />
+        <PageHeader
+          title="Afname plannen"
+          backHref={routes.docent.assignments}
+          backLabel="Afnames"
+        />
         <EmptyBlock
           icon={FileCode2}
           title="Je hebt nog geen gepubliceerde toets"
@@ -216,7 +267,12 @@ function AssignmentFormInner({ options }: { options: Options }) {
         <div className="flex min-w-0 flex-col gap-6">
           <Section step={1} title="Toets en klas" icon={School}>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Toets" htmlFor={`${id}-test`} error={errors.test} hint="Alleen gepubliceerde toetsen.">
+              <Field
+                label="Toets"
+                htmlFor={`${id}-test`}
+                error={errors.test}
+                hint="Alleen gepubliceerde toetsen."
+              >
                 <NativeSelect
                   id={`${id}-test`}
                   value={testId}
@@ -268,7 +324,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
           </Section>
 
           <Section step={2} title="Modus" icon={FileCheck2}>
-            <div role="radiogroup" aria-label="Modus" className="grid gap-3 md:grid-cols-2">
+            <div
+              role="radiogroup"
+              aria-label="Modus"
+              className="grid gap-3 md:grid-cols-2"
+            >
               {(Object.keys(MODE_INFO) as AssignmentMode[]).map((m) => {
                 const info = MODE_INFO[m];
                 const Icon = info.icon;
@@ -283,20 +343,30 @@ function AssignmentFormInner({ options }: { options: Options }) {
                     onClick={() => chooseMode(m)}
                     className={cn(
                       "relative flex flex-col gap-3 rounded-xl border bg-background p-4 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                      active && "border-primary bg-primary/[0.04] ring-1 ring-primary",
+                      active &&
+                        "border-primary bg-primary/[0.04] ring-1 ring-primary",
                     )}
                   >
                     <span className="flex items-center gap-3">
                       <span
                         className={cn(
                           "grid size-10 place-items-center rounded-lg",
-                          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground",
                         )}
                       >
                         <Icon className="size-5" aria-hidden="true" />
                       </span>
-                      <span className="text-base font-semibold">{info.title}</span>
-                      {active ? <Check className="ml-auto size-5 text-primary" aria-hidden="true" /> : null}
+                      <span className="text-base font-semibold">
+                        {info.title}
+                      </span>
+                      {active ? (
+                        <Check
+                          className="ml-auto size-5 text-primary"
+                          aria-hidden="true"
+                        />
+                      ) : null}
                     </span>
                     <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
                       {info.points.map((p) => (
@@ -311,7 +381,8 @@ function AssignmentFormInner({ options }: { options: Options }) {
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              De modus zet handige standaardinstellingen. Je kunt alles hieronder nog aanpassen.
+              De modus zet handige standaardinstellingen. Je kunt alles
+              hieronder nog aanpassen.
             </p>
           </Section>
 
@@ -319,7 +390,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium">Start</span>
-                <div role="radiogroup" aria-label="Start" className="grid gap-2 sm:grid-cols-3">
+                <div
+                  role="radiogroup"
+                  aria-label="Start"
+                  className="grid gap-2 sm:grid-cols-3"
+                >
                   <ChoiceButton
                     active={startMode === "now"}
                     onClick={() => setStartMode("now")}
@@ -350,7 +425,12 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   />
                 </div>
                 {startMode === "scheduled" ? (
-                  <Field label="Opent op" htmlFor={`${id}-opens`} error={errors.opensAt} className="sm:max-w-xs">
+                  <Field
+                    label="Opent op"
+                    htmlFor={`${id}-opens`}
+                    error={errors.opensAt}
+                    className="sm:max-w-xs"
+                  >
                     <Input
                       id={`${id}-opens`}
                       type="datetime-local"
@@ -372,10 +452,13 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       setClosesEnabled(e.target.checked);
                       if (e.target.checked && !closesAt) {
                         const base =
-                          startMode === "scheduled" && fromDateTimeLocal(opensAt)
+                          startMode === "scheduled" &&
+                          fromDateTimeLocal(opensAt)
                             ? (fromDateTimeLocal(opensAt) as Date)
                             : new Date();
-                        const d = new Date(base.getTime() + (limitMinutes ?? 50) * 60_000);
+                        const d = new Date(
+                          base.getTime() + (limitMinutes ?? 50) * 60_000,
+                        );
                         d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
                         setClosesAt(toDateTimeLocal(d));
                       }
@@ -434,7 +517,8 @@ function AssignmentFormInner({ options }: { options: Options }) {
                         onClick={() => setTimeLimit(String(m))}
                         className={cn(
                           "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums transition-colors hover:bg-accent",
-                          limitMinutes === m && "border-primary bg-primary/10 text-primary",
+                          limitMinutes === m &&
+                            "border-primary bg-primary/10 text-primary",
                         )}
                       >
                         {m} min
@@ -447,7 +531,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
           </Section>
 
           <Section step={4} title="Toegangscode" icon={KeyRound}>
-            <div role="radiogroup" aria-label="Toegangscode" className="grid gap-2 sm:grid-cols-3">
+            <div
+              role="radiogroup"
+              aria-label="Toegangscode"
+              className="grid gap-2 sm:grid-cols-3"
+            >
               <ChoiceButton
                 active={codeMode === "generate"}
                 onClick={() => setCodeMode("generate")}
@@ -468,7 +556,12 @@ function AssignmentFormInner({ options }: { options: Options }) {
               />
             </div>
             {codeMode === "custom" ? (
-              <Field label="Jouw code" htmlFor={`${id}-code`} error={errors.code} className="sm:max-w-xs">
+              <Field
+                label="Jouw code"
+                htmlFor={`${id}-code`}
+                error={errors.code}
+                className="sm:max-w-xs"
+              >
                 <Input
                   id={`${id}-code`}
                   value={customCode}
@@ -482,7 +575,8 @@ function AssignmentFormInner({ options }: { options: Options }) {
               </Field>
             ) : null}
             <p className="text-xs text-muted-foreground">
-              Leerlingen typen de code als ze beginnen. Zo start niemand voordat jij de code op het bord laat zien.
+              Leerlingen typen de code als ze beginnen. Zo start niemand voordat
+              jij de code op het bord laat zien.
             </p>
           </Section>
 
@@ -500,21 +594,29 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   <>
                     {test.title}
                     <span className="block text-xs text-muted-foreground">
-                      {test.questionCount} vragen · {test.totalPoints.toLocaleString("nl-NL")} punten
+                      {test.questionCount} vragen ·{" "}
+                      {test.totalPoints.toLocaleString("nl-NL")} punten
                     </span>
                   </>
                 ) : (
-                  <span className="text-muted-foreground">Nog niet gekozen</span>
+                  <span className="text-muted-foreground">
+                    Nog niet gekozen
+                  </span>
                 )}
               </SummaryRow>
               <SummaryRow icon={Users} label="Klas">
                 {klas ? (
                   `${klas.name} · ${klas.studentCount} leerlingen`
                 ) : (
-                  <span className="text-muted-foreground">Nog niet gekozen</span>
+                  <span className="text-muted-foreground">
+                    Nog niet gekozen
+                  </span>
                 )}
               </SummaryRow>
-              <SummaryRow icon={mode === "exam" ? FileCheck2 : Dumbbell} label="Modus">
+              <SummaryRow
+                icon={mode === "exam" ? FileCheck2 : Dumbbell}
+                label="Modus"
+              >
                 {MODE_INFO[mode].title}
               </SummaryRow>
               <SummaryRow icon={CalendarClock} label="Tijdvak">
@@ -532,7 +634,9 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 </span>
               </SummaryRow>
               <SummaryRow icon={Clock} label="Tijdslimiet">
-                {formatMinutes(limitMinutes && limitMinutes > 0 ? limitMinutes : null)}
+                {formatMinutes(
+                  limitMinutes && limitMinutes > 0 ? limitMinutes : null,
+                )}
               </SummaryRow>
               <SummaryRow icon={KeyRound} label="Toegangscode">
                 {codeMode === "generate"
@@ -547,9 +651,17 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 {SHOW_RESULTS_LABELS[settings.showResults]}
               </SummaryRow>
             </dl>
-            <Button type="submit" size="lg" disabled={create.isPending} className="w-full">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={create.isPending}
+              className="w-full"
+            >
               {create.isPending ? (
-                <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
               ) : startMode === "now" ? (
                 <Play aria-hidden="true" />
               ) : (
@@ -582,7 +694,10 @@ function Section({
           {step}
         </span>
         {title}
-        <Icon className="ml-auto size-4 text-muted-foreground" aria-hidden="true" />
+        <Icon
+          className="ml-auto size-4 text-muted-foreground"
+          aria-hidden="true"
+        />
       </h2>
       {children}
     </section>
@@ -647,7 +762,12 @@ function ChoiceButton({
       )}
     >
       {Icon ? (
-        <Icon className={cn("mt-0.5 size-4 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+        <Icon
+          className={cn(
+            "mt-0.5 size-4 shrink-0",
+            active ? "text-primary" : "text-muted-foreground",
+          )}
+        />
       ) : (
         <span
           className={cn(
@@ -655,7 +775,9 @@ function ChoiceButton({
             active ? "border-primary bg-primary" : "border-muted-foreground/40",
           )}
         >
-          {active ? <span className="size-1.5 rounded-full bg-primary-foreground" /> : null}
+          {active ? (
+            <span className="size-1.5 rounded-full bg-primary-foreground" />
+          ) : null}
         </span>
       )}
       <span className="flex flex-col gap-0.5">
@@ -666,10 +788,21 @@ function ChoiceButton({
   );
 }
 
-function SummaryRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
+function SummaryRow({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex gap-3">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <Icon
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+        aria-hidden="true"
+      />
       <div className="flex min-w-0 flex-col">
         <dt className="text-xs text-muted-foreground">{label}</dt>
         <dd className="font-medium break-words">{children}</dd>

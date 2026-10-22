@@ -70,6 +70,13 @@ import { pathToFileURL } from "node:url";
 
 const PYODIDE_DIR = process.argv[2];
 const WASM_MAX_MB = Math.max(64, Number(process.argv[3]) || 512);
+// argv[4]: "--make-snapshot" (pristine snapshot maker: never runs student
+// code), "--snapshot=<file>" (start from that memory snapshot), or nothing.
+const MODE_ARG = process.argv[4] ?? "";
+const MAKE_SNAPSHOT = MODE_ARG === "--make-snapshot";
+const SNAPSHOT_PATH = MODE_ARG.startsWith("--snapshot=")
+  ? MODE_ARG.slice("--snapshot=".length)
+  : null;
 
 /* ----------------------------- Captured handles ---------------------------- */
 
@@ -383,13 +390,47 @@ async function main() {
     pathToFileURL(path.join(PYODIDE_DIR, "pyodide.mjs")).href
   );
   const sink = () => {};
-  const pyodide = await loadPyodide({
+  const options = {
     indexURL: `${PYODIDE_DIR.replace(/\/$/, "")}/`,
     jsglobals: Object.freeze(Object.create(null)),
     stdout: sink,
     stderr: sink,
     env: { HOME: "/home/pyodide" },
-  });
+  };
+
+  if (MAKE_SNAPSHOT) {
+    // Pristine interpreter -> memory snapshot, streamed to the parent in
+    // base64 chunks. No student code ever runs in this process.
+    const py = await loadPyodide({ ...options, _makeSnapshot: true });
+    const snap = Buffer.from(py.makeMemorySnapshot());
+    const CHUNK = 768 * 1024;
+    for (let i = 0; i < snap.length; i += CHUNK) {
+      send({
+        t: "snapshot-chunk",
+        data: snap.subarray(i, i + CHUNK).toString("base64"),
+      });
+    }
+    send({
+      t: "snapshot-end",
+      size: snap.length,
+      loadMs: Math.round(hrNow() - t0),
+    });
+    stdout.end(() => reallyExit(0));
+    return;
+  }
+
+  let pyodide;
+  let fromSnapshot = false;
+  if (SNAPSHOT_PATH) {
+    try {
+      const snapshot = fs.readFileSync(SNAPSHOT_PATH);
+      pyodide = await loadPyodide({ ...options, _loadSnapshot: snapshot });
+      fromSnapshot = true;
+    } catch (e) {
+      logToStderr(`snapshot load failed, loading normally: ${e?.message ?? e}`);
+    }
+  }
+  pyodide ??= await loadPyodide(options);
   pyodide.setStdin({ error: true });
 
   // Wait for the harness from the parent.
@@ -404,6 +445,7 @@ async function main() {
     t: "ready",
     loadMs: Math.round(hrNow() - t0),
     rss: memoryUsage().rss,
+    fromSnapshot,
   });
 
   for (;;) {
