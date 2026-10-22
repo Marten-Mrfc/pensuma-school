@@ -198,16 +198,24 @@ describe("numbers", () => {
     expect(cmp("3.34", "3.33", "numbers", true, 0).passed).toBe(false);
   });
 
-  test("count and order", () => {
+  test("expected numbers as an ordered subsequence (extra numbers allowed)", () => {
+    expect(cmp("100.0 euro is 108.0 dollar", "108", "numbers").passed).toBe(
+      true,
+    );
     expect(cmp("1 2 3", "1\n2\n3", "numbers").passed).toBe(true);
-    expect(cmp("1 3 2", "1 2 3", "numbers").feedback).toContain(
-      "Getal 2: verwacht 2, maar je programma printte 3",
+    expect(cmp("Invoer 4, 7, 9 → som 20", "20", "numbers").passed).toBe(true);
+    expect(cmp("1 2 3 4", "1 3", "numbers").passed).toBe(true);
+    expect(cmp("3 2 1", "1 2", "numbers").passed).toBe(false);
+    expect(cmp("15", "5", "numbers").passed).toBe(false);
+    expect(cmp("anything", "geen getal", "numbers").passed).toBe(true);
+  });
+
+  test("feedback", () => {
+    expect(cmp("100 euro is 107 dollar", "108", "numbers").feedback).toBe(
+      "Het getal 108 ontbreekt in je uitvoer (gevonden: 100, 107). Een verschil tot 0.01 mag.",
     );
-    expect(cmp("1 2", "1 2 3", "numbers").feedback).toContain(
-      "Getal 3 ontbreekt: 3",
-    );
-    expect(cmp("1 2 3 4", "1 2 3", "numbers").feedback).toContain(
-      "Extra getal: 4",
+    expect(cmp("1 2", "1 2 3", "numbers", true, 0).feedback).toBe(
+      "Het getal 3 ontbreekt na 2 in je uitvoer (gevonden: 1, 2).",
     );
     expect(cmp("geen", "7", "numbers").feedback).toContain("geen getallen");
   });

@@ -137,37 +137,95 @@ function emptyResult(input: GradeInput, error: PythonError): CodeGradingResult {
   });
 }
 
+const TOO_LARGE: PythonError = {
+  type: "InputTooLarge",
+  message: "Je code is te lang om na te kijken.",
+  line: null,
+  traceback: "",
+};
+
 /**
  * Grade code against ALL given tests (including hidden ones) and checks.
  * Never throws for student errors; infrastructure problems give
  * status "internal_error".
  */
 export async function gradeCode(input: GradeInput): Promise<CodeGradingResult> {
+  const [result] = await gradeCodeBatch([input]);
+  return result;
+}
+
+/**
+ * Grade several questions of ONE submission (one student) in one sandbox
+ * job: much faster than one job per question. Never mix students in a
+ * batch: their code would share an interpreter.
+ *
+ * 1. Static analysis (syntax + AST checks) of every question runs first, in
+ *    the pristine sandbox, before any student code runs, so code of one
+ *    question can't tamper with the checks of another.
+ * 2. Then every test of every question runs, each in a fresh namespace with
+ *    builtins/modules restored; after a timeout or crash the job continues
+ *    in a fresh sandbox process.
+ * Each question gets the full GRADER_JOB_TIMEOUT_MS budget. Results are
+ * returned in the same order as `items`.
+ */
+export async function gradeCodeBatch(
+  items: GradeInput[],
+): Promise<CodeGradingResult[]> {
+  if (items.length === 0) return [];
   const config = graderConfig();
-  const normalized: GradeInput = {
+  const normalized: GradeInput[] = items.map((input) => ({
     ...input,
     tests: input.tests.slice(0, MAX_TESTS),
     timeLimitMs: clampTimeLimit(input.timeLimitMs),
-  };
-  if (input.code.length > MAX_CODE_LENGTH) {
-    return emptyResult(normalized, {
-      type: "InputTooLarge",
-      message: "Je code is te lang om na te kijken.",
-      line: null,
-      traceback: "",
-    });
-  }
+  }));
+  const gradable = normalized.filter(
+    (item) => item.code.length <= MAX_CODE_LENGTH,
+  );
   try {
-    return await getGraderPool().withJob((lease) =>
-      runGrading(normalized, new SandboxExecutor(lease), {
-        totalTimeLimitMs: config.jobTimeoutMs,
-        maxOutput: config.maxOutput,
-      }),
+    const graded = await getGraderPool().withJob(async (lease) => {
+      const executor = new SandboxExecutor(lease);
+      const analyses = new Map<string, HarnessAnalysis | Error>();
+      for (const item of gradable) {
+        if (analyses.has(item.code)) continue;
+        try {
+          analyses.set(item.code, await executor.analyze(item.code));
+        } catch (e) {
+          analyses.set(
+            item.code,
+            e instanceof Error ? e : new Error(String(e)),
+          );
+        }
+      }
+      const results = new Map<GradeInput, CodeGradingResult>();
+      for (const item of gradable) {
+        const analysis = analyses.get(item.code);
+        const cached: GradingExecutor = {
+          analyze: async () => {
+            if (!analysis || analysis instanceof Error)
+              throw analysis ?? new Error("geen analyse");
+            return analysis;
+          },
+          run: (request, timeLimitMs) => executor.run(request, timeLimitMs),
+        };
+        results.set(
+          item,
+          await runGrading(item, cached, {
+            totalTimeLimitMs: config.jobTimeoutMs,
+            maxOutput: config.maxOutput,
+          }),
+        );
+      }
+      return results;
+    });
+    return normalized.map(
+      (item) => graded.get(item) ?? emptyResult(item, TOO_LARGE),
     );
   } catch (e) {
-    return emptyResult(
-      normalized,
-      internalError(e instanceof Error ? e.message : String(e)),
+    const error = internalError(e instanceof Error ? e.message : String(e));
+    return normalized.map((item) =>
+      item.code.length > MAX_CODE_LENGTH
+        ? emptyResult(item, TOO_LARGE)
+        : emptyResult(item, error),
     );
   }
 }

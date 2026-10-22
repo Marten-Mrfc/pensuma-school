@@ -18,9 +18,12 @@
  *             printing *all* numbers doesn't pass "print the even numbers".
  * - contains: every expected line must appear (as whole words/numbers)
  *             somewhere in the output, in any order.
- * - numbers:  only the numbers are compared, in order and count, with
- *             `tolerance`. Understands "108.50", "1e3", "-5" and Dutch
- *             decimal commas ("108,50").
+ * - numbers:  only the numbers count: the expected numbers must appear in
+ *             order (as a subsequence) among the printed numbers, each
+ *             within `tolerance`; other numbers (e.g. the echoed input
+ *             in "100.0 euro is 108.0 dollar") may appear in between.
+ *             Understands "108.50", "1e3", "-5" and Dutch decimal
+ *             commas ("108,50").
  * - regex:    `expected` is a JavaScript regular expression, searched in
  *             the output (flags "m", plus "i" when `ignoreCase`).
  */
@@ -398,35 +401,40 @@ function compareNumbers(
 ): OutputCompareResult {
   const a = extractNumbers(actual);
   const e = extractNumbers(expected);
-  for (let i = 0; i < Math.min(a.length, e.length); i++) {
-    if (!numbersEqual(a[i].value, e[i].value, tolerance)) {
-      const which = e.length > 1 ? `Getal ${i + 1}: verwacht` : "Verwacht";
-      return {
-        passed: false,
-        feedback: `${which} ${formatNumber(e[i].value)}, maar je programma printte ${a[i].text}.${tolerance > 0 ? ` (Een verschil tot ${formatNumber(tolerance)} mag.)` : ""}`,
-      };
-    }
-  }
-  if (a.length === e.length) return { passed: true, feedback: null };
+  const list = (xs: FoundNumber[]) =>
+    `${xs
+      .slice(0, 8)
+      .map((x) => formatNumber(x.value))
+      .join(", ")}${xs.length > 8 ? ", …" : ""}`;
+  if (e.length === 0) return { passed: true, feedback: null };
   if (a.length === 0) {
     return {
       passed: false,
-      feedback: `Je programma printte geen getallen. Verwacht: ${e
-        .map((x) => formatNumber(x.value))
-        .slice(0, 5)
-        .join(", ")}${e.length > 5 ? ", …" : ""}.`,
+      feedback: `Je programma printte geen getallen. Verwacht: ${list(e)}.`,
     };
   }
-  if (a.length < e.length) {
-    return {
-      passed: false,
-      feedback: `Je programma printte ${plural(a.length, "getal", "getallen")}, maar er werden er ${e.length} verwacht. Getal ${a.length + 1} ontbreekt: ${formatNumber(e[a.length].value)}.`,
-    };
+  // Expected numbers must appear in order as a subsequence of the printed
+  // numbers (other numbers, such as the echoed input, may come in between).
+  // Earliest-match greedy is optimal for subsequence matching.
+  let j = 0;
+  for (let i = 0; i < e.length; i++) {
+    while (j < a.length && !numbersEqual(a[j].value, e[i].value, tolerance))
+      j++;
+    if (j >= a.length) {
+      const found = list(a);
+      const tol =
+        tolerance > 0
+          ? ` Een verschil tot ${formatNumber(tolerance)} mag.`
+          : "";
+      const after = i > 0 ? ` na ${formatNumber(e[i - 1].value)}` : "";
+      return {
+        passed: false,
+        feedback: `Het getal ${formatNumber(e[i].value)} ontbreekt${after} in je uitvoer (gevonden: ${found}).${tol}`,
+      };
+    }
+    j++;
   }
-  return {
-    passed: false,
-    feedback: `Je programma printte meer getallen dan verwacht (${a.length} in plaats van ${e.length}). Extra getal: ${a[e.length].text}.`,
-  };
+  return { passed: true, feedback: null };
 }
 
 function compareRegex(

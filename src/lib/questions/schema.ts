@@ -29,8 +29,10 @@ import { z } from "zod";
  *   lines are ignored; `ignoreCase` still applies).
  * - contains: every expected line must appear somewhere in the output
  *   (as whole words/numbers, any order).
- * - numbers: only the numbers are compared, in order, with `tolerance`
- *   ("108,50", "1e3" and "-5" are understood).
+ * - numbers: only the numbers count: the expected numbers must appear in
+ *   order (as a subsequence) among the printed numbers, each within
+ *   `tolerance`; other numbers (e.g. the echoed input) may appear in
+ *   between ("108,50", "1e3" and "-5" are understood).
  * - regex: `expectedOutput` is a (JavaScript) regular expression searched in
  *   the output (multiline; case-insensitive when `ignoreCase`).
  */
