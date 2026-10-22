@@ -2,7 +2,7 @@
 
 // TEMPORARY visual check page. Delete after review.
 import { BookOpen, FileCode2, Trash2, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CodeEditor } from "@/components/app/code-editor";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { CopyButton } from "@/components/app/copy-button";
@@ -51,9 +51,12 @@ export default function Preview() {
     'def is_even(n):\n    """Geeft True als n even is."""\n    return n % 2 == 0\n\nnaam = input("Wat is je naam? ")\nprint(f"Hallo {naam}!", 42, True, None)\n',
   );
   const [md, setMd] = useState(MD);
-  const deadlineSoon = new Date(Date.now() + 4 * 60 * 1000 + 30 * 1000);
-  const deadlineLater = new Date(Date.now() + 75 * 60 * 1000);
-  const deadlineDanger = new Date(Date.now() + 45 * 1000);
+  const [base, setBase] = useState<number | null>(null);
+  useEffect(() => setBase(Date.now()), []);
+  const b = base ?? 0;
+  const deadlineSoon = new Date(b + 4 * 60 * 1000 + 30 * 1000);
+  const deadlineLater = new Date(b + 75 * 60 * 1000);
+  const deadlineDanger = new Date(b + 45 * 1000);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10 px-5 py-10">
@@ -98,9 +101,13 @@ export default function Preview() {
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <CountdownTimer deadline={deadlineLater} />
-        <CountdownTimer deadline={deadlineSoon} />
-        <CountdownTimer deadline={deadlineDanger} />
+        {base ? (
+          <>
+            <CountdownTimer deadline={deadlineLater} />
+            <CountdownTimer deadline={deadlineSoon} />
+            <CountdownTimer deadline={deadlineDanger} />
+          </>
+        ) : null}
         <CopyButton value="17053" label="Kopieer" variant="outline" />
         <CopyButton value="17053" />
         <ConfirmDialog

@@ -111,6 +111,9 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
   }, [preview]);
 
   const importable = preview.filter((r) => r.status.kind !== "error");
+  /** Rows that actually change something (members are only sent for renaming). */
+  const toAdd = counts.new + counts.existing;
+  const canSubmit = toAdd > 0 || (updateNames && counts.renamable > 0);
 
   const importMutation = useMutation(
     trpc.student.import.mutationOptions({
@@ -310,7 +313,7 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
           ) : null}
           <Button
             onClick={submit}
-            disabled={importable.length === 0 || importMutation.isPending || checking}
+            disabled={!canSubmit || importMutation.isPending || checking}
             aria-busy={importMutation.isPending}
           >
             {importMutation.isPending ? (
@@ -318,9 +321,11 @@ export function ImportStudentsPanel({ classId, className, onCancel, onImported }
             ) : (
               <UserPlus aria-hidden="true" />
             )}
-            {importable.length === 0
-              ? "Importeren"
-              : `${importable.length} ${importable.length === 1 ? "leerling" : "leerlingen"} toevoegen aan ${className}`}
+            {toAdd === 0
+              ? canSubmit
+                ? "Namen bijwerken"
+                : "Importeren"
+              : `${toAdd} ${toAdd === 1 ? "leerling" : "leerlingen"} toevoegen aan ${className}`}
           </Button>
         </div>
       </div>

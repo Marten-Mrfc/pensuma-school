@@ -1,17 +1,13 @@
 import "server-only";
 
-import type { GradeInput, RunInput, RunResult } from "@/lib/python/types";
-import type { CodeGradingResult } from "@/lib/questions/schema";
-
 /**
- * Server-side Python grader (sandboxed Pyodide).
- * STUB: implemented by the grader workstream.
+ * Server-side Python grader (sandboxed Pyodide child processes).
+ *
+ * - gradeCode(input): grade code against ALL tests (incl. hidden) + checks
+ * - runCode(input): run code once (clean stdout, transcript, error)
+ * - runCodeBatch(code, stdins, timeLimitMs): run once per stdin in one job
+ * - warmUpGrader(): start the warm pool early (optional)
+ *
+ * See ./grader.ts, ./pool.ts, ./sandbox-process.ts and grader/sandbox.mjs.
  */
-export async function gradeCode(_input: GradeInput): Promise<CodeGradingResult> {
-  throw new Error("gradeCode is not implemented yet");
-}
-
-/** Run code once on the server (used by teachers to generate expected output). */
-export async function runCode(_input: RunInput): Promise<RunResult> {
-  throw new Error("runCode is not implemented yet");
-}
+export { gradeCode, runCode, runCodeBatch, warmUpGrader } from "./grader";

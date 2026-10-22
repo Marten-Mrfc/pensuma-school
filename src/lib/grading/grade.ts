@@ -11,6 +11,13 @@
  *          runtime_error  at least one test ended with an exception
  *          ok             everything ran (tests may still have failed)
  */
+
+import type {
+  HarnessAnalysis,
+  HarnessRunRequest,
+  HarnessRunResult,
+} from "@/lib/python/harness";
+import type { GradeInput } from "@/lib/python/types";
 import type {
   CheckResult,
   CodeCheck,
@@ -21,14 +28,13 @@ import type {
   PythonError,
   TestResult,
 } from "@/lib/questions/schema";
-import type {
-  HarnessAnalysis,
-  HarnessRunRequest,
-  HarnessRunResult,
-} from "@/lib/python/harness";
-import type { GradeInput } from "@/lib/python/types";
 import { compareOutput, compareValues, quote } from "./compare";
-import { type PyValue, pyRepr, pyTypeName, tryParsePythonLiteral } from "./pyvalue";
+import {
+  type PyValue,
+  pyRepr,
+  pyTypeName,
+  tryParsePythonLiteral,
+} from "./pyvalue";
 
 /* -------------------------------------------------------------------------- */
 /*                                    Types                                   */
@@ -159,7 +165,8 @@ export function evaluateIoTest(
     stdin: test.stdin,
     expected: test.expectedOutput,
   };
-  if (outcome.kind !== "result") return outcomeFailure(base, outcome, timeLimitMs);
+  if (outcome.kind !== "result")
+    return outcomeFailure(base, outcome, timeLimitMs);
   const r = outcome.result;
   const withOutput: TestResult = { ...base, actual: r.stdout, error: r.error };
   const cmp = compareOutput(r.stdout, test.expectedOutput, {
@@ -173,7 +180,11 @@ export function evaluateIoTest(
       : errorFeedback(r.error);
     return { ...withOutput, passed: false, feedback };
   }
-  return { ...withOutput, passed: cmp.passed, feedback: cmp.feedback ?? undefined };
+  return {
+    ...withOutput,
+    passed: cmp.passed,
+    feedback: cmp.feedback ?? undefined,
+  };
 }
 
 function calledName(call: string): string | null {
@@ -203,7 +214,8 @@ export function evaluateFunctionTest(
       error: internalError(parsed.error),
     };
   }
-  if (outcome.kind !== "result") return outcomeFailure(base, outcome, timeLimitMs);
+  if (outcome.kind !== "result")
+    return outcomeFailure(base, outcome, timeLimitMs);
   const r = outcome.result;
   const fn = calledName(test.call);
   const withOutput: TestResult = { ...base, stdout: r.stdout };
@@ -214,7 +226,9 @@ export function evaluateFunctionTest(
   if (!r.value) {
     const callError = r.error;
     const missingFunction =
-      callError?.type === "NameError" && fn !== null && callError.message.includes(`'${fn}'`);
+      callError?.type === "NameError" &&
+      fn !== null &&
+      callError.message.includes(`'${fn}'`);
     if (missingFunction && r.moduleError) {
       return {
         ...withOutput,
@@ -258,16 +272,24 @@ export function evaluateFunctionTest(
         : `Je functie gaf None terug, maar verwacht werd ${quote(pyRepr(parsed.value))}. Vergeet je return?`;
   } else if (
     pyTypeName(actual.value) !== pyTypeName(parsed.value) &&
-    !(["int", "float"].includes(actual.value.t) && ["int", "float"].includes(parsed.value.t))
+    !(
+      ["int", "float"].includes(actual.value.t) &&
+      ["int", "float"].includes(parsed.value.t)
+    )
   ) {
     feedback = `Je functie gaf ${quote(actual.repr)} (${pyTypeName(actual.value)}) terug, maar verwacht werd ${quote(pyRepr(parsed.value))} (${pyTypeName(parsed.value)}).`;
   } else if (["int", "float", "str", "bool"].includes(parsed.value.t)) {
     feedback = `Je functie gaf ${quote(actual.repr)} terug, maar verwacht werd ${quote(pyRepr(parsed.value))}.`;
   } else {
-    feedback = `Je functie gaf ${quote(actual.repr)} terug. ${cmp.reason ?? ""}`.trim();
+    feedback =
+      `Je functie gaf ${quote(actual.repr)} terug. ${cmp.reason ?? ""}`.trim();
     if (!/[.!?]$/.test(feedback)) feedback += ".";
   }
-  return { ...withOutput, actual: actual.repr, feedback: feedback + moduleNote };
+  return {
+    ...withOutput,
+    actual: actual.repr,
+    feedback: feedback + moduleNote,
+  };
 }
 
 export function evaluateTest(
@@ -295,22 +317,42 @@ export function defaultCheckMessage(check: CodeCheck): string {
   const req = check.kind === "requires";
   switch (check.construct) {
     case "function_def":
-      if (v) return req ? `Je moet een functie ${quote(v)} maken (met def).` : `Je mag geen functie ${quote(v)} maken.`;
-      return req ? "Je moet een functie maken (met def)." : "Je mag geen eigen functies maken (def).";
+      if (v)
+        return req
+          ? `Je moet een functie ${quote(v)} maken (met def).`
+          : `Je mag geen functie ${quote(v)} maken.`;
+      return req
+        ? "Je moet een functie maken (met def)."
+        : "Je mag geen eigen functies maken (def).";
     case "function_call":
-      if (v) return req ? `Je moet ${quote(`${v}()`)} gebruiken.` : `Je mag ${quote(`${v}()`)} niet gebruiken.`;
-      return req ? "Je moet een functie aanroepen." : "Je mag geen functies aanroepen.";
+      if (v)
+        return req
+          ? `Je moet ${quote(`${v}()`)} gebruiken.`
+          : `Je mag ${quote(`${v}()`)} niet gebruiken.`;
+      return req
+        ? "Je moet een functie aanroepen."
+        : "Je mag geen functies aanroepen.";
     case "import":
-      if (v) return req ? `Je moet de module ${quote(v)} importeren.` : `Je mag de module ${quote(v)} niet importeren.`;
-      return req ? "Je moet een module importeren." : "Je mag geen modules importeren.";
+      if (v)
+        return req
+          ? `Je moet de module ${quote(v)} importeren.`
+          : `Je mag de module ${quote(v)} niet importeren.`;
+      return req
+        ? "Je moet een module importeren."
+        : "Je mag geen modules importeren.";
     default: {
       const noun = CONSTRUCT_NOUN[check.construct] ?? check.construct;
-      return req ? `Je moet ${noun} gebruiken.` : `Je mag geen ${noun.replace(/^een /, "")} gebruiken.`;
+      return req
+        ? `Je moet ${noun} gebruiken.`
+        : `Je mag geen ${noun.replace(/^een /, "")} gebruiken.`;
     }
   }
 }
 
-export function evaluateCheck(check: CodeCheck, analysis: HarnessAnalysis): CheckResult {
+export function evaluateCheck(
+  check: CodeCheck,
+  analysis: HarnessAnalysis,
+): CheckResult {
   const message = check.message?.trim() || defaultCheckMessage(check);
   if (!analysis.ok) {
     return { checkId: check.id, passed: false, weight: check.weight, message };
@@ -319,7 +361,9 @@ export function evaluateCheck(check: CodeCheck, analysis: HarnessAnalysis): Chec
   let present: boolean;
   switch (check.construct) {
     case "function_def":
-      present = v ? analysis.functionDefs.includes(v) : analysis.constructs.function_def;
+      present = v
+        ? analysis.functionDefs.includes(v)
+        : analysis.constructs.function_def;
       break;
     case "function_call":
       present = v
@@ -354,7 +398,8 @@ export function buildGradingResult(input: {
 
   const testResults: TestResult[] = tests.map((test) => {
     const outcome = outcomes.get(test.id);
-    if (outcome && !syntaxError) return evaluateTest(test, outcome, timeLimitMs);
+    if (outcome && !syntaxError)
+      return evaluateTest(test, outcome, timeLimitMs);
     const base: TestResult = {
       ...baseResult(test, 0),
       ...(test.kind === "io"
@@ -364,7 +409,8 @@ export function buildGradingResult(input: {
     if (syntaxError) {
       return {
         ...base,
-        feedback: "Je code bevat een syntaxfout, daardoor kon deze test niet worden uitgevoerd.",
+        feedback:
+          "Je code bevat een syntaxfout, daardoor kon deze test niet worden uitgevoerd.",
       };
     }
     const err = input.internal ?? internalError("test niet uitgevoerd");
@@ -378,19 +424,25 @@ export function buildGradingResult(input: {
   const checkResults = checks.map((c) => evaluateCheck(c, fallbackAnalysis));
 
   const totalWeight =
-    tests.reduce((s, t) => s + t.weight, 0) + checks.reduce((s, c) => s + c.weight, 0);
+    tests.reduce((s, t) => s + t.weight, 0) +
+    checks.reduce((s, c) => s + c.weight, 0);
   const passedWeight =
     testResults.reduce((s, t) => s + (t.passed ? t.weight : 0), 0) +
     checkResults.reduce((s, c) => s + (c.passed ? c.weight : 0), 0);
 
   let status: CodeGradingResult["status"] = "ok";
   if (syntaxError) status = "syntax_error";
-  else if (input.internal || testResults.some((t) => t.error?.type === "InternalError"))
+  else if (
+    input.internal ||
+    testResults.some((t) => t.error?.type === "InternalError")
+  )
     status = "internal_error";
   else if (testResults.some((t) => t.timedOut)) status = "timeout";
-  else if (testResults.some((t) => t.error && !t.passed)) status = "runtime_error";
+  else if (testResults.some((t) => t.error && !t.passed))
+    status = "runtime_error";
 
-  const fraction = totalWeight > 0 ? Math.min(1, Math.max(0, passedWeight / totalWeight)) : 0;
+  const fraction =
+    totalWeight > 0 ? Math.min(1, Math.max(0, passedWeight / totalWeight)) : 0;
   return {
     kind: "code",
     status,
@@ -468,13 +520,20 @@ export async function runGrading(
         options.totalTimeLimitMs !== undefined &&
         Date.now() - started > options.totalTimeLimitMs
       ) {
-        outcomes.set(test.id, { kind: "crashed", error: TOTAL_TIMEOUT_ERROR, durationMs: 0 });
+        outcomes.set(test.id, {
+          kind: "crashed",
+          error: TOTAL_TIMEOUT_ERROR,
+          durationMs: 0,
+        });
         continue;
       }
       try {
         outcomes.set(
           test.id,
-          await executor.run(harnessRequestForTest(code, test, options), timeLimitMs),
+          await executor.run(
+            harnessRequestForTest(code, test, options),
+            timeLimitMs,
+          ),
         );
       } catch (e) {
         outcomes.set(test.id, {

@@ -33,7 +33,12 @@ export type GraderConfig = {
   startupTimeoutMs: number;
 };
 
-function intEnv(name: string, fallback: number, min: number, max: number): number {
+function intEnv(
+  name: string,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") return fallback;
   const n = Number(raw);
@@ -70,13 +75,18 @@ export function graderConfig(): GraderConfig {
   // Resolved at runtime on purpose (not statically analyzable): these files
   // are copied into the Docker image explicitly, not traced by Next.js.
   const cwd = process.cwd();
-  const sandboxDir = realDir(process.env.GRADER_SANDBOX_DIR || [cwd, "grader"].join(path.sep));
+  const sandboxDir = realDir(
+    process.env.GRADER_SANDBOX_DIR || [cwd, "grader"].join(path.sep),
+  );
   const pyodideDir = realDir(
     process.env.PYODIDE_DIR || [cwd, "node_modules", "pyodide"].join(path.sep),
   );
-  const isBun = typeof (process.versions as Record<string, string | undefined>).bun === "string";
+  const isBun =
+    typeof (process.versions as Record<string, string | undefined>).bun ===
+    "string";
   const nodePath =
-    process.env.GRADER_NODE_PATH || (isBun ? (findOnPath("node") ?? "node") : process.execPath);
+    process.env.GRADER_NODE_PATH ||
+    (isBun ? (findOnPath("node") ?? "node") : process.execPath);
   const wasmMemoryMb = intEnv("GRADER_WASM_MEMORY_MB", 384, 64, 2048);
   cached = {
     poolSize: intEnv("GRADER_POOL_SIZE", 2, 0, 32),
@@ -85,7 +95,12 @@ export function graderConfig(): GraderConfig {
     sandboxScript: path.join(sandboxDir, "sandbox.mjs"),
     pyodideDir,
     nodePath,
-    memoryLimitMb: intEnv("GRADER_MEMORY_LIMIT_MB", Math.max(768, wasmMemoryMb + 384), 256, 8192),
+    memoryLimitMb: intEnv(
+      "GRADER_MEMORY_LIMIT_MB",
+      Math.max(768, wasmMemoryMb + 384),
+      256,
+      8192,
+    ),
     wasmMemoryMb,
     jsHeapMb: 128,
     jobTimeoutMs: intEnv("GRADER_JOB_TIMEOUT_MS", 120_000, 5_000, 600_000),

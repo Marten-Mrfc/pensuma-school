@@ -16,7 +16,7 @@ import {
   Trash2,
   WandSparkles,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,10 @@ export function TestCaseEditor({
   const [generating, setGenerating] = useState<Set<string>>(() => new Set());
   const [genErrors, setGenErrors] = useState<Record<string, string>>({});
   const generate = useGenerateExpected();
+  const latest = useRef({ tests, onChange });
+  useEffect(() => {
+    latest.current = { tests, onChange };
+  });
 
   function setTest(id: string, patch: Partial<IoTest> | Partial<FunctionTest>) {
     onChange(tests.map((t) => (t.id === id ? ({ ...t, ...patch } as CodeTest) : t)));
@@ -118,21 +122,14 @@ export function TestCaseEditor({
       action: {
         label: "Ongedaan maken",
         onClick: () => {
-          // Re-insert using the latest list passed in at click time.
-          onChangeRef.restore?.(removed, index);
+          // Use the newest list/handler: edits made after deleting are kept.
+          const current = latest.current.tests.filter((t) => t.id !== removed.id);
+          current.splice(Math.min(index, current.length), 0, removed);
+          latest.current.onChange(current);
         },
       },
     });
   }
-
-  // Undo needs the newest `tests`; keep a tiny mutable holder.
-  const onChangeRef: { restore?: (t: CodeTest, i: number) => void } = {
-    restore: (t, i) => {
-      const next = tests.filter((x) => x.id !== t.id);
-      next.splice(Math.min(i, next.length), 0, t);
-      onChange(next);
-    },
-  };
 
   function move(index: number, delta: -1 | 1) {
     const target = index + delta;
@@ -173,7 +170,8 @@ export function TestCaseEditor({
 
       const errors: Record<string, string> = {};
       let filled = 0;
-      const next = tests.map((t) => {
+      // The teacher may have edited meanwhile: apply to the newest list.
+      const next = latest.current.tests.map((t) => {
         const r = byId.get(t.id);
         if (!r) return t;
         if (!r.ok) {
@@ -183,7 +181,7 @@ export function TestCaseEditor({
         filled++;
         return t.kind === "io" ? { ...t, expectedOutput: r.value } : { ...t, expected: r.value };
       });
-      onChange(next);
+      latest.current.onChange(next);
       setGenErrors((prev) => {
         const merged = { ...prev };
         for (const id of ids) delete merged[id];

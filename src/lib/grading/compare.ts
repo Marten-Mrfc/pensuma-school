@@ -143,12 +143,17 @@ export function extractNumbers(text: string): FoundNumber[] {
     else if (
       (c === "-" || c === "+" || c === "−") &&
       (isDigit(text[i + 1]) ||
-        ((text[i + 1] === "." || text[i + 1] === ",") && isDigit(text[i + 2]))) &&
+        ((text[i + 1] === "." || text[i + 1] === ",") &&
+          isDigit(text[i + 2]))) &&
       !isWordChar(text[i - 1]) &&
       text[i - 1] !== ")"
     )
       start = i;
-    else if ((c === "." || c === ",") && isDigit(text[i + 1]) && !isWordChar(text[i - 1]))
+    else if (
+      (c === "." || c === ",") &&
+      isDigit(text[i + 1]) &&
+      !isWordChar(text[i - 1])
+    )
       start = i;
     if (start < 0) {
       i++;
@@ -167,7 +172,8 @@ export function extractNumbers(text: string): FoundNumber[] {
       // "1,2,3": a comma chain without spaces is a list, not a decimal.
       let k = j + 1;
       while (isDigit(text[k])) k++;
-      const isChain = text[j] === "," && text[k] === "," && isDigit(text[k + 1]);
+      const isChain =
+        text[j] === "," && text[k] === "," && isDigit(text[k + 1]);
       if (!isChain) {
         j++;
         while (isDigit(text[j])) frac += text[j++];
@@ -190,7 +196,9 @@ export function extractNumbers(text: string): FoundNumber[] {
       i = start + 1;
       continue;
     }
-    const value = Number(`${sign}${intPart || "0"}${frac ? `.${frac}` : ""}${exp}`);
+    const value = Number(
+      `${sign}${intPart || "0"}${frac ? `.${frac}` : ""}${exp}`,
+    );
     if (Number.isFinite(value)) out.push({ value, text: text.slice(start, j) });
     i = j;
   }
@@ -208,7 +216,8 @@ function compareExact(
 ): OutputCompareResult {
   const a = normalizeLines(actual);
   const e = normalizeLines(expected);
-  const same = (x: string, y: string) => fold(x, ignoreCase) === fold(y, ignoreCase);
+  const same = (x: string, y: string) =>
+    fold(x, ignoreCase) === fold(y, ignoreCase);
   if (a.length === e.length && a.every((l, i) => same(l, e[i]))) {
     return { passed: true, feedback: null };
   }
@@ -273,7 +282,8 @@ function compareFlexible(
     const W = A + 1;
     const can = new Uint8Array((E + 1) * W);
     can[E * W + A] = 1;
-    for (let j = A - 1; j >= 0; j--) can[E * W + j] = tolerable[j] && can[E * W + j + 1] ? 1 : 0;
+    for (let j = A - 1; j >= 0; j--)
+      can[E * W + j] = tolerable[j] && can[E * W + j + 1] ? 1 : 0;
     for (let i = E - 1; i >= 0; i--) {
       for (let j = A - 1; j >= 0; j--) {
         can[i * W + j] =
@@ -303,7 +313,11 @@ function compareFlexible(
     matched[k] = true;
     j = k + 1;
   }
-  if (!passed && missing < 0 && aRaw.every((_, idx) => matched[idx] || tolerable[idx])) {
+  if (
+    !passed &&
+    missing < 0 &&
+    aRaw.every((_, idx) => matched[idx] || tolerable[idx])
+  ) {
     passed = true;
   }
   if (passed) return { passed: true, feedback: null };
@@ -388,7 +402,10 @@ function compareNumbers(
   if (a.length === 0) {
     return {
       passed: false,
-      feedback: `Je programma printte geen getallen. Verwacht: ${e.map((x) => formatNumber(x.value)).slice(0, 5).join(", ")}${e.length > 5 ? ", …" : ""}.`,
+      feedback: `Je programma printte geen getallen. Verwacht: ${e
+        .map((x) => formatNumber(x.value))
+        .slice(0, 5)
+        .join(", ")}${e.length > 5 ? ", …" : ""}.`,
     };
   }
   if (a.length < e.length) {
@@ -486,7 +503,12 @@ function at(path: string): string {
   return path ? ` bij ${path}` : "";
 }
 
-function diff(actual: PyValue, expected: PyValue, tol: number, path: string): Mismatch | null {
+function diff(
+  actual: PyValue,
+  expected: PyValue,
+  tol: number,
+  path: string,
+): Mismatch | null {
   const ga = KIND_GROUP[actual.t] ?? actual.t;
   const ge = KIND_GROUP[expected.t] ?? expected.t;
   if (ga !== ge) {
@@ -503,13 +525,19 @@ function diff(actual: PyValue, expected: PyValue, tol: number, path: string): Mi
     case "bytes":
       return (actual as typeof expected).v === expected.v
         ? null
-        : { path, reason: `verwacht ${describe(expected)}, maar het was ${describe(actual)}` };
+        : {
+            path,
+            reason: `verwacht ${describe(expected)}, maar het was ${describe(actual)}`,
+          };
     case "int":
     case "float": {
       if (actual.t === "int" && expected.t === "int") {
         return BigInt(actual.v) === BigInt(expected.v)
           ? null
-          : { path, reason: `verwacht ${quote(expected.v)}, maar het was ${quote(actual.v)}` };
+          : {
+              path,
+              reason: `verwacht ${quote(expected.v)}, maar het was ${quote(actual.v)}`,
+            };
       }
       const a = asNumber(actual) as number;
       const e = asNumber(expected) as number;
@@ -543,9 +571,14 @@ function diff(actual: PyValue, expected: PyValue, tol: number, path: string): Mi
       const ev = expected.v;
       const used = new Array<boolean>(av.length).fill(false);
       for (const e of ev) {
-        const idx = av.findIndex((a, k) => !used[k] && diff(a, e, tol, "") === null);
+        const idx = av.findIndex(
+          (a, k) => !used[k] && diff(a, e, tol, "") === null,
+        );
         if (idx < 0) {
-          return { path, reason: `de set${at(path)} mist ${quote(pyRepr(e, 80), 80)}` };
+          return {
+            path,
+            reason: `de set${at(path)} mist ${quote(pyRepr(e, 80), 80)}`,
+          };
         }
         used[idx] = true;
       }
@@ -565,13 +598,18 @@ function diff(actual: PyValue, expected: PyValue, tol: number, path: string): Mi
         const entry = av.find(([ak]) => diff(ak, ek, 0, "") === null);
         const keyText = pyRepr(ek, 60);
         if (!entry) {
-          return { path, reason: `de dictionary${at(path)} mist de sleutel ${quote(keyText, 60)}` };
+          return {
+            path,
+            reason: `de dictionary${at(path)} mist de sleutel ${quote(keyText, 60)}`,
+          };
         }
         const m = diff(entry[1], evv, tol, `${path}[${keyText}]`);
         if (m) return m;
       }
       if (av.length > ev.length) {
-        const extra = av.find(([ak]) => !ev.some(([ek]) => diff(ak, ek, 0, "") === null));
+        const extra = av.find(
+          ([ak]) => !ev.some(([ek]) => diff(ak, ek, 0, "") === null),
+        );
         if (extra) {
           return {
             path,
@@ -582,9 +620,14 @@ function diff(actual: PyValue, expected: PyValue, tol: number, path: string): Mi
       return null;
     }
     case "other":
-      return actual.t === "other" && actual.repr === expected.repr && actual.type === expected.type
+      return actual.t === "other" &&
+        actual.repr === expected.repr &&
+        actual.type === expected.type
         ? null
-        : { path, reason: `verwacht ${describe(expected)}, maar het was ${describe(actual)}` };
+        : {
+            path,
+            reason: `verwacht ${describe(expected)}, maar het was ${describe(actual)}`,
+          };
   }
 }
 
@@ -602,5 +645,9 @@ export function compareValues(
   if (!m) return { equal: true, reason: null };
   const where = m.path ? `Bij ${m.path}: ` : "";
   const reason = m.reason.charAt(0).toUpperCase() + m.reason.slice(1);
-  return { equal: false, reason: m.path && !m.reason.includes(" bij ") ? `${where}${m.reason}` : reason };
+  return {
+    equal: false,
+    reason:
+      m.path && !m.reason.includes(" bij ") ? `${where}${m.reason}` : reason,
+  };
 }

@@ -31,7 +31,7 @@ import { NativeSelect } from "@/components/ui/select";
 import { type AssignmentSettings, SHOW_RESULTS_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import {
   ACCESS_CODE_REGEX,
   type AssignmentMode,
@@ -78,12 +78,7 @@ export function AssignmentForm() {
   return <AssignmentFormInner options={options.data} />;
 }
 
-type Options = NonNullable<ReturnType<typeof useFormOptionsType>>;
-// Helper only used for typing the options prop.
-function useFormOptionsType() {
-  const trpc = useTRPC();
-  return useQuery(trpc.assignment.formOptions.queryOptions()).data;
-}
+type Options = RouterOutputs["assignment"]["formOptions"];
 
 function AssignmentFormInner({ options }: { options: Options }) {
   const trpc = useTRPC();
@@ -418,18 +413,19 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 hint="De tijd loopt vanaf het moment dat de leerling begint. Leeg = geen limiet."
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Input
-                    id={`${id}-limit`}
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={1440}
-                    placeholder="Geen limiet"
-                    value={timeLimit}
-                    onChange={(e) => setTimeLimit(e.target.value)}
-                    className="sm:w-36"
-                    aria-invalid={!!errors.timeLimit}
-                  />
+                  <div className="sm:w-36 sm:shrink-0">
+                    <Input
+                      id={`${id}-limit`}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={1440}
+                      placeholder="Geen limiet"
+                      value={timeLimit}
+                      onChange={(e) => setTimeLimit(e.target.value)}
+                      aria-invalid={!!errors.timeLimit}
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {DURATIONS.map((m) => (
                       <button

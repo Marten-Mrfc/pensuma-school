@@ -452,3 +452,18 @@ body::before {
 html {
   scroll-behavior: smooth;
 }
+
+/* Code must show exactly what was typed: DM Mono's contextual alternates
+   would otherwise turn a leading "f" into "ƒ" (e.g. "for", f-strings). */
+code,
+kbd,
+samp,
+pre,
+.font-mono,
+.cm-editor,
+.cm-content {
+  font-feature-settings:
+    "liga" 0,
+    "calt" 0;
+  font-variant-ligatures: none;
+}

@@ -1,0 +1,699 @@
+"use client";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  Flag,
+  LayoutGrid,
+  Loader2,
+  Maximize,
+  Send,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { use, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { CountdownTimer } from "@/components/app/countdown-timer";
+import { getErrorMessage } from "@/components/app/get-error-message";
+import { ErrorState, LoadingState } from "@/components/app/states";
+import { ExamShell } from "@/components/layout/exam-shell";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import type { AnswerResponse } from "@/lib/questions/schema";
+import { routes } from "@/lib/routes";
+import { cn } from "@/lib/utils";
+import { useTRPC, useTRPCClient } from "@/trpc/react";
+import { ActivityLogger, type ClientEventType } from "./activity-logger";
+import { AnswerSaver } from "./answer-saver";
+import { QuestionNavigator } from "./question-navigator";
+import { QuestionView } from "./question-view";
+import { SaveIndicator } from "./save-indicator";
+import {
+  type AttemptData,
+  isAnswered,
+  readStorage,
+  removeStorage,
+  type Responses,
+  storageKey,
+  writeStorage,
+} from "./types";
+
+/* -------------------------------------------------------------------------- */
+/*                                   Loader                                   */
+/* -------------------------------------------------------------------------- */
+
+export function ExamPage({ params }: { params: Promise<{ pogingId: string }> }) {
+  const { pogingId } = use(params);
+  return <ExamLoader attemptId={pogingId} />;
+}
+
+function ExamLoader({ attemptId }: { attemptId: string }) {
+  const trpc = useTRPC();
+  const router = useRouter();
+  const query = useQuery(
+    trpc.portal.getAttempt.queryOptions(
+      { attemptId },
+      {
+        staleTime: Number.POSITIVE_INFINITY,
+        gcTime: 0,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+    ),
+  );
+  const submitted = query.data?.attempt.status === "submitted";
+
+  useEffect(() => {
+    if (submitted) router.replace(routes.leerling.result(attemptId));
+  }, [submitted, attemptId, router]);
+
+  if (query.isPending) {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-4 py-10">
+        <LoadingState label="Toets wordt geladen…" />
+      </div>
+    );
+  }
+  if (query.isError) {
+    return (
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 py-16">
+        <ErrorState
+          title="Deze toets kon niet worden geladen"
+          error={query.error}
+          onRetry={() => query.refetch()}
+        />
+        <Button asChild variant="ghost" className="self-center">
+          <Link href={routes.leerling.dashboard}>Terug naar mijn toetsen</Link>
+        </Button>
+      </div>
+    );
+  }
+  if (submitted) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center">
+        <Loader2 className="size-6 animate-spin text-primary" aria-hidden="true" />
+        <p className="text-muted-foreground">Deze toets is ingeleverd. Je gaat naar je resultaat…</p>
+      </div>
+    );
+  }
+  return (
+    <ExamRunner
+      key={attemptId}
+      data={query.data}
+      serverOffsetMs={new Date(query.data.serverNow).getTime() - query.dataUpdatedAt}
+    />
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Runner                                   */
+/* -------------------------------------------------------------------------- */
+
+type Backup = Record<string, { response: AnswerResponse; updatedAt: number }>;
+
+function initialState(data: AttemptData, serverOffsetMs: number) {
+  const attemptId = data.attempt.id;
+  const responses: Responses = {};
+  const savedAt: Record<string, number> = {};
+  for (const a of data.answers) {
+    if (a.response) responses[a.questionId] = a.response;
+    savedAt[a.questionId] = a.savedAt ? new Date(a.savedAt).getTime() : 0;
+  }
+  // Restore local changes that never reached the server (crash, offline, closed tab).
+  const restored: string[] = [];
+  const backup = readStorage<Backup>(storageKey(attemptId)) ?? {};
+  const known = new Set(data.questions.map((q) => q.id));
+  for (const [questionId, entry] of Object.entries(backup)) {
+    if (!known.has(questionId) || !entry?.response) continue;
+    const serverTime = savedAt[questionId] ?? 0;
+    const same = JSON.stringify(entry.response) === JSON.stringify(responses[questionId] ?? null);
+    if (!same && entry.updatedAt > serverTime) {
+      responses[questionId] = entry.response;
+      restored.push(questionId);
+    }
+  }
+  const flagged = new Set(readStorage<string[]>(storageKey(attemptId, "flags")) ?? []);
+  const pos = readStorage<number>(storageKey(attemptId, "pos")) ?? 0;
+  const index = Math.min(Math.max(0, pos), Math.max(0, data.questions.length - 1));
+  void serverOffsetMs;
+  return { responses, restored, flagged, index };
+}
+
+function useFullscreenElement() {
+  return useSyncExternalStore(
+    (onChange) => {
+      document.addEventListener("fullscreenchange", onChange);
+      return () => document.removeEventListener("fullscreenchange", onChange);
+    },
+    () => !!document.fullscreenElement,
+    () => true,
+  );
+}
+
+function ExamRunner({ data, serverOffsetMs }: { data: AttemptData; serverOffsetMs: number }) {
+  const attemptId = data.attempt.id;
+  const settings = data.assignment.settings;
+  const questions = data.questions;
+  const trpcClient = useTRPCClient();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  const [init] = useState(() => initialState(data, serverOffsetMs));
+  const [responses, setResponses] = useState<Responses>(init.responses);
+  const [index, setIndex] = useState(init.index);
+  const [flagged, setFlagged] = useState<Set<string>>(init.flagged);
+  const [offset, setOffset] = useState(serverOffsetMs);
+  const [deadlineAt, setDeadlineAt] = useState<Date | null>(
+    data.attempt.deadlineAt ? new Date(data.attempt.deadlineAt) : null,
+  );
+  const [navOpen, setNavOpen] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [finishing, setFinishing] = useState<null | "manual" | "auto">(null);
+  const finishingRef = useRef(false);
+  const offsetRef = useRef(serverOffsetMs);
+
+  const handlers = useRef({ locked: (_err: unknown) => {} });
+  const indexRef = useRef(index);
+  const goToRef = useRef((_next: number) => {});
+
+  const [saver] = useState(
+    () =>
+      new AnswerSaver(
+        attemptId,
+        (questionId, response) =>
+          trpcClient.portal.saveAnswer.mutate({ attemptId, questionId, response }),
+        {
+          serverOffsetMs: () => offsetRef.current,
+          onLocked: (err) => handlers.current.locked(err),
+        },
+      ),
+  );
+  const [logger] = useState(
+    () =>
+      new ActivityLogger((events) => trpcClient.portal.logEvents.mutate({ attemptId, events })),
+  );
+  const snapshot = useSyncExternalStore(saver.subscribe, saver.getSnapshot, saver.getSnapshot);
+  const isFullscreen = useFullscreenElement();
+  const fullscreenSupported = typeof document !== "undefined" && document.fullscreenEnabled;
+  const mustFullscreen = settings.requireFullscreen && fullscreenSupported;
+
+  const question = questions[index];
+  const answered = new Set(questions.filter((q) => isAnswered(q, responses[q.id])).map((q) => q.id));
+
+  const log = (type: ClientEventType, details?: Record<string, unknown>) => logger.log(type, details);
+
+  /* ------------------------------ lifecycle ------------------------------ */
+
+  const goToResult = () => {
+    removeStorage(storageKey(attemptId));
+    removeStorage(storageKey(attemptId, "flags"));
+    removeStorage(storageKey(attemptId, "pos"));
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    void queryClient.invalidateQueries({ queryKey: trpc.portal.pathKey() });
+    router.replace(routes.leerling.result(attemptId));
+  };
+
+  const finish = async (mode: "manual" | "auto") => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setFinishing(mode);
+    if (mode === "auto") toast.info("De tijd is om! We leveren je werk nu in…");
+    const flushed = await Promise.race([
+      saver.flush(),
+      new Promise<boolean>((r) => setTimeout(() => r(false), 8000)),
+    ]);
+    if (!flushed && mode === "manual" && !saver.isLocked) {
+      toast.warning("Niet alles kon worden opgeslagen. We leveren in wat er op de server staat.");
+    }
+    await logger.flush();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await trpcClient.portal.submitAttempt.mutate({ attemptId });
+        break;
+      } catch (err) {
+        const code = (err as { data?: { code?: string } }).data?.code;
+        if (code === "PRECONDITION_FAILED") break;
+        if (mode === "manual" || attempt >= 20) {
+          finishingRef.current = false;
+          setFinishing(null);
+          toast.error(getErrorMessage(err, "Inleveren lukte niet. Probeer het opnieuw."));
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+    logger.stop();
+    goToResult();
+  };
+
+  useEffect(() => {
+    handlers.current.locked = () => {
+      if (finishingRef.current) return;
+      finishingRef.current = true;
+      toast.info("Deze toets is ingeleverd. Je kunt niets meer wijzigen.");
+      logger.stop();
+      goToResult();
+    };
+  });
+
+  // Push restored local changes to the server once.
+  useEffect(() => {
+    for (const questionId of init.restored) {
+      const r = init.responses[questionId];
+      if (r) saver.update(questionId, r, { backup: false });
+    }
+    if (init.restored.length) {
+      toast.success("We hebben je laatste wijzigingen teruggezet.");
+    }
+  }, [init, saver]);
+
+  useEffect(() => {
+    logger.start();
+    return () => {
+      void saver.flush();
+      void logger.flush();
+      logger.stop();
+      saver.dispose();
+    };
+  }, [logger, saver]);
+
+  // Save on tab hide / page hide; warn before closing with unsaved work.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") {
+        void saver.flush();
+        void logger.flush();
+      }
+    };
+    const onPageHide = () => {
+      void saver.flush();
+      void logger.flush();
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saver.hasPending && !finishingRef.current) e.preventDefault();
+    };
+    const onOnline = () => void saver.flush();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [saver, logger]);
+
+  // Anti-cheat: focus / visibility (one "away" episode = one logged loss).
+  useEffect(() => {
+    if (!settings.logFocusEvents) return;
+    let away = false;
+    const goAway = (type: "focus_lost" | "visibility_hidden") => {
+      if (away || finishingRef.current) return;
+      away = true;
+      logger.log(type, { questionId: questions[indexRef.current]?.id });
+    };
+    const comeBack = (type: "focus_gained" | "visibility_visible") => {
+      if (!away) return;
+      away = false;
+      logger.log(type);
+    };
+    const onBlur = () => goAway("focus_lost");
+    const onFocus = () => comeBack("focus_gained");
+    const onVisibility = () =>
+      document.visibilityState === "hidden"
+        ? goAway("visibility_hidden")
+        : comeBack("visibility_visible");
+    const onCopy = () => logger.log("copy");
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("copy", onCopy);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("copy", onCopy);
+    };
+  }, [settings.logFocusEvents, logger, questions]);
+
+  // Anti-cheat: fullscreen enter/exit.
+  useEffect(() => {
+    if (!settings.requireFullscreen) return;
+    let wasFullscreen = !!document.fullscreenElement;
+    const onChange = () => {
+      const now = !!document.fullscreenElement;
+      if (now === wasFullscreen || finishingRef.current) {
+        wasFullscreen = now;
+        return;
+      }
+      wasFullscreen = now;
+      logger.log(now ? "fullscreen_enter" : "fullscreen_exit");
+      if (!now) void logger.flush();
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [settings.requireFullscreen, logger]);
+
+  // Heartbeat: last activity for the teacher + time extensions / force-submit.
+  useEffect(() => {
+    const beat = async () => {
+      try {
+        const sent = Date.now();
+        const res = await trpcClient.portal.heartbeat.mutate({ attemptId });
+        const received = Date.now();
+        const next = new Date(res.serverNow).getTime() - (sent + received) / 2;
+        if (Math.abs(next - offsetRef.current) > 1500) {
+          offsetRef.current = next;
+          setOffset(next);
+        }
+        setDeadlineAt((current) => {
+          const incoming = res.deadlineAt ? new Date(res.deadlineAt) : null;
+          return current?.getTime() === incoming?.getTime() ? current : incoming;
+        });
+        if (res.status === "submitted") handlers.current.locked(null);
+      } catch {
+        // Offline: the save indicator already shows it.
+      }
+    };
+    const id = setInterval(beat, 30_000);
+    return () => clearInterval(id);
+  }, [trpcClient, attemptId]);
+
+  // Five- and one-minute warnings.
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const remaining = deadlineAt.getTime() - (Date.now() + offset);
+    const warn = (ms: number, text: string) => {
+      if (remaining > ms) timers.push(setTimeout(() => toast.warning(text, { duration: 8000 }), remaining - ms));
+    };
+    warn(5 * 60_000, "Nog 5 minuten! Rond je antwoorden af.");
+    warn(60_000, "Nog 1 minuut. Je werk wordt straks automatisch ingeleverd.");
+    return () => timers.forEach(clearTimeout);
+  }, [deadlineAt, offset]);
+
+  // Remember the current question (reload lands on the same one).
+  useEffect(() => {
+    indexRef.current = index;
+    writeStorage(storageKey(attemptId, "pos"), index);
+  }, [index, attemptId]);
+
+  /* ------------------------------- actions ------------------------------- */
+
+  const goTo = (next: number) => {
+    if (next < 0 || next >= questions.length || next === index) return;
+    void saver.flush();
+    setIndex(next);
+    setNavOpen(false);
+  };
+
+  const setResponse = (questionId: string, response: AnswerResponse) => {
+    setResponses((prev) => ({ ...prev, [questionId]: response }));
+    saver.update(questionId, response);
+  };
+
+  const toggleFlag = (questionId: string) => {
+    setFlagged((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      writeStorage(storageKey(attemptId, "flags"), [...next]);
+      return next;
+    });
+  };
+
+  // Keyboard: Alt+←/→ switch questions, Ctrl/Cmd+S saves.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        goToRef.current(indexRef.current + (e.key === "ArrowRight" ? 1 : -1));
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void saver.flush();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [saver]);
+  useEffect(() => {
+    goToRef.current = goTo;
+  });
+
+  const enterFullscreen = () => {
+    void document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {
+      toast.error("Volledig scherm lukte niet. Probeer F11 of vraag je docent om hulp.");
+    });
+  };
+
+  /* -------------------------------- render ------------------------------- */
+
+  const unanswered = questions.filter((q) => !answered.has(q.id));
+  const flaggedList = questions.filter((q) => flagged.has(q.id));
+  const isLast = index === questions.length - 1;
+  const monitored = settings.logFocusEvents || settings.requireFullscreen;
+
+  const jumpChip = (q: (typeof questions)[number]) => {
+    const i = questions.indexOf(q);
+    return (
+      <button
+        key={q.id}
+        type="button"
+        onClick={() => {
+          setSubmitOpen(false);
+          goTo(i);
+        }}
+        className="inline-flex h-7 min-w-7 items-center justify-center rounded-md border bg-card px-2 text-sm font-semibold tabular-nums transition-colors hover:border-primary/50 hover:bg-accent"
+        title={q.title}
+      >
+        {i + 1}
+      </button>
+    );
+  };
+
+  const navigator = (
+    <QuestionNavigator
+      questions={questions}
+      currentIndex={index}
+      answered={answered}
+      flagged={flagged}
+      onSelect={goTo}
+    />
+  );
+
+  const monitoringNote = monitored ? (
+    <p className="flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+      <Eye className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      <span>
+        Tijdens deze toets wordt bijgehouden wanneer je {settings.requireFullscreen ? "het volledige scherm of " : ""}
+        het venster verlaat.
+      </span>
+    </p>
+  ) : null;
+
+  return (
+    <>
+      <ExamShell
+        title={data.assignment.title}
+        subtitle={
+          <>
+            Vraag {index + 1} van {questions.length}
+            <span className="hidden sm:inline"> · {answered.size} beantwoord</span>
+          </>
+        }
+        bodyMode="fixed"
+        timer={
+          deadlineAt ? (
+            <CountdownTimer
+              deadline={deadlineAt}
+              serverOffsetMs={offset}
+              onExpire={() => void finish("auto")}
+            />
+          ) : null
+        }
+        actions={
+          <>
+            <SaveIndicator snapshot={snapshot} />
+            <Button
+              onClick={() => setSubmitOpen(true)}
+              disabled={!!finishing}
+              className="max-sm:px-3"
+              aria-label="Inleveren"
+            >
+              {finishing ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
+              <span className="max-sm:sr-only">Inleveren</span>
+            </Button>
+          </>
+        }
+        footer={
+          <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-5">
+            <Button variant="outline" onClick={() => goTo(index - 1)} disabled={index === 0}>
+              <ArrowLeft aria-hidden="true" />
+              <span className="max-sm:sr-only">Vorige</span>
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" className="xl:hidden" onClick={() => setNavOpen(true)}>
+                <LayoutGrid aria-hidden="true" />
+                <span className="tabular-nums">
+                  {index + 1}/{questions.length}
+                </span>
+              </Button>
+              <span className="hidden items-center gap-1.5 text-xs text-muted-foreground xl:flex">
+                <Kbd>Alt</Kbd>+<Kbd>←</Kbd>/<Kbd>→</Kbd> vorige/volgende vraag
+              </span>
+            </div>
+            {isLast ? (
+              <Button onClick={() => setSubmitOpen(true)} disabled={!!finishing}>
+                <span className="max-sm:sr-only">Naar inleveren</span>
+                <Send aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button onClick={() => goTo(index + 1)}>
+                <span className="max-sm:sr-only">Volgende</span>
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            )}
+          </div>
+        }
+      >
+        <div className="flex h-full min-h-0">
+          <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-card/40 p-4 xl:flex">
+            {navigator}
+            <div className="mt-auto">{monitoringNote}</div>
+          </aside>
+          <div className="min-h-0 min-w-0 flex-1">
+            {question ? (
+              <QuestionView
+                key={question.id}
+                question={question}
+                number={index + 1}
+                total={questions.length}
+                response={responses[question.id]}
+                onChange={(r) => setResponse(question.id, r)}
+                flagged={flagged.has(question.id)}
+                onToggleFlag={() => toggleFlag(question.id)}
+                settings={settings}
+                onLog={log}
+                disabled={!!finishing || snapshot.state === "locked"}
+              />
+            ) : null}
+          </div>
+        </div>
+      </ExamShell>
+
+      <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-5 pb-6">
+          <SheetHeader className="px-0">
+            <SheetTitle>Vragen</SheetTitle>
+            <SheetDescription>Kies een vraag om ernaartoe te gaan.</SheetDescription>
+          </SheetHeader>
+          <div className="mx-auto w-full max-w-sm">{navigator}</div>
+          {monitoringNote ? <div className="mx-auto mt-4 w-full max-w-sm">{monitoringNote}</div> : null}
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        title="Toets inleveren?"
+        description="Na het inleveren kun je je antwoorden niet meer veranderen."
+        confirmLabel="Inleveren"
+        cancelLabel="Nog even terug"
+        onConfirm={() => finish("manual")}
+      >
+        <div className="flex flex-col gap-3">
+          {unanswered.length ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/8 p-3">
+              <p className="font-medium text-warning-ink">
+                {unanswered.length === 1
+                  ? "1 vraag is nog niet beantwoord:"
+                  : `${unanswered.length} vragen zijn nog niet beantwoord:`}
+              </p>
+              <div className="flex flex-wrap gap-1.5">{unanswered.map(jumpChip)}</div>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-success/10 p-3 font-medium text-success-ink">
+              Je hebt alle {questions.length} vragen beantwoord. Goed bezig!
+            </p>
+          )}
+          {flaggedList.length ? (
+            <div className="flex flex-col gap-2 rounded-lg border p-3">
+              <p className="flex items-center gap-1.5 font-medium">
+                <Flag className="size-4 text-warning-ink" aria-hidden="true" />
+                Gemarkeerd voor later:
+              </p>
+              <div className="flex flex-wrap gap-1.5">{flaggedList.map(jumpChip)}</div>
+            </div>
+          ) : null}
+          {snapshot.state === "offline" ? (
+            <p className="text-sm text-warning-ink">
+              Let op: je bent offline. We proberen je antwoorden eerst op te slaan.
+            </p>
+          ) : null}
+        </div>
+      </ConfirmDialog>
+
+      {mustFullscreen && !isFullscreen && !finishing ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fullscreen-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-background/95 p-6 backdrop-blur-sm"
+        >
+          <div className="flex max-w-md flex-col items-center gap-4 text-center">
+            <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
+              <Maximize className="size-7" aria-hidden="true" />
+            </span>
+            <h2 id="fullscreen-title" className="font-display text-2xl font-bold tracking-tight">
+              Ga terug naar volledig scherm om verder te gaan
+            </h2>
+            <p className="text-muted-foreground">
+              Deze toets werkt alleen in volledig scherm. Het verlaten ervan wordt bijgehouden. Je
+              antwoorden zijn veilig opgeslagen.
+            </p>
+            <Button size="lg" className="h-12 px-6 text-base" onClick={enterFullscreen} autoFocus>
+              <Maximize aria-hidden="true" />
+              Volledig scherm
+            </Button>
+            <button
+              type="button"
+              onClick={() => setSubmitOpen(true)}
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Ik ben klaar en wil inleveren
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {finishing ? (
+        <div
+          className={cn(
+            "fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm",
+          )}
+          role="status"
+        >
+          <div className="flex flex-col items-center gap-3 text-center">
+            <Loader2 className="size-8 animate-spin text-primary" aria-hidden="true" />
+            <p className="font-display text-lg font-semibold">
+              {finishing === "auto" ? "De tijd is om. Je werk wordt ingeleverd…" : "Inleveren…"}
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}

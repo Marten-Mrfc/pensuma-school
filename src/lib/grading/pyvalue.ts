@@ -61,7 +61,10 @@ function decodeEscapes(body: string, pos: number): string {
     const n = body[++i];
     switch (n) {
       case undefined:
-        throw new PyLiteralError("Ongeldige escape aan het eind van een string", pos);
+        throw new PyLiteralError(
+          "Ongeldige escape aan het eind van een string",
+          pos,
+        );
       case "\n":
         break;
       case "\\":
@@ -179,7 +182,10 @@ function tokenize(src: string): Token[] {
       i = j + delim.length;
       continue;
     }
-    if ((c >= "0" && c <= "9") || (c === "." && /[0-9]/.test(src[i + 1] ?? ""))) {
+    if (
+      (c >= "0" && c <= "9") ||
+      (c === "." && /[0-9]/.test(src[i + 1] ?? ""))
+    ) {
       const m = NUMBER_RE.exec(rest);
       if (!m) throw new PyLiteralError("Ongeldig getal", i);
       tokens.push({ k: "num", text: m[0], pos: i });
@@ -276,7 +282,8 @@ class Parser {
 
   private expectEnd(): void {
     const t = this.peek();
-    if (t.k !== "end") throw new PyLiteralError("Onverwachte tekst na de waarde", t.pos);
+    if (t.k !== "end")
+      throw new PyLiteralError("Onverwachte tekst na de waarde", t.pos);
   }
 
   parseValue(): PyValue {
@@ -284,7 +291,10 @@ class Parser {
     if (t.k === "op" && (t.text === "-" || t.text === "+")) {
       const operand = this.parseValue();
       if (operand.t !== "int" && operand.t !== "float") {
-        throw new PyLiteralError("Een plus- of minteken kan alleen voor een getal staan", t.pos);
+        throw new PyLiteralError(
+          "Een plus- of minteken kan alleen voor een getal staan",
+          t.pos,
+        );
       }
       return t.text === "-" ? negate(operand, t.pos) : operand;
     }
@@ -297,7 +307,10 @@ class Parser {
         while (this.peek().k === "str") {
           const s = this.next() as Extract<Token, { k: "str" }>;
           if (s.bytes !== bytes)
-            throw new PyLiteralError("Je kunt bytes en strings niet aan elkaar plakken", s.pos);
+            throw new PyLiteralError(
+              "Je kunt bytes en strings niet aan elkaar plakken",
+              s.pos,
+            );
           value += s.value;
         }
         return bytes ? { t: "bytes", v: value } : { t: "str", v: value };
@@ -331,7 +344,10 @@ class Parser {
             ) {
               return { t: t.text, v: dedupe(inner.v) };
             }
-            throw new PyLiteralError(`${t.text}() verwacht een lijst, tuple of set`, t.pos);
+            throw new PyLiteralError(
+              `${t.text}() verwacht een lijst, tuple of set`,
+              t.pos,
+            );
           }
           case "float": {
             // float('inf') / float('nan') / float('-inf') / float(1)
@@ -340,8 +356,10 @@ class Parser {
             this.expectOp(")");
             if (arg.t === "str") {
               const s = arg.v.trim().toLowerCase();
-              if (s === "inf" || s === "+inf" || s === "infinity") return { t: "float", v: "inf" };
-              if (s === "-inf" || s === "-infinity") return { t: "float", v: "-inf" };
+              if (s === "inf" || s === "+inf" || s === "infinity")
+                return { t: "float", v: "inf" };
+              if (s === "-inf" || s === "-infinity")
+                return { t: "float", v: "-inf" };
               if (s === "nan") return { t: "float", v: "nan" };
               const n = Number(s);
               if (!Number.isNaN(n) && s !== "") return { t: "float", v: n };
@@ -446,7 +464,8 @@ function strictEqual(a: PyValue, b: PyValue): boolean {
 
 function dedupe(items: PyValue[]): PyValue[] {
   const out: PyValue[] = [];
-  for (const it of items) if (!out.some((o) => strictEqual(o, it))) out.push(it);
+  for (const it of items)
+    if (!out.some((o) => strictEqual(o, it))) out.push(it);
   return out;
 }
 
@@ -514,7 +533,8 @@ export function strRepr(s: string, prefix = ""): string {
     else if (ch === "\n") out += "\\n";
     else if (ch === "\r") out += "\\r";
     else if (ch === "\t") out += "\\t";
-    else if (code < 0x20 || code === 0x7f) out += `\\x${code.toString(16).padStart(2, "0")}`;
+    else if (code < 0x20 || code === 0x7f)
+      out += `\\x${code.toString(16).padStart(2, "0")}`;
     else out += ch;
   }
   return `${prefix}${quote}${out}${quote}`;
@@ -549,7 +569,9 @@ function reprInner(v: PyValue): string {
     case "set":
       return v.v.length ? `{${v.v.map(reprInner).join(", ")}}` : "set()";
     case "frozenset":
-      return v.v.length ? `frozenset({${v.v.map(reprInner).join(", ")}})` : "frozenset()";
+      return v.v.length
+        ? `frozenset({${v.v.map(reprInner).join(", ")}})`
+        : "frozenset()";
     case "dict":
       return `{${v.v.map(([k, x]) => `${reprInner(k)}: ${reprInner(x)}`).join(", ")}}`;
     case "other":

@@ -52,8 +52,8 @@ export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps
       key: "status",
       header: "Status",
       hideBelow: "sm",
-      sortValue: (m) => (m.banned ? 2 : m.lastLoginAt ? 0 : 1),
-      cell: (m) => <StudentStatus banned={m.banned} lastLoginAt={m.lastLoginAt} />,
+      sortValue: (m) => (m.banned ? 1 : 0),
+      cell: (m) => <StudentStatus banned={m.banned} />,
     },
     {
       key: "pin",
@@ -68,7 +68,7 @@ export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps
       sortValue: (m) => m.lastLoginAt,
       cell: (m) => (
         <span className="text-xs text-muted-foreground">
-          {m.lastLoginAt ? formatDateTime(m.lastLoginAt) : "Nog niet"}
+          {formatDateTime(m.lastLoginAt)}
         </span>
       ),
     },

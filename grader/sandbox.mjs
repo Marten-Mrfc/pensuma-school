@@ -88,7 +88,8 @@ const logToStderr = (...args) => {
   stderrBudget -= line.length;
   stderrWrite(line);
 };
-for (const k of ["log", "info", "debug", "warn", "error", "trace"]) console[k] = logToStderr;
+for (const k of ["log", "info", "debug", "warn", "error", "trace"])
+  console[k] = logToStderr;
 
 function send(obj) {
   stdout.write(`${JSON.stringify(obj)}\n`);
@@ -175,7 +176,13 @@ function clampWasmMemory(source) {
   else if (ArrayBuffer.isView(source))
     bytes = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
   else return source;
-  if (bytes.length < 8 || bytes[0] !== 0 || bytes[1] !== 0x61 || bytes[2] !== 0x73 || bytes[3] !== 0x6d)
+  if (
+    bytes.length < 8 ||
+    bytes[0] !== 0 ||
+    bytes[1] !== 0x61 ||
+    bytes[2] !== 0x73 ||
+    bytes[3] !== 0x6d
+  )
     return source;
   const maxPages = Math.floor((WASM_MAX_MB * 1024 * 1024) / 65536);
   let pos = 8;
@@ -188,16 +195,22 @@ function clampWasmMemory(source) {
       if (count < 1) return source;
       const flags = bytes[p++];
       if (flags & 0x04) return source; // memory64: leave alone
-      let initial;
-      [initial, p] = readLeb(bytes, p);
+      const [initial, afterInitial] = readLeb(bytes, p);
+      p = afterInitial;
       let max = null;
       if (flags & 0x01) [max, p] = readLeb(bytes, p);
       if (max !== null && max <= maxPages) return source;
       const newMax = Math.max(initial, maxPages);
       const entry = [flags | 0x01, ...writeLeb(initial), ...writeLeb(newMax)];
-      const body = [...writeLeb(count), ...entry, ...bytes.subarray(p, bodyEnd)];
+      const body = [
+        ...writeLeb(count),
+        ...entry,
+        ...bytes.subarray(p, bodyEnd),
+      ];
       const header = [5, ...writeLeb(body.length)];
-      const out = new Uint8Array(pos + header.length + body.length + (bytes.length - bodyEnd));
+      const out = new Uint8Array(
+        pos + header.length + body.length + (bytes.length - bodyEnd),
+      );
       out.set(bytes.subarray(0, pos), 0);
       out.set(header, pos);
       out.set(body, pos + header.length);
@@ -214,17 +227,24 @@ function clampWasmMemory(source) {
   const origCompile = W.compile.bind(W);
   const OrigModule = W.Module;
   W.instantiate = (source, imports) =>
-    origInstantiate(source instanceof OrigModule ? source : clampWasmMemory(source), imports);
+    origInstantiate(
+      source instanceof OrigModule ? source : clampWasmMemory(source),
+      imports,
+    );
   W.compile = (source) => origCompile(clampWasmMemory(source));
   const PatchedModule = function Module(source) {
     return new OrigModule(clampWasmMemory(source));
   };
   PatchedModule.prototype = OrigModule.prototype;
-  for (const k of ["imports", "exports", "customSections"]) PatchedModule[k] = OrigModule[k];
+  for (const k of ["imports", "exports", "customSections"])
+    PatchedModule[k] = OrigModule[k];
   W.Module = PatchedModule;
   if (W.instantiateStreaming)
     W.instantiateStreaming = async (resp, imports) =>
-      origInstantiate(clampWasmMemory(await (await resp).arrayBuffer()), imports);
+      origInstantiate(
+        clampWasmMemory(await (await resp).arrayBuffer()),
+        imports,
+      );
   if (W.compileStreaming)
     W.compileStreaming = async (resp) =>
       origCompile(clampWasmMemory(await (await resp).arrayBuffer()));
@@ -259,7 +279,11 @@ function lockdown() {
     }
     if (k in globalThis) {
       try {
-        Object.defineProperty(globalThis, k, { value: undefined, configurable: false, writable: false });
+        Object.defineProperty(globalThis, k, {
+          value: undefined,
+          configurable: false,
+          writable: false,
+        });
       } catch {
         // ignore
       }
@@ -303,7 +327,11 @@ function lockdown() {
     }
   }
   try {
-    Object.defineProperty(process, "env", { value: Object.freeze({}), configurable: false, writable: false });
+    Object.defineProperty(process, "env", {
+      value: Object.freeze({}),
+      configurable: false,
+      writable: false,
+    });
   } catch {
     // ignore
   }
@@ -351,7 +379,9 @@ function sendRaw(prefix, json) {
 
 async function main() {
   const t0 = hrNow();
-  const { loadPyodide } = await import(pathToFileURL(path.join(PYODIDE_DIR, "pyodide.mjs")).href);
+  const { loadPyodide } = await import(
+    pathToFileURL(path.join(PYODIDE_DIR, "pyodide.mjs")).href
+  );
   const sink = () => {};
   const pyodide = await loadPyodide({
     indexURL: `${PYODIDE_DIR.replace(/\/$/, "")}/`,
@@ -370,7 +400,11 @@ async function main() {
   const analyzeJson = pyodide.globals.get("_pensuma_analyze_json");
 
   lockdown();
-  send({ t: "ready", loadMs: Math.round(hrNow() - t0), rss: memoryUsage().rss });
+  send({
+    t: "ready",
+    loadMs: Math.round(hrNow() - t0),
+    rss: memoryUsage().rss,
+  });
 
   for (;;) {
     const msg = await nextMessage();
@@ -396,7 +430,11 @@ async function main() {
 
 main().catch((e) => {
   try {
-    send({ t: "fatal", id: "", message: `start-up failed: ${String(e?.stack ?? e).slice(0, 2000)}` });
+    send({
+      t: "fatal",
+      id: "",
+      message: `start-up failed: ${String(e?.stack ?? e).slice(0, 2000)}`,
+    });
   } finally {
     reallyExit(2);
   }

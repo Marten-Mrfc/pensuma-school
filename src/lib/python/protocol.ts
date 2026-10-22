@@ -6,7 +6,11 @@
  */
 import type { PyValue } from "@/lib/grading/pyvalue";
 import type { PythonError } from "@/lib/questions/schema";
-import type { HarnessAnalysis, HarnessRunResult, HarnessValue } from "./harness";
+import type {
+  HarnessAnalysis,
+  HarnessRunResult,
+  HarnessValue,
+} from "./harness";
 import type { TranscriptSegment } from "./types";
 
 const MAX_TEXT = 1024 * 1024;
@@ -25,7 +29,10 @@ function str(x: Json, max = MAX_TEXT): string {
 
 export function sanitizePythonError(x: Json): PythonError | null {
   if (!isObj(x)) return null;
-  const line = typeof x.line === "number" && Number.isInteger(x.line) && x.line > 0 ? x.line : null;
+  const line =
+    typeof x.line === "number" && Number.isInteger(x.line) && x.line > 0
+      ? x.line
+      : null;
   return {
     type: str(x.type, 200) || "Error",
     message: str(x.message, 10_000),
@@ -34,9 +41,14 @@ export function sanitizePythonError(x: Json): PythonError | null {
   };
 }
 
-function sanitizePyValue(x: Json, depth = 0, budget = { n: MAX_LIST * 2 }): PyValue {
+function sanitizePyValue(
+  x: Json,
+  depth = 0,
+  budget = { n: MAX_LIST * 2 },
+): PyValue {
   budget.n--;
-  if (!isObj(x) || depth > 60 || budget.n < 0) return { t: "other", type: "?", repr: "..." };
+  if (!isObj(x) || depth > 60 || budget.n < 0)
+    return { t: "other", type: "?", repr: "..." };
   switch (x.t) {
     case "none":
       return { t: "none" };
@@ -47,8 +59,10 @@ function sanitizePyValue(x: Json, depth = 0, budget = { n: MAX_LIST * 2 }): PyVa
         ? { t: "int", v: x.v }
         : { t: "other", type: "int", repr: str(x.v, 100) };
     case "float":
-      if (typeof x.v === "number" && Number.isFinite(x.v)) return { t: "float", v: x.v };
-      if (x.v === "inf" || x.v === "-inf" || x.v === "nan") return { t: "float", v: x.v };
+      if (typeof x.v === "number" && Number.isFinite(x.v))
+        return { t: "float", v: x.v };
+      if (x.v === "inf" || x.v === "-inf" || x.v === "nan")
+        return { t: "float", v: x.v };
       return { t: "other", type: "float", repr: "?" };
     case "str":
       return { t: "str", v: str(x.v) };
@@ -59,7 +73,10 @@ function sanitizePyValue(x: Json, depth = 0, budget = { n: MAX_LIST * 2 }): PyVa
     case "set":
     case "frozenset": {
       const items = Array.isArray(x.v) ? x.v.slice(0, MAX_LIST) : [];
-      return { t: x.t, v: items.map((i) => sanitizePyValue(i, depth + 1, budget)) };
+      return {
+        t: x.t,
+        v: items.map((i) => sanitizePyValue(i, depth + 1, budget)),
+      };
     }
     case "dict": {
       const items = Array.isArray(x.v) ? x.v.slice(0, MAX_LIST) : [];
@@ -69,15 +86,19 @@ function sanitizePyValue(x: Json, depth = 0, budget = { n: MAX_LIST * 2 }): PyVa
           .filter((p): p is unknown[] => Array.isArray(p) && p.length === 2)
           .map(
             (p) =>
-              [sanitizePyValue(p[0], depth + 1, budget), sanitizePyValue(p[1], depth + 1, budget)] as [
-                PyValue,
-                PyValue,
-              ],
+              [
+                sanitizePyValue(p[0], depth + 1, budget),
+                sanitizePyValue(p[1], depth + 1, budget),
+              ] as [PyValue, PyValue],
           ),
       };
     }
     default:
-      return { t: "other", type: str(x.type, 100) || "object", repr: str(x.repr, 2000) };
+      return {
+        t: "other",
+        type: str(x.type, 100) || "object",
+        repr: str(x.repr, 2000),
+      };
   }
 }
 
@@ -93,7 +114,10 @@ function sanitizeSegments(x: Json): TranscriptSegment[] {
   const out: TranscriptSegment[] = [];
   for (const s of x.slice(0, MAX_SEGMENTS)) {
     if (isObj(s) && typeof s.kind === "string" && SEGMENT_KINDS.has(s.kind)) {
-      out.push({ kind: s.kind as TranscriptSegment["kind"], text: str(s.text) });
+      out.push({
+        kind: s.kind as TranscriptSegment["kind"],
+        text: str(s.text),
+      });
     }
   }
   return out;
@@ -116,7 +140,10 @@ export function sanitizeRunResult(x: Json): HarnessRunResult | null {
 
 function strList(x: Json): string[] {
   return Array.isArray(x)
-    ? x.filter((s): s is string => typeof s === "string").slice(0, MAX_LIST).map((s) => s.slice(0, 500))
+    ? x
+        .filter((s): s is string => typeof s === "string")
+        .slice(0, MAX_LIST)
+        .map((s) => s.slice(0, 500))
     : [];
 }
 

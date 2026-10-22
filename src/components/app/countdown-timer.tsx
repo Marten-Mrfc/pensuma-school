@@ -126,11 +126,17 @@ export function CountdownTimer({
         tone === "warning" &&
           "border-warning/40 bg-warning/12 text-warning-ink",
         tone === "danger" &&
-          "border-destructive/40 bg-destructive/10 text-destructive-ink motion-safe:animate-pulse",
+          "border-destructive/40 bg-destructive/10 text-destructive-ink",
         className,
       )}
     >
-      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <Icon
+        className={cn(
+          "size-4 shrink-0",
+          tone === "danger" && "motion-safe:animate-pulse",
+        )}
+        aria-hidden="true"
+      />
       <span aria-hidden="true">
         {totalSeconds === null ? "--:--" : format(totalSeconds)}
       </span>

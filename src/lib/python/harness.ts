@@ -27,8 +27,9 @@
  * outside the interpreter. Expected values (`FunctionTest.expected`) are
  * parsed by a TypeScript Python-literal parser (`src/lib/grading/pyvalue.ts`).
  */
-import type { PythonError } from "@/lib/questions/schema";
+
 import type { PyValue } from "@/lib/grading/pyvalue";
+import type { PythonError } from "@/lib/questions/schema";
 import type { TranscriptSegment } from "./types";
 
 /** Default cap for captured output per run (characters). */
