@@ -727,11 +727,13 @@ function HintsUsedChip({
 }) {
   const pct = Math.round(hintPenaltyFraction(hints, used) * 100);
   const order = new Map(hints.map((h, i) => [h.id, i + 1]));
+  // A hint revealed twice counts (and costs) once.
+  const count = new Set(used.map((u) => u.id)).size;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-info/25 bg-info/[0.06] px-3 py-2 text-sm">
       <span className="inline-flex items-center gap-1.5 font-medium text-info-ink">
         <Lightbulb className="size-4" aria-hidden="true" />
-        {used.length} {used.length === 1 ? "hint" : "hints"} bekeken (−{pct}%)
+        {count} {count === 1 ? "hint" : "hints"} bekeken (−{pct}%)
       </span>
       <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
         {used.map((u) => (

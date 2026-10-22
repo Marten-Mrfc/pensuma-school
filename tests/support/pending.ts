@@ -11,7 +11,7 @@ import { test } from "bun:test";
 export function pendingTest(
   owner: string,
   name: string,
-  fn: () => void | Promise<unknown>,
+  fn: () => Promise<unknown>,
   timeoutMs?: number,
 ): void {
   test.todo(`${name} [wacht op ${owner}]`, fn, timeoutMs);

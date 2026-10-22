@@ -92,7 +92,7 @@ test("build, publish, plan, take, grade and release an exam", async ({
   await planLink.click();
   await page.waitForURL(/\/docent\/afnames\/nieuw/);
   await page
-    .getByRole("checkbox", { name: new RegExp(escape(DEMO_CLASS)) })
+    .getByRole("checkbox", { name: new RegExp(escapeRegExp(DEMO_CLASS)) })
     .check();
   await page.getByLabel("Titel (optioneel)").fill(AFNAME_TITLE);
   await page
@@ -202,6 +202,6 @@ test("build, publish, plan, take, grade and release an exam", async ({
   await studentContext.close();
 });
 
-function escape(s: string) {
+function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

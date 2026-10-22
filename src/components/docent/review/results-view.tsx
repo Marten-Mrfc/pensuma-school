@@ -182,6 +182,14 @@ function ResultsContent({ data }: { data: Results }) {
     return c * dir || x.student.name.localeCompare(y.student.name, "nl");
   });
 
+  /** aria-sort for a sortable column header (only the active column). */
+  const ariaSort = (key: SortKey) =>
+    sort.key === key
+      ? sort.dir === 1
+        ? ("ascending" as const)
+        : ("descending" as const)
+      : undefined;
+
   const toggleSort = (key: SortKey) =>
     setSort((s) =>
       s.key === key
@@ -378,6 +386,7 @@ function ResultsContent({ data }: { data: Results }) {
                 <tr className="text-xs text-muted-foreground">
                   <th
                     scope="col"
+                    aria-sort={ariaSort("name")}
                     className="sticky left-0 z-20 min-w-48 border-b bg-card px-4 py-2 text-left font-medium"
                   >
                     <SortButton
@@ -394,6 +403,7 @@ function ResultsContent({ data }: { data: Results }) {
                       <th
                         key={q.id}
                         scope="col"
+                        aria-sort={ariaSort(`q:${q.id}`)}
                         className="min-w-16 border-b bg-muted/30 px-1 py-2 text-center font-medium"
                       >
                         <Tooltip>
@@ -423,7 +433,7 @@ function ResultsContent({ data }: { data: Results }) {
                             </span>
                           </TooltipContent>
                         </Tooltip>
-                        <span className="block text-[10px] font-normal tabular-nums opacity-70">
+                        <span className="block text-[10px] font-normal tabular-nums">
                           {neutralized ? (
                             <span className="inline-flex items-center gap-0.5 font-medium text-warning-ink">
                               <Ban className="size-2.5" aria-hidden="true" />
@@ -438,6 +448,7 @@ function ResultsContent({ data }: { data: Results }) {
                   })}
                   <th
                     scope="col"
+                    aria-sort={ariaSort("total")}
                     className="min-w-20 border-b border-l px-3 py-2 text-right font-medium"
                   >
                     <SortButton
@@ -451,6 +462,7 @@ function ResultsContent({ data }: { data: Results }) {
                   </th>
                   <th
                     scope="col"
+                    aria-sort={ariaSort("grade")}
                     className="min-w-20 border-b px-3 py-2 text-right font-medium"
                   >
                     <SortButton
@@ -683,6 +695,7 @@ function ResultRow({ row, data }: { row: Row; data: Results }) {
             cell.status === "needs_review" && cell.manualScore == null;
           const extra = [
             review ? "nog nakijken" : null,
+            !cell.answered && !review ? "niet beantwoord" : null,
             cell.manualScore != null ? "handmatig aangepast" : null,
             cell.hasFeedback ? "met feedback" : null,
           ].filter(Boolean);
@@ -694,7 +707,7 @@ function ResultRow({ row, data }: { row: Row; data: Results }) {
                 className={cn(
                   "relative inline-flex h-8 w-full min-w-12 items-center justify-center rounded-md px-1 text-xs font-semibold whitespace-nowrap tabular-nums transition-all outline-none hover:brightness-95 hover:ring-2 hover:ring-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
                   scoreTone(cell),
-                  !cell.answered && !review && "font-normal opacity-80",
+                  !cell.answered && !review && "font-normal",
                 )}
               >
                 {review ? (

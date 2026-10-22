@@ -6,11 +6,14 @@
  * - Self-contained (default; CI): Playwright builds and starts the app on
  *   port 3210 against its own database `pensuma_e2e_test`, seeded with fixed
  *   PINs.
+ *   E2E_DEV=1 starts `next dev` instead of a production build (quick local
+ *   runs; set E2E_PORT to move it off 3210). CI always uses the build.
  * - Against a running server: set E2E_BASE_URL (e.g. http://localhost:3100).
  *   No server is started and nothing is seeded; the dev seed is used and
  *   tests create (and delete) throwaway students where they need them.
  */
-export const E2E_PORT = 3210;
+export const E2E_PORT = Number(process.env.E2E_PORT ?? 3210);
+export const E2E_DEV = process.env.E2E_DEV === "1";
 
 export const EXTERNAL_BASE_URL = process.env.E2E_BASE_URL?.replace(/\/$/, "");
 export const SELF_CONTAINED = !EXTERNAL_BASE_URL;

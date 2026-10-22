@@ -213,7 +213,7 @@ export function SimilarityView({
                       {features.map((f) => (
                         <span
                           key={f}
-                          className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium"
+                          className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium"
                         >
                           {f}
                         </span>
@@ -333,7 +333,7 @@ export function SimilarityView({
                           {features.map((f) => (
                             <span
                               key={f}
-                              className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+                              className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium"
                             >
                               {f}
                             </span>

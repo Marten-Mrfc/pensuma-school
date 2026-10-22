@@ -236,6 +236,20 @@ describe("feedback snippets", () => {
       tb.feedback.update({ id: general.id, text: "Overgenomen" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
+
+  test("tying a snippet to a question that does not exist is NOT_FOUND", async () => {
+    const t = callerFor(await insertTeacher());
+    const missing = "00000000-0000-4000-8000-000000000000";
+    await expect(
+      t.feedback.create({ text: "Let op de spaties.", questionId: missing }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    const { id } = await t.feedback.create({ text: "Let op de spaties." });
+    await expect(
+      t.feedback.update({ id, questionId: missing }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    // Still a general snippet.
+    expect((await t.feedback.list()).general.map((s) => s.id)).toEqual([id]);
+  });
 });
 
 describe("feedback.gradeMany", () => {

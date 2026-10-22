@@ -80,7 +80,13 @@ export function QuestionEditor({
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warningCount = issues.length - errorCount;
   const titleIssue = issues.some((i) => i.target?.field === "title");
-  const promptIssue = issues.some((i) => i.target?.field === "prompt");
+  // Only errors colour the prompt red; warnings (alt text) show below it.
+  const promptIssue = issues.some(
+    (i) => i.target?.field === "prompt" && i.severity === "error",
+  );
+  const promptWarnings = issues.filter(
+    (i) => i.target?.field === "prompt" && i.severity === "warning",
+  );
   const pointsIssue = issues.some((i) => i.target?.field === "points");
 
   return (
@@ -171,6 +177,7 @@ export function QuestionEditor({
             className={promptIssue ? "border-destructive/50" : undefined}
           />
           <PromptImageWarning prompt={question.prompt} />
+          <IssueList issues={promptWarnings} compact />
         </div>
         <TopicTagsField
           value={question.tags}

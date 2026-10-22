@@ -496,7 +496,13 @@ function MonitorHeader({
             ? `${othersInProgress} ${othersInProgress === 1 ? "leerling is" : "leerlingen zijn"} nog bezig. Hun werk wordt nu automatisch ingeleverd en nagekeken. Daarna kan niemand meer beginnen.`
             : "Daarna kan niemand meer beginnen. Je kunt de afname later heropenen."
         }
-        confirmLabel={inProgress > 0 ? "Sluiten en inleveren" : "Sluiten"}
+        confirmLabel={
+          // Students with verlengde tijd keep working unless the box is ticked.
+          othersInProgress > 0 ||
+          (submitAccommodated && inProgressWithAccommodation > 0)
+            ? "Sluiten en inleveren"
+            : "Sluiten"
+        }
         onConfirm={async () => {
           const res = await m.close.mutateAsync({
             id: a.id,

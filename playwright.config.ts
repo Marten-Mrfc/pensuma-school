@@ -6,6 +6,8 @@
  *   bun run test:a11y                     only e2e/a11y
  *   E2E_BASE_URL=http://localhost:3100 bunx playwright test --project=desktop
  *                                         against a running dev server
+ *   E2E_DEV=1 E2E_PORT=3150 bunx playwright test …
+ *                                         self-contained, but with `next dev`
  *
  * CI builds the app in an earlier step and sets E2E_SKIP_BUILD=1.
  * The web server starts BEFORE globalSetup, so database creation and
@@ -14,6 +16,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import {
   BASE_URL,
+  E2E_DEV,
   E2E_PORT,
   SELF_CONTAINED,
   serverEnv,
@@ -23,8 +26,12 @@ const CI = !!process.env.CI;
 
 const serverCommand = [
   "bun e2e/support/create-db.ts",
-  ...(process.env.E2E_SKIP_BUILD ? [] : ["bunx next build"]),
-  `bunx next start -p ${E2E_PORT}`,
+  ...(E2E_DEV
+    ? [`bunx next dev -p ${E2E_PORT}`]
+    : [
+        ...(process.env.E2E_SKIP_BUILD ? [] : ["bunx next build"]),
+        `bunx next start -p ${E2E_PORT}`,
+      ]),
 ].join(" && ");
 
 export default defineConfig({
@@ -36,7 +43,7 @@ export default defineConfig({
   retries: CI ? 1 : 0,
   timeout: 60_000,
   // A dev server compiles each route on first visit: be patient there.
-  expect: { timeout: SELF_CONTAINED ? 10_000 : 30_000 },
+  expect: { timeout: SELF_CONTAINED && !E2E_DEV ? 10_000 : 30_000 },
   outputDir: "test-results",
   reporter: CI
     ? [["github"], ["html", { open: "never" }]]
@@ -78,7 +85,8 @@ export default defineConfig({
         timeout: 600_000,
         reuseExistingServer: !CI,
         env: { ...serverEnv() },
-        stdout: "pipe",
+        // E2E_SERVER_LOG=1 shows the server's request log.
+        stdout: process.env.E2E_SERVER_LOG ? "pipe" : "ignore",
         stderr: "pipe",
       }
     : undefined,

@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
@@ -108,7 +108,7 @@ export function AssignmentList() {
         }
       />
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-6">
         <TabsList className="w-full sm:w-fit">
           {TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value} className="gap-2 px-3">
@@ -126,39 +126,45 @@ export function AssignmentList() {
             </TabsTrigger>
           ))}
         </TabsList>
-      </Tabs>
 
-      {query.isPending ? (
-        <LoadingState variant="list" />
-      ) : query.isError ? (
-        <ErrorState error={query.error} onRetry={() => query.refetch()} />
-      ) : visible.length === 0 ? (
-        <EmptyBlock
-          icon={
-            tab === "open"
-              ? Radio
-              : tab === "planned"
-                ? CalendarClock
-                : NotebookPen
-          }
-          title={EMPTY[tab].title}
-          description={EMPTY[tab].description}
-          action={
-            <Button asChild variant={tab === "closed" ? "outline" : "default"}>
-              <Link href={routes.docent.newAssignment()}>
-                <CalendarPlus aria-hidden="true" />
-                Afname plannen
-              </Link>
-            </Button>
-          }
-        />
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {visible.map((row) => (
-            <AssignmentRow key={row.id} row={row} />
-          ))}
-        </ul>
-      )}
+        {/* The tab panel (aria-controls of the active tab points here). */}
+        <TabsContent value={tab} className="flex flex-col">
+          {query.isPending ? (
+            <LoadingState variant="list" />
+          ) : query.isError ? (
+            <ErrorState error={query.error} onRetry={() => query.refetch()} />
+          ) : visible.length === 0 ? (
+            <EmptyBlock
+              icon={
+                tab === "open"
+                  ? Radio
+                  : tab === "planned"
+                    ? CalendarClock
+                    : NotebookPen
+              }
+              title={EMPTY[tab].title}
+              description={EMPTY[tab].description}
+              action={
+                <Button
+                  asChild
+                  variant={tab === "closed" ? "outline" : "default"}
+                >
+                  <Link href={routes.docent.newAssignment()}>
+                    <CalendarPlus aria-hidden="true" />
+                    Afname plannen
+                  </Link>
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {visible.map((row) => (
+                <AssignmentRow key={row.id} row={row} />
+              ))}
+            </ul>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
