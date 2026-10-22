@@ -101,7 +101,7 @@ export default function LoginPage() {
           <Logo size="sm" className="lg:hidden" />
           <ThemeToggle />
         </div>
-        <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
+        <div className="flex flex-1 items-start justify-center px-5 pt-8 pb-10 sm:items-center sm:px-8 sm:py-10">
           <div className="w-full max-w-[25rem]">
             <div className="mb-8 flex flex-col gap-2">
               <h1 className="font-display-wide text-3xl font-bold tracking-tight">

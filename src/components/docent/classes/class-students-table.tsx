@@ -1,0 +1,110 @@
+"use client";
+
+import { Search } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { type SimpleTableColumn, SimpleTable } from "@/components/app/simple-table";
+import { Input } from "@/components/ui/input";
+import { routes } from "@/lib/routes";
+import type { RouterOutputs } from "@/trpc/react";
+import { formatDateTime } from "../students/format";
+import { PinReveal } from "../students/pin-reveal";
+import { StudentActionsMenu } from "../students/student-actions-menu";
+import { StudentStatus } from "../students/student-status";
+
+type Member = RouterOutputs["class"]["get"]["members"][number];
+
+export interface ClassStudentsTableProps {
+  classId: string;
+  members: Member[];
+}
+
+/** Members of one class with PIN reveal and row actions. */
+export function ClassStudentsTable({ classId, members }: ClassStudentsTableProps) {
+  const [filter, setFilter] = useState("");
+  const term = filter.trim().toLowerCase();
+  const rows = term
+    ? members.filter((m) => m.name.toLowerCase().includes(term) || m.studentNumber.startsWith(term))
+    : members;
+
+  const columns: SimpleTableColumn<Member>[] = [
+    {
+      key: "studentNumber",
+      header: "Nummer",
+      sortValue: (m) => m.studentNumber,
+      cell: (m) => <span className="font-mono text-[0.8rem] tabular-nums">{m.studentNumber}</span>,
+      className: "w-24",
+    },
+    {
+      key: "name",
+      header: "Naam",
+      sortValue: (m) => m.name,
+      cell: (m) => (
+        <Link
+          href={routes.docent.student(m.id)}
+          className="font-medium underline-offset-4 outline-none hover:underline focus-visible:underline"
+        >
+          {m.name}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      hideBelow: "sm",
+      sortValue: (m) => (m.banned ? 2 : m.lastLoginAt ? 0 : 1),
+      cell: (m) => <StudentStatus banned={m.banned} lastLoginAt={m.lastLoginAt} />,
+    },
+    {
+      key: "pin",
+      header: "Pincode",
+      cell: (m) => <PinReveal userId={m.id} hasPin={m.hasPin} />,
+      className: "whitespace-nowrap",
+    },
+    {
+      key: "lastLoginAt",
+      header: "Laatst ingelogd",
+      hideBelow: "lg",
+      sortValue: (m) => m.lastLoginAt,
+      cell: (m) => (
+        <span className="text-xs text-muted-foreground">
+          {m.lastLoginAt ? formatDateTime(m.lastLoginAt) : "Nog niet"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">Acties</span>,
+      align: "right",
+      className: "w-12",
+      cell: (m) => (
+        <StudentActionsMenu
+          classId={classId}
+          student={{ id: m.id, name: m.name, studentNumber: m.studentNumber, banned: m.banned }}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3">
+      {members.length > 8 ? (
+        <Input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter op naam of nummer"
+          prefixIcon={<Search className="size-4 text-muted-foreground" />}
+          aria-label="Filter leerlingen"
+          allowClear
+          className="sm:max-w-xs"
+        />
+      ) : null}
+      <SimpleTable
+        caption="Leerlingen in deze klas"
+        columns={columns}
+        rows={rows}
+        emptyText={term ? "Geen leerlingen gevonden met dit filter." : "Nog geen leerlingen in deze klas."}
+      />
+    </div>
+  );
+}

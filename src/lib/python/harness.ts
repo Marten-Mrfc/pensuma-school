@@ -148,6 +148,14 @@ _orig_stdout = _sys.stdout
 _orig_stderr = _sys.stderr
 _orig_stdin = _sys.stdin
 _orig_recursion = _sys.getrecursionlimit()
+_orig_setrecursionlimit = _sys.setrecursionlimit
+# Deeper recursion overflows the JavaScript stack under Pyodide, which is a
+# fatal (and slow) interpreter crash instead of a RecursionError.
+_MAX_RECURSION = 3000
+
+
+def _capped_setrecursionlimit(limit):
+    _orig_setrecursionlimit(max(50, min(int(limit), _MAX_RECURSION)))
 _orig_cwd = _os.getcwd()
 _run_counter = [0]
 
@@ -377,8 +385,9 @@ def _restore_interpreter():
     _sys.stdout = _orig_stdout
     _sys.stderr = _orig_stderr
     _sys.stdin = _orig_stdin
+    _sys.setrecursionlimit = _orig_setrecursionlimit
     try:
-        _sys.setrecursionlimit(_orig_recursion)
+        _orig_setrecursionlimit(_orig_recursion)
     except Exception:
         pass
     # Undo changes to builtins and imported modules, so runs can't affect each other.
@@ -448,11 +457,12 @@ def _pensuma_run(req, emit=None, reader=None):
         _sys.stderr = _Writer(cap, "stderr")
         _sys.stdin = _Reader(next_line)
         _builtins.input = _input
+        _sys.setrecursionlimit = _capped_setrecursionlimit
         _make_workdir()
         g = {"__name__": "main" if mode == "function" else "__main__", "__builtins__": _builtins}
         try:
             compiled = compile(code, _STUDENT_FILE, "exec", dont_inherit=True)
-            _sys.setrecursionlimit(recursion_limit)
+            _capped_setrecursionlimit(recursion_limit)
             exec(compiled, g)
         except SystemExit as e:
             if e.code not in (None, 0) and not isinstance(e.code, int):
@@ -472,9 +482,9 @@ def _pensuma_run(req, emit=None, reader=None):
             error = None
             try:
                 expr = compile(call or "None", _TEST_FILE, "eval", dont_inherit=True)
-                _sys.setrecursionlimit(recursion_limit)
+                _capped_setrecursionlimit(recursion_limit)
                 result = eval(expr, g)
-                _sys.setrecursionlimit(_orig_recursion)
+                _orig_setrecursionlimit(_orig_recursion)
                 ser = _serialize(result, [_MAX_ITEMS], 0, set())
                 try:
                     r = repr(result)

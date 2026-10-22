@@ -91,15 +91,18 @@ export default function HomePage() {
           />
           <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 pt-14 pb-20 sm:px-8 md:pt-20 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:pt-24 lg:pb-28">
             <div className="flex flex-col items-start gap-7">
-              <span className="inline-flex items-center gap-2 rounded-full border bg-card/80 py-1 pr-3 pl-1.5 text-xs font-medium text-muted-foreground shadow-xs">
-                <span className="rounded-full bg-primary px-2 py-0.5 text-[0.68rem] font-semibold tracking-wide text-primary-foreground uppercase">
-                  Nieuw
+              <span className="inline-flex items-center gap-2 rounded-full border bg-card/80 py-1 pr-3.5 pl-2.5 text-xs font-medium text-muted-foreground shadow-xs">
+                <span className="relative flex size-2" aria-hidden="true">
+                  <span className="absolute inline-flex size-full rounded-full bg-primary/50 motion-safe:animate-ping" />
+                  <span className="relative inline-flex size-2 rounded-full bg-primary" />
                 </span>
                 Het toetsplatform voor informatica
               </span>
-              <h1 className="font-display-wide text-[2.6rem] leading-[1.02] font-extrabold tracking-tight text-balance sm:text-6xl lg:text-[4.1rem]">
-                Python-toetsen zonder gedoe
-                <span className="text-primary">.</span>
+              <h1 className="font-display-wide text-[clamp(2rem,8.6vw,3.4rem)] lg:text-[clamp(2.4rem,4.4vw,3.4rem)] leading-[1.04] font-extrabold tracking-tight">
+                <span className="block whitespace-nowrap">Python-toetsen</span>
+                <span className="block">
+                  zonder gedoe<span className="text-primary">.</span>
+                </span>
               </h1>
               <p className="max-w-xl text-lg leading-relaxed text-pretty text-muted-foreground">
                 Leerlingen programmeren in de browser en Pensuma kijkt direct

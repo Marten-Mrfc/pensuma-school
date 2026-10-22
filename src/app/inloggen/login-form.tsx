@@ -173,7 +173,7 @@ function StudentLoginForm({ next }: { next: string | null }) {
           onChange={(e) => setStudentNumber(e.target.value.replace(/\D/g, ""))}
           status={fieldError.number ? "error" : undefined}
           autoFocus
-          className="font-mono tracking-wide"
+          className="[&_input]:font-mono [&_input]:tracking-wider [&_input]:placeholder:font-sans [&_input]:placeholder:tracking-normal"
         />
       </FormField>
 
