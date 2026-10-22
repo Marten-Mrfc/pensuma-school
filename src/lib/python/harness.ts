@@ -1,6 +1,6 @@
 /**
  * The Pensuma Python harness: one Python source, used by BOTH the browser
- * worker (`python.worker.ts`) and the server sandbox (`grader/sandbox.mjs`,
+ * worker (`public/python-worker.mjs`) and the server sandbox (`grader/sandbox.mjs`,
  * which receives this source from the parent process at start-up), so the
  * semantics of running and grading student code are identical everywhere.
  *

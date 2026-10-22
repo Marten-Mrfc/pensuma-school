@@ -1,6 +1,6 @@
 /**
  * Messages between the main thread (runner-client.ts) and the Pyodide Web
- * Worker (python.worker.ts).
+ * Worker (public/python-worker.mjs, a static, unbundled module worker).
  *
  * Interactive input uses a SharedArrayBuffer (only when the page is
  * cross-origin isolated): Int32Array control words [state, byteLength] and a
@@ -22,7 +22,15 @@ export const INPUT_STATE_EOF = 2;
 export const INPUT_BUFFER_BYTES = 64 * 1024;
 
 export type WorkerRequest =
-  | { t: "init"; indexURL: string; inputBuffer: SharedArrayBuffer | null }
+  | {
+      t: "init";
+      /** Absolute URL of the self-hosted Pyodide folder, ending in "/". */
+      indexURL: string;
+      /** Python harness source (harness.ts) and its file name. */
+      harness: string;
+      filename: string;
+      inputBuffer: SharedArrayBuffer | null;
+    }
   | { t: "analyze"; id: number; code: string }
   | { t: "run"; id: number; request: HarnessRunRequest; interactive: boolean };
 

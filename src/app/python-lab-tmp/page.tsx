@@ -18,6 +18,8 @@ export default function PythonLab() {
   const runner = usePythonRunner({ preload: true });
   const [code, setCode] = useState('naam = input("Wat is je naam? ")\nprint("Hallo " + naam)');
   const [serverResult, setServerResult] = useState<CodeGradingResult | null>(null);
+  const [coi, setCoi] = useState("?");
+  useEffect(() => setCoi(String(window.crossOriginIsolated)), []);
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__pensuma = {
       grade: runner.grade,
@@ -29,7 +31,7 @@ export default function PythonLab() {
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6">
       <h1 className="text-2xl font-semibold">Python-lab (tijdelijk)</h1>
-      <p data-testid="coi">crossOriginIsolated: {String(typeof window !== "undefined" && window.crossOriginIsolated)}</p>
+      <p data-testid="coi">crossOriginIsolated: {coi}</p>
       <textarea
         data-testid="code"
         className="bg-card h-32 rounded-md border p-2 font-mono text-sm"

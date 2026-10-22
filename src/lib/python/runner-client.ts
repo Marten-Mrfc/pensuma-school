@@ -17,6 +17,8 @@ import {
 import type { PythonError } from "@/lib/questions/schema";
 import {
   DEFAULT_MAX_OUTPUT,
+  HARNESS_FILENAME,
+  HARNESS_PY,
   type HarnessAnalysis,
   type HarnessRunRequest,
   type HarnessRunResult,
@@ -35,8 +37,14 @@ import {
   INPUT_BUFFER_BYTES,
   INPUT_STATE_DATA,
   INPUT_STATE_EOF,
+  type WorkerRequest,
   type WorkerResponse,
 } from "./worker-protocol";
+
+/** Static module worker (see public/python-worker.mjs). */
+const WORKER_URL = "/python-worker.mjs";
+/** Self-hosted Pyodide runtime (copied by scripts/copy-pyodide.mjs). */
+const PYODIDE_PATH = "/pyodide/";
 
 export type RunnerSnapshot = {
   status: PythonRunnerStatus;
@@ -151,7 +159,9 @@ export class PythonWorkerClient {
     this.inputBuffer = interactive
       ? new SharedArrayBuffer(8 + INPUT_BUFFER_BYTES)
       : null;
-    const worker = new Worker(new URL("./python.worker.ts", import.meta.url), {
+    // A static module worker (public/python-worker.mjs), deliberately not
+    // bundled: Turbopack makes bundled workers classic, which Pyodide rejects.
+    const worker = new Worker(WORKER_URL, {
       type: "module",
       name: "pensuma-python",
     });
@@ -169,6 +179,7 @@ export class PythonWorkerClient {
             this.update({ status: this.active ? "running" : "ready" });
             resolve();
           } else if (msg.t === "load-error") {
+            console.warn("[python] Pyodide failed to load:", msg.message);
             this.killWorker();
             this.update({ status: "error", loadError: LOAD_ERROR });
             reject(new Error(msg.message));
@@ -194,11 +205,14 @@ export class PythonWorkerClient {
       });
     });
     ready.catch(() => {});
-    worker.postMessage({
+    const init: WorkerRequest = {
       t: "init",
-      indexURL: new URL("/pyodide/", window.location.href).href,
+      indexURL: new URL(PYODIDE_PATH, window.location.href).href,
+      harness: HARNESS_PY,
+      filename: HARNESS_FILENAME,
       inputBuffer: this.inputBuffer,
-    });
+    };
+    worker.postMessage(init);
     this.ready = ready;
     return ready;
   }
