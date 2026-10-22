@@ -1,21 +1,15 @@
 /**
- * Demo content: a Python basics test with code, multiple-choice and open
- * questions, plus an open practice assignment for the demo class.
+ * Pure demo question data (no database imports), shared by the demo seeding
+ * and the grader tests (every code question's model solution must pass).
  */
-import { and, eq } from "drizzle-orm";
 import {
-  assignmentSettingsSchema,
   codeQuestionDataSchema,
   multipleChoiceDataSchema,
   openQuestionDataSchema,
   type QuestionType,
 } from "@/lib/questions/schema";
-import { db } from "@/server/db";
-import { assignments, classes, questions, tests } from "@/server/db/schema";
 
-const TEST_TITLE = "Python basis – oefentoets";
-
-type SeedQuestion = {
+export type SeedQuestion = {
   type: QuestionType;
   title: string;
   prompt: string;
@@ -28,9 +22,21 @@ const io = (
   stdin: string,
   expectedOutput: string,
   extra: Record<string, unknown> = {},
-) => ({ id, kind: "io", name: stdin ? `Invoer: ${stdin.split("\n").join(", ")}` : "Uitvoer", stdin, expectedOutput, ...extra });
+) => ({
+  id,
+  kind: "io",
+  name: stdin ? `Invoer: ${stdin.split("\n").join(", ")}` : "Uitvoer",
+  stdin,
+  expectedOutput,
+  ...extra,
+});
 
-const fn = (id: string, call: string, expected: string, extra: Record<string, unknown> = {}) => ({
+const fn = (
+  id: string,
+  call: string,
+  expected: string,
+  extra: Record<string, unknown> = {},
+) => ({
   id,
   kind: "function",
   name: `${call} → ${expected}`,
@@ -39,7 +45,7 @@ const fn = (id: string, call: string, expected: string, extra: Record<string, un
   ...extra,
 });
 
-const QUESTIONS: SeedQuestion[] = [
+export const DEMO_QUESTIONS: SeedQuestion[] = [
   {
     type: "code",
     title: "Hallo wereld",
@@ -64,7 +70,7 @@ const QUESTIONS: SeedQuestion[] = [
       "Hallo Mark",
       "```",
       "",
-      "Je mag zelf weten wat je tussen de haakjes van `input()` zet, bijvoorbeeld `input(\"Wat is je naam? \")`.",
+      'Je mag zelf weten wat je tussen de haakjes van `input()` zet, bijvoorbeeld `input("Wat is je naam? ")`.',
     ].join("\n"),
     data: codeQuestionDataSchema.parse({
       starterCode: "# Vraag de naam en print een begroeting\n",
@@ -112,9 +118,22 @@ const QUESTIONS: SeedQuestion[] = [
     ].join("\n"),
     data: codeQuestionDataSchema.parse({
       starterCode: "getallen = [3, 8, 15, 22, 7, 10, 41, 6]\n\n",
-      solution: "getallen = [3, 8, 15, 22, 7, 10, 41, 6]\n\nfor getal in getallen:\n    if getal % 2 == 0:\n        print(getal)\n",
-      tests: [io("t1", "", "8\n22\n10\n6", { name: "Even getallen uit de lijst", match: "exact" })],
-      checks: [{ id: "c1", kind: "requires", construct: "for_loop", message: "Gebruik een for-lus." }],
+      solution:
+        "getallen = [3, 8, 15, 22, 7, 10, 41, 6]\n\nfor getal in getallen:\n    if getal % 2 == 0:\n        print(getal)\n",
+      tests: [
+        io("t1", "", "8\n22\n10\n6", {
+          name: "Even getallen uit de lijst",
+          match: "exact",
+        }),
+      ],
+      checks: [
+        {
+          id: "c1",
+          kind: "requires",
+          construct: "for_loop",
+          message: "Gebruik een for-lus.",
+        },
+      ],
     }),
   },
   {
@@ -132,8 +151,10 @@ const QUESTIONS: SeedQuestion[] = [
       "Je hoeft zelf niets te printen. Gebruik géén `statistics`-module.",
     ].join("\n"),
     data: codeQuestionDataSchema.parse({
-      starterCode: "def gemiddelde(getallen):\n    # jouw code hier\n    pass\n",
-      solution: "def gemiddelde(getallen):\n    return sum(getallen) / len(getallen)\n",
+      starterCode:
+        "def gemiddelde(getallen):\n    # jouw code hier\n    pass\n",
+      solution:
+        "def gemiddelde(getallen):\n    return sum(getallen) / len(getallen)\n",
       tests: [
         fn("t1", "gemiddelde([1, 2, 3])", "2.0"),
         fn("t2", "gemiddelde([10])", "10.0"),
@@ -141,8 +162,20 @@ const QUESTIONS: SeedQuestion[] = [
         fn("t4", "gemiddelde([-4, 4, 9])", "3.0", { hidden: true }),
       ],
       checks: [
-        { id: "c1", kind: "requires", construct: "function_def", value: "gemiddelde", message: "Maak een functie met de naam gemiddelde." },
-        { id: "c2", kind: "forbids", construct: "import", value: "statistics", message: "Je mag de statistics-module niet gebruiken." },
+        {
+          id: "c1",
+          kind: "requires",
+          construct: "function_def",
+          value: "gemiddelde",
+          message: "Maak een functie met de naam gemiddelde.",
+        },
+        {
+          id: "c2",
+          kind: "forbids",
+          construct: "import",
+          value: "statistics",
+          message: "Je mag de statistics-module niet gebruiken.",
+        },
       ],
     }),
   },
@@ -164,7 +197,8 @@ const QUESTIONS: SeedQuestion[] = [
     type: "multiple_choice",
     title: "Geldige variabelenamen",
     points: 2,
-    prompt: "Welke van deze namen zijn **geldige** variabelenamen in Python? Kies alle goede antwoorden.",
+    prompt:
+      "Welke van deze namen zijn **geldige** variabelenamen in Python? Kies alle goede antwoorden.",
     data: multipleChoiceDataSchema.parse({
       multiple: true,
       scoring: "partial",
@@ -215,17 +249,24 @@ const QUESTIONS: SeedQuestion[] = [
       "```",
     ].join("\n"),
     data: codeQuestionDataSchema.parse({
-      solution: 'n = int(input("Getal: "))\nfor i in range(1, 11):\n    print(i, "x", n, "=", i * n)\n',
+      solution:
+        'n = int(input("Getal: "))\nfor i in range(1, 11):\n    print(i, "x", n, "=", i * n)\n',
       tests: [
         io(
           "t1",
           "3",
-          Array.from({ length: 10 }, (_, i) => `${i + 1} x 3 = ${(i + 1) * 3}`).join("\n"),
+          Array.from(
+            { length: 10 },
+            (_, i) => `${i + 1} x 3 = ${(i + 1) * 3}`,
+          ).join("\n"),
         ),
         io(
           "t2",
           "7",
-          Array.from({ length: 10 }, (_, i) => `${i + 1} x 7 = ${(i + 1) * 7}`).join("\n"),
+          Array.from(
+            { length: 10 },
+            (_, i) => `${i + 1} x 7 = ${(i + 1) * 7}`,
+          ).join("\n"),
           { hidden: true },
         ),
       ],
@@ -249,7 +290,14 @@ const QUESTIONS: SeedQuestion[] = [
         io("t2", "stop", "0", { match: "numbers" }),
         io("t3", "100\n-50\n1\nstop", "51", { match: "numbers", hidden: true }),
       ],
-      checks: [{ id: "c1", kind: "requires", construct: "while_loop", message: "Gebruik een while-lus." }],
+      checks: [
+        {
+          id: "c1",
+          kind: "requires",
+          construct: "while_loop",
+          message: "Gebruik een while-lus.",
+        },
+      ],
     }),
   },
   {
@@ -268,7 +316,13 @@ const QUESTIONS: SeedQuestion[] = [
         fn("t3", "grootste(-1, -5, -3)", "-1", { hidden: true }),
       ],
       checks: [
-        { id: "c1", kind: "forbids", construct: "function_call", value: "max", message: "Je mag max() niet gebruiken." },
+        {
+          id: "c1",
+          kind: "forbids",
+          construct: "function_call",
+          value: "max",
+          message: "Je mag max() niet gebruiken.",
+        },
       ],
     }),
   },
@@ -276,57 +330,13 @@ const QUESTIONS: SeedQuestion[] = [
     type: "open",
     title: "for of while?",
     points: 2,
-    prompt: "Leg in je eigen woorden uit wat het verschil is tussen een `for`-lus en een `while`-lus. Geef bij allebei een voorbeeld van wanneer je hem zou gebruiken.",
+    prompt:
+      "Leg in je eigen woorden uit wat het verschil is tussen een `for`-lus en een `while`-lus. Geef bij allebei een voorbeeld van wanneer je hem zou gebruiken.",
     data: openQuestionDataSchema.parse({
       modelAnswer:
         "Een for-lus herhaalt voor elk element van een reeks (of een vast aantal keer, met range). Een while-lus herhaalt zolang een voorwaarde waar is, handig als je vooraf niet weet hoe vaak.",
-      rubric: "1 punt: juist verschil uitgelegd. 1 punt: passend voorbeeld bij beide lussen.",
+      rubric:
+        "1 punt: juist verschil uitgelegd. 1 punt: passend voorbeeld bij beide lussen.",
     }),
   },
 ];
-
-export async function seedDemoTest(adminId: string) {
-  let [test] = await db.select().from(tests).where(eq(tests.title, TEST_TITLE));
-  if (!test) {
-    [test] = await db
-      .insert(tests)
-      .values({
-        title: TEST_TITLE,
-        topic: "Python – basis",
-        status: "published",
-        createdById: adminId,
-        description:
-          "Een oefentoets met de basis van Python: `print`, `input`, rekenen, `if`, lussen en functies.\n\nJe mag je code zo vaak uitvoeren en testen als je wilt.",
-      })
-      .returning();
-    await db.insert(questions).values(
-      QUESTIONS.map((q, position) => ({ ...q, testId: test.id, position })),
-    );
-    console.log(`✓ Demotoets "${TEST_TITLE}" aangemaakt (${QUESTIONS.length} vragen)`);
-  } else {
-    console.log(`✓ Demotoets "${TEST_TITLE}" bestaat al`);
-  }
-
-  const [klas] = await db.select().from(classes).where(eq(classes.name, "4H2 (demo)"));
-  if (!klas) return;
-  const [existing] = await db
-    .select()
-    .from(assignments)
-    .where(and(eq(assignments.testId, test.id), eq(assignments.classId, klas.id)));
-  if (!existing) {
-    await db.insert(assignments).values({
-      testId: test.id,
-      classId: klas.id,
-      title: "Oefenen: Python basis",
-      mode: "practice",
-      status: "open",
-      createdById: adminId,
-      settings: assignmentSettingsSchema.parse({
-        showResults: "immediately",
-        maxAttempts: 5,
-        logFocusEvents: false,
-      }),
-    });
-    console.log("✓ Oefenafname voor 4H2 (demo) geopend");
-  }
-}

@@ -13,6 +13,8 @@
  *   GRADER_JOB_TIMEOUT_MS     total wall-clock budget per job (default 120000)
  *   GRADER_QUEUE_TIMEOUT_MS   max time a job may wait in the queue (default 120000)
  *   GRADER_MAX_OUTPUT         max captured output per run, characters (default 65536)
+ *   GRADER_SNAPSHOT           "0" disables the Pyodide start-up snapshot (default on;
+ *                             written read-only to the OS temp dir, see snapshot.ts)
  */
 import fs from "node:fs";
 import path from "node:path";

@@ -40,7 +40,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # SQL migrations, applied automatically on startup (src/instrumentation.ts)
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
-# GRADER-FILES (filled in once the grader layout is final)
+# Server-side Python grader: sandbox entry script + the Pyodide runtime it loads
+COPY --from=builder --chown=nextjs:nodejs /app/grader ./grader
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pyodide ./node_modules/pyodide
 
 USER nextjs
 EXPOSE 3000

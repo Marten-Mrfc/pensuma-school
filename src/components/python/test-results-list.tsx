@@ -31,6 +31,12 @@ export type TestResultsListProps = {
   result: CodeGradingResult;
   /** Denser layout, all tests collapsed (e.g. in a side panel or table row). */
   compact?: boolean;
+  /**
+   * "student" (default): hidden tests show only "Verborgen test – geslaagd /
+   * niet geslaagd". "teacher": hidden tests are shown in full (input,
+   * expected, actual, feedback, error) with a "verborgen" badge.
+   */
+  audience?: "student" | "teacher";
   className?: string;
 };
 
@@ -181,11 +187,13 @@ function TestRow({
   index,
   defaultOpen,
   compact,
+  audience,
 }: {
   test: TestResult;
   index: number;
   defaultOpen: boolean;
   compact: boolean;
+  audience: "student" | "teacher";
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const name = test.name?.trim() || `Test ${index + 1}`;
@@ -195,7 +203,7 @@ function TestRow({
       ? "tijdslimiet"
       : "niet geslaagd";
 
-  if (test.hidden) {
+  if (test.hidden && audience === "student") {
     return (
       <li
         className={cn(
@@ -236,6 +244,12 @@ function TestRow({
               </span>
             ) : null}
           </span>
+          {test.hidden ? (
+            <Badge variant="secondary" className="gap-1">
+              <EyeOff aria-hidden="true" />
+              verborgen
+            </Badge>
+          ) : null}
           {test.kind === "function" ? (
             <Badge variant="outline" className="hidden sm:inline-flex">
               functie
@@ -310,11 +324,14 @@ function CheckRow({ check }: { check: CheckResult }) {
 export function TestResultsList({
   result,
   compact = false,
+  audience = "student",
   className,
 }: TestResultsListProps) {
   const total = result.tests.length;
   const passed = result.tests.filter((t) => t.passed).length;
-  const firstFailed = result.tests.findIndex((t) => !t.passed && !t.hidden);
+  const firstFailed = result.tests.findIndex(
+    (t) => !t.passed && (!t.hidden || audience === "teacher"),
+  );
   const label = STATUS_LABEL[result.status];
 
   return (
@@ -361,6 +378,7 @@ export function TestResultsList({
               test={t}
               index={i}
               compact={compact}
+              audience={audience}
               defaultOpen={
                 !compact &&
                 i === firstFailed &&

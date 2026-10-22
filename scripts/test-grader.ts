@@ -8,6 +8,7 @@
  *
  * Run: bun run test:grader          (exit code 1 when a check fails)
  */
+
 import fs from "node:fs";
 import http from "node:http";
 import type net from "node:net";
@@ -16,9 +17,17 @@ import path from "node:path";
 import {
   type CodeQuestionData,
   codeQuestionDataSchema,
+  multipleChoiceDataSchema,
+  openQuestionDataSchema,
 } from "@/lib/questions/schema";
+import { DEMO_QUESTIONS } from "@/server/demo/questions";
 import { graderConfig } from "@/server/grader/config";
-import { gradeCode, runCode, runCodeBatch } from "@/server/grader/grader";
+import {
+  gradeCode,
+  gradeCodeBatch,
+  runCode,
+  runCodeBatch,
+} from "@/server/grader/grader";
 import { getGraderPool, SandboxPool } from "@/server/grader/pool";
 import { SandboxProcess } from "@/server/grader/sandbox-process";
 
@@ -916,6 +925,121 @@ async function performanceNumbers(): Promise<void> {
   console.log(`  pool stats: ${JSON.stringify(pool.stats())}`);
 }
 
+/* -------------------------------------------------------------------------- */
+/*                         Seeded demo test + batching                        */
+/* -------------------------------------------------------------------------- */
+
+/** The seeded demo questions: every code question's model solution must pass. */
+function loadSeedQuestions(): { title: string; data: CodeQuestionData }[] {
+  return DEMO_QUESTIONS.filter((q) => q.type === "code").map((q) => ({
+    title: q.title,
+    data: codeQuestionDataSchema.parse(q.data),
+  }));
+}
+
+async function seedAndBatch(): Promise<void> {
+  section("Seeded demo test: every model solution passes all its tests");
+  const seeded = loadSeedQuestions();
+  const items = seeded.map((q) => ({
+    code: q.data.solution,
+    tests: q.data.tests,
+    checks: q.data.checks,
+    timeLimitMs: q.data.timeLimitMs,
+  }));
+  const batch = await gradeCodeBatch(items);
+  seeded.forEach((q, i) => {
+    const r = batch[i];
+    check(
+      `${q.title}`,
+      r.fraction === 1,
+      `${r.status}, ${r.passedWeight}/${r.totalWeight}`,
+    );
+    if (r.fraction !== 1) {
+      for (const t of r.tests)
+        if (!t.passed) console.log(`      [x] ${t.name}: ${t.feedback}`);
+      for (const c of r.checks)
+        if (!c.passed) console.log(`      [x] check: ${c.message}`);
+    }
+  });
+
+  section(`Batch grading: one attempt with ${items.length} code questions`);
+  const pool = getGraderPool();
+  const config = graderConfig();
+  const waitWarm = async () => {
+    for (
+      let i = 0;
+      i < 150 && pool.stats().ready < Math.min(config.poolSize, 2);
+      i++
+    ) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+  const perQuestion: number[] = [];
+  const batched: number[] = [];
+  for (let round = 0; round < 3; round++) {
+    await waitWarm();
+    let t = performance.now();
+    for (const item of items) await gradeCode(item);
+    perQuestion.push(performance.now() - t);
+    await waitWarm();
+    t = performance.now();
+    await gradeCodeBatch(items);
+    batched.push(performance.now() - t);
+  }
+  console.log(
+    `  one job per question (gradeCode × ${items.length}): ${perQuestion.map(ms).join(", ")}`,
+  );
+  console.log(
+    `  one job per attempt (gradeCodeBatch):      ${batched.map(ms).join(", ")}`,
+  );
+  check(
+    "batch is faster than one job per question",
+    batched[2] < perQuestion[2],
+  );
+
+  // A timeout in the middle: the batch continues in a fresh sandbox, order kept.
+  const loop = {
+    ...items[0],
+    code: "while True:\n    pass",
+    timeLimitMs: 1000,
+  };
+  const mixed = await gradeCodeBatch([items[0], loop, items[1]]);
+  check(
+    "timeout mid-batch: later questions still graded, order kept",
+    mixed[0].fraction === 1 &&
+      mixed[1].status === "timeout" &&
+      mixed[2].fraction === 1,
+    mixed.map((r) => r.status).join(", "),
+  );
+
+  // Code of question 1 can't fake the static checks of question 2.
+  const tamper = {
+    code: [
+      "import __main__",
+      "def fake(code):",
+      "    return {'ok': True, 'constructs': {k: True for k in ['for_loop', 'while_loop', 'if_statement', 'function_def', 'function_call', 'import', 'list_comprehension']}, 'functionDefs': [], 'functionCalls': [], 'imports': []}",
+      "__main__._pensuma_analyze = fake",
+      "print('klaar')",
+    ].join("\n"),
+    tests: [],
+    checks: [],
+    timeLimitMs: 2000,
+  };
+  const needsFor = {
+    code: "print(8)\nprint(22)",
+    tests: [],
+    checks: codeQuestionDataSchema.parse({
+      checks: [{ id: "c", kind: "requires", construct: "for_loop" }],
+    }).checks,
+    timeLimitMs: 2000,
+  };
+  const t2 = await gradeCodeBatch([tamper, needsFor]);
+  check(
+    "one question's code can't fake another question's checks",
+    t2[1].checks[0].passed === false,
+  );
+}
+
 async function main(): Promise<void> {
   const config = graderConfig();
   console.log(
@@ -928,6 +1052,7 @@ async function main(): Promise<void> {
     await adversarialJsEscape();
     await adversarialRssWatchdog();
   }
+  if (!only || only === "seed") await seedAndBatch();
   if (!only || only === "perf") await performanceNumbers();
   getGraderPool().close();
   console.log(`\n${passes} passed, ${failures} failed`);

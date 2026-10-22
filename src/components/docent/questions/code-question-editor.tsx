@@ -316,7 +316,7 @@ export function CodeQuestionEditor({
               {lastRun.source === "server" ? "server" : "in je browser"})
               {fresh ? "" : " — let op: de vraag is daarna gewijzigd"}
             </p>
-            <TestResultsList result={lastRun.result} />
+            <TestResultsList result={lastRun.result} audience="teacher" />
           </div>
         ) : null}
       </EditorSection>

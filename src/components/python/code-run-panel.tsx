@@ -4,6 +4,7 @@ import { Info, Keyboard, Play, Square } from "lucide-react";
 import {
   useEffect,
   useId,
+  useImperativeHandle,
   useRef,
   useState,
   useSyncExternalStore,
@@ -18,6 +19,15 @@ import { cn } from "@/lib/utils";
 import { PythonErrorCard } from "./python-error-card";
 import { RunConsole } from "./run-console";
 
+/** Imperative handle, e.g. for a Ctrl/Cmd+Enter shortcut in the editor. */
+export type CodeRunPanelHandle = {
+  /** Start a run (no-op while running or disabled). */
+  run: () => void;
+  /** Stop the current run (no-op when idle). */
+  stop: () => void;
+  isRunning: () => boolean;
+};
+
 export type CodeRunPanelProps = {
   code: string;
   /** Pre-filled stdin lines (one per input()). */
@@ -28,6 +38,14 @@ export type CodeRunPanelProps = {
   className?: string;
   /** Max height of the console output. */
   consoleMaxHeight?: string;
+  /**
+   * Imperative handle (React 19: `ref` is a normal prop):
+   *   const panel = useRef<CodeRunPanelHandle>(null);
+   *   <CodeRunPanel ref={panel} code={code} />
+   *   // in the editor's Ctrl/Cmd+Enter handler:
+   *   panel.current?.run();
+   */
+  ref?: React.Ref<CodeRunPanelHandle>;
 };
 
 const subscribeNever = () => () => {};
@@ -61,6 +79,7 @@ export function CodeRunPanel({
   onRun,
   className,
   consoleMaxHeight = "20rem",
+  ref,
 }: CodeRunPanelProps) {
   const runner = usePythonRunner({ preload: !disabled });
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -146,6 +165,14 @@ export function CodeRunPanel({
     resolveInput.current = null;
     runner.stop();
   };
+
+  useImperativeHandle(ref, () => ({
+    run: () => void start(),
+    stop: () => {
+      if (running) stop();
+    },
+    isRunning: () => running,
+  }));
 
   const submitInput = (value: string | null) => {
     const resolve = resolveInput.current;

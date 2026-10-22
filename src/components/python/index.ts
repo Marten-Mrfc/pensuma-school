@@ -1,4 +1,8 @@
-export { CodeRunPanel, type CodeRunPanelProps } from "./code-run-panel";
+export {
+  CodeRunPanel,
+  type CodeRunPanelHandle,
+  type CodeRunPanelProps,
+} from "./code-run-panel";
 export { FeedbackText } from "./feedback-text";
 export {
   PythonErrorCard,

@@ -123,9 +123,11 @@ BETTER_AUTH_SECRET=... BETTER_AUTH_URL=https://... docker compose up -d --build
 
 ### Sizing
 
-Each server-side Python sandbox uses roughly 100 MB of RAM. Grading is queued, so a
-class of 30 submitting at once is fine on a 2 vCPU / 2–4 GB machine with the defaults.
-Raise `GRADER_POOL_SIZE` / `GRADER_MAX_CONCURRENCY` on bigger machines.
+Each server-side Python sandbox uses about 170–210 MB of RAM while it exists. A whole
+attempt is graded in one sandbox job (~50 ms when warm), jobs are queued, and sandboxes
+start in ~0.5 s from a snapshot, so a class of 30 submitting at once is fine on a
+2 vCPU / 2–4 GB machine with the defaults. Raise `GRADER_POOL_SIZE` /
+`GRADER_MAX_CONCURRENCY` on bigger machines. See `.env.example` for all grader settings.
 
 ## Project structure
 

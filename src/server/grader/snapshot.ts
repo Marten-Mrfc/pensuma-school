@@ -17,6 +17,31 @@ import { sandboxArgs } from "./sandbox-process";
 
 const MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024;
 
+const SNAPSHOT_FILE = /^pensuma-pyodide-(\d+)-[a-z0-9]+\.snap$/;
+
+/** Remove snapshots left behind by server processes that no longer exist. */
+function removeStaleSnapshots(dir: string): void {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    const m = SNAPSHOT_FILE.exec(name);
+    if (!m) continue;
+    const pid = Number(m[1]);
+    if (pid === process.pid) continue;
+    try {
+      process.kill(pid, 0); // still running: keep
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ESRCH") {
+        fs.rmSync(path.join(dir, name), { force: true });
+      }
+    }
+  }
+}
+
 export async function makeSnapshot(config: GraderConfig): Promise<string> {
   const args = sandboxArgs(config, { makeSnapshot: true });
   const child = spawn(config.nodePath, args, {
@@ -83,8 +108,10 @@ export async function makeSnapshot(config: GraderConfig): Promise<string> {
 
   try {
     const snap = await done;
+    const dir = fs.realpathSync(os.tmpdir());
+    removeStaleSnapshots(dir);
     const file = path.join(
-      fs.realpathSync(os.tmpdir()),
+      dir,
       `pensuma-pyodide-${process.pid}-${Date.now().toString(36)}.snap`,
     );
     fs.writeFileSync(file, snap, { mode: 0o444 });

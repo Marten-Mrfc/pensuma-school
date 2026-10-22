@@ -10,7 +10,7 @@ import {
 } from "@/lib/questions/schema";
 import { db } from "@/server/db";
 import { answers, attempts, questions } from "@/server/db/schema";
-import { gradeCode } from "@/server/grader";
+import { gradeCode, gradeCodeBatch } from "@/server/grader";
 
 /**
  * Grading orchestration: turns stored answers into scores.
@@ -22,9 +22,6 @@ import { gradeCode } from "@/server/grader";
  * Grading never touches `manualScore` / `feedback`: the teacher's override
  * always wins (see `effectiveScore`).
  */
-
-/** How many answers of one attempt are graded at the same time. */
-const GRADE_CONCURRENCY = 3;
 
 /** Score that counts: the teacher's override wins over the automatic score. */
 export function effectiveScore(answer: {
@@ -213,16 +210,7 @@ export async function gradeAnswer(answerId: string): Promise<void> {
     answer.manualScore != null,
   );
 
-  await db
-    .update(answers)
-    .set({
-      status: outcome.status,
-      autoScore: outcome.autoScore,
-      result: outcome.result,
-      maxScore: points,
-      gradedAt: new Date(),
-    })
-    .where(eq(answers.id, answerId));
+  await saveOutcome(answerId, outcome, points);
 }
 
 /** Recompute attempt.score / maxScore / gradingStatus from its answers. */
@@ -281,50 +269,135 @@ export function isGradingInFlight(attemptId: string): boolean {
   return inFlight.has(attemptId);
 }
 
-async function runWithLimit<T>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<void>,
+/** Persist a grading outcome on an answer. */
+async function saveOutcome(
+  answerId: string,
+  outcome: GradeOutcome,
+  points: number,
 ) {
-  let next = 0;
-  const workers = Array.from(
-    { length: Math.min(limit, items.length) },
-    async () => {
-      while (next < items.length) {
-        const item = items[next++];
-        await fn(item);
-      }
-    },
-  );
-  await Promise.all(workers);
+  await db
+    .update(answers)
+    .set({
+      status: outcome.status,
+      autoScore: outcome.autoScore,
+      result: outcome.result,
+      maxScore: points,
+      gradedAt: new Date(),
+    })
+    .where(eq(answers.id, answerId));
 }
 
+/**
+ * Grade a whole attempt. All code answers of the attempt go to the grader in
+ * ONE sandbox job (`gradeCodeBatch`): isolation is needed between students,
+ * not between one student's own questions, and one job is ~50x faster than a
+ * fresh sandbox per question.
+ */
 async function gradeAttemptNow(attemptId: string): Promise<void> {
   const rows = await db
-    .select({ id: answers.id })
+    .select({
+      answer: {
+        id: answers.id,
+        response: answers.response,
+        manualScore: answers.manualScore,
+      },
+      question: {
+        type: questions.type,
+        data: questions.data,
+        points: questions.points,
+      },
+    })
     .from(answers)
+    .innerJoin(questions, eq(questions.id, answers.questionId))
     .where(eq(answers.attemptId, attemptId));
 
-  await runWithLimit(rows, GRADE_CONCURRENCY, async ({ id }) => {
+  const codeJobs: Array<{
+    answerId: string;
+    points: number;
+    reviewStatus: AnswerStatus;
+    input: Parameters<typeof gradeCodeBatch>[0][number];
+  }> = [];
+
+  for (const { answer, question } of rows) {
     try {
-      await gradeAnswer(id);
+      if (question.type === "code") {
+        const data = parseQuestionData("code", question.data);
+        if (!isBlankResponse("code", answer.response, data.starterCode)) {
+          codeJobs.push({
+            answerId: answer.id,
+            points: question.points,
+            reviewStatus:
+              answer.manualScore != null ? "graded" : "needs_review",
+            input: {
+              code: (answer.response as { code: string }).code,
+              tests: data.tests,
+              checks: data.checks,
+              timeLimitMs: data.timeLimitMs,
+            },
+          });
+          continue;
+        }
+      }
+      const outcome = await computeOutcome(
+        question.type,
+        question.data,
+        answer.response,
+        question.points,
+        answer.manualScore != null,
+      );
+      await saveOutcome(answer.id, outcome, question.points);
     } catch (err) {
-      console.error(`[grading] answer ${id} failed`, err);
-      // Make sure the attempt doesn't stay "pending" forever.
-      await db
-        .update(answers)
-        .set({
+      console.error(`[grading] answer ${answer.id} failed`, err);
+      await saveOutcome(
+        answer.id,
+        {
           status: "needs_review",
           autoScore: null,
           result: internalErrorResult(
             err instanceof Error ? err.message : String(err),
           ),
-          gradedAt: new Date(),
-        })
-        .where(eq(answers.id, id))
-        .catch(() => {});
+        },
+        question.points,
+      ).catch(() => {});
     }
-  });
+  }
+
+  if (codeJobs.length > 0) {
+    let results: CodeGradingResult[] | null = null;
+    let failure: string | null = null;
+    try {
+      results = await gradeCodeBatch(codeJobs.map((j) => j.input));
+    } catch (err) {
+      console.error(`[grading] batch for attempt ${attemptId} failed`, err);
+      failure =
+        err instanceof Error ? err.message : "Onbekende fout in de nakijker";
+    }
+    await Promise.all(
+      codeJobs.map((job, i) => {
+        const result = results?.[i];
+        const outcome: GradeOutcome =
+          !result || result.status === "internal_error"
+            ? {
+                status: job.reviewStatus,
+                autoScore: null,
+                result:
+                  result ??
+                  internalErrorResult(
+                    failure ?? "Geen resultaat van de nakijker",
+                  ),
+              }
+            : {
+                status: "graded",
+                autoScore: round2(result.fraction * job.points),
+                result,
+              };
+        return saveOutcome(job.answerId, outcome, job.points).catch((err) =>
+          console.error(`[grading] saving answer ${job.answerId} failed`, err),
+        );
+      }),
+    );
+  }
+
   await recomputeAttemptScore(attemptId);
 }
 
