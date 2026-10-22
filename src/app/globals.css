@@ -1,16 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Anybody:wght@600;700;800&display=swap');
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Font families come from next/font (see src/app/layout.tsx), which sets
+     --font-dm-sans / --font-anybody / --font-dm-mono on <html>. */
   --font-sans:
-    'DM Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-    'Noto Color Emoji';
-  --font-display: 'Anybody', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-display:
+    var(--font-anybody), "Anybody", var(--font-dm-sans), ui-sans-serif,
+    system-ui, sans-serif;
   --font-mono:
-    'DM Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    var(--font-dm-mono), "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
   --radius-sm: var(--radius);
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
@@ -32,8 +36,15 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-ink: var(--success-ink);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-ink: var(--warning-ink);
   --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-ink: var(--info-ink);
+  --color-destructive-ink: var(--destructive-ink);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -109,6 +120,34 @@
   --success: oklch(0.55 0.18 145);
   --warning: oklch(0.7 0.16 75);
   --info: oklch(0.55 0.22 260);
+  /* Text on a solid status fill, and readable status text on paper. */
+  --success-foreground: oklch(0.98 0.006 130);
+  --warning-foreground: oklch(0.22 0.03 70);
+  --info-foreground: oklch(0.98 0.006 130);
+  --success-ink: oklch(0.42 0.12 145);
+  --warning-ink: oklch(0.47 0.11 62);
+  --info-ink: oklch(0.45 0.16 262);
+  --destructive-ink: oklch(0.48 0.18 28);
+
+  /* Exit animations (dialogs, popovers) referenced by uipkge components. */
+  --dur-exit: 150ms;
+
+  /* Python syntax colours, shared by the CodeMirror editor and the
+     Markdown code blocks (Shiki css-variables theme). Earthy, paper-friendly. */
+  --code-bg: oklch(0.985 0.005 130);
+  --code-fg: oklch(0.27 0.014 150);
+  --code-gutter: oklch(0.6 0.012 145);
+  --code-active-line: oklch(0.46 0.08 145 / 0.06);
+  --code-selection: oklch(0.46 0.08 145 / 0.18);
+  --code-keyword: oklch(0.47 0.15 315);
+  --code-string: oklch(0.5 0.11 160);
+  --code-number: oklch(0.55 0.14 55);
+  --code-comment: oklch(0.6 0.02 140);
+  --code-function: oklch(0.48 0.13 252);
+  --code-builtin: oklch(0.52 0.15 28);
+  --code-class: oklch(0.5 0.12 200);
+  --code-operator: oklch(0.45 0.03 150);
+  --code-punctuation: oklch(0.5 0.015 150);
 }
 
 .dark {
@@ -153,6 +192,28 @@
   --success: oklch(0.65 0.16 145);
   --warning: oklch(0.78 0.17 75);
   --info: oklch(0.65 0.18 260);
+  --success-foreground: oklch(0.16 0.01 150);
+  --warning-foreground: oklch(0.2 0.03 70);
+  --info-foreground: oklch(0.16 0.01 150);
+  --success-ink: oklch(0.8 0.13 145);
+  --warning-ink: oklch(0.85 0.13 80);
+  --info-ink: oklch(0.8 0.11 262);
+  --destructive-ink: oklch(0.78 0.14 25);
+
+  --code-bg: oklch(0.185 0.011 150);
+  --code-fg: oklch(0.92 0.01 130);
+  --code-gutter: oklch(0.55 0.014 145);
+  --code-active-line: oklch(1 0 0 / 0.04);
+  --code-selection: oklch(0.72 0.1 145 / 0.25);
+  --code-keyword: oklch(0.78 0.12 315);
+  --code-string: oklch(0.8 0.11 155);
+  --code-number: oklch(0.82 0.12 65);
+  --code-comment: oklch(0.62 0.02 140);
+  --code-function: oklch(0.8 0.1 245);
+  --code-builtin: oklch(0.78 0.12 35);
+  --code-class: oklch(0.82 0.09 195);
+  --code-operator: oklch(0.8 0.02 140);
+  --code-punctuation: oklch(0.7 0.015 140);
 }
 
 @layer base {
@@ -163,34 +224,34 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings:
-      'rlig' 1,
-      'calt' 1;
+      "rlig" 1,
+      "calt" 1;
   }
 
   /* Tailwind v4 dropped `cursor: pointer` for buttons. Restore it for all
      interactive elements (native + Reka role-based controls). Disabled
      elements stay default. */
   button:not(:disabled),
-  [role='button']:not([aria-disabled='true']),
-  [role='checkbox']:not([aria-disabled='true']),
-  [role='radio']:not([aria-disabled='true']),
-  [role='switch']:not([aria-disabled='true']),
-  [role='menuitem']:not([aria-disabled='true']),
-  [role='menuitemcheckbox']:not([aria-disabled='true']),
-  [role='menuitemradio']:not([aria-disabled='true']),
-  [role='option']:not([aria-disabled='true']),
-  [role='tab']:not([aria-disabled='true']),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="menuitemcheckbox"]:not([aria-disabled="true"]),
+  [role="menuitemradio"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
   summary,
   label[for],
   select:not(:disabled),
-  input[type='checkbox']:not(:disabled),
-  input[type='radio']:not(:disabled),
-  input[type='range']:not(:disabled),
-  input[type='file']:not(:disabled),
-  input[type='submit']:not(:disabled),
-  input[type='reset']:not(:disabled),
-  input[type='button']:not(:disabled),
-  input[type='color']:not(:disabled) {
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="color"]:not(:disabled) {
     cursor: pointer;
   }
 
@@ -240,26 +301,42 @@
   }
 }
 
-/* Card hover lift */
-[data-slot='card']:hover {
-  box-shadow: var(--shadow-md);
+/* Card hover lift — only for cards that are clickable (a link card, or a
+   card marked data-interactive). Static cards such as forms and exam
+   questions stay put under the cursor. */
+a[data-slot="card"]:hover,
+[data-slot="card"][data-interactive]:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 2px 4px -2px rgba(0, 0, 0, 0.06);
   transform: translateY(-1px);
 }
 
-.dark [data-slot='card']:hover {
-  box-shadow: var(--shadow-md);
+.dark a[data-slot="card"]:hover,
+.dark [data-slot="card"][data-interactive]:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -2px rgba(0, 0, 0, 0.2);
 }
 
 /* Subtle background texture */
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: -1;
   background-image:
-    radial-gradient(circle at 20% 80%, oklch(0.46 0.08 145 / 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, oklch(0.46 0.08 145 / 0.02) 0%, transparent 50%);
+    radial-gradient(
+      circle at 20% 80%,
+      oklch(0.46 0.08 145 / 0.03) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 80% 20%,
+      oklch(0.46 0.08 145 / 0.02) 0%,
+      transparent 50%
+    );
 }
 
 /* Scrollbar styling */
@@ -320,4 +397,58 @@ body::before {
   .animate-shake {
     animation: none;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Pensuma extras                                                      */
+/* ------------------------------------------------------------------ */
+
+/* Emphasized easing used by uipkge overlays (dialog, sheet, tabs). */
+@utility ease-emphasized {
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Graph-paper backdrop: a nod to the maths/informatica notebook. */
+@utility bg-graph-paper {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklch, var(--primary) 7%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--primary) 7%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 28px 28px;
+}
+
+/* Display headings: Anybody, slightly widened for character. */
+@utility font-display-wide {
+  font-family: var(--font-display);
+  font-stretch: 112%;
+  font-variation-settings: "wdth" 112;
+  letter-spacing: -0.02em;
+}
+
+/* Shiki css-variables theme → our shared syntax tokens. */
+:root {
+  --shiki-foreground: var(--code-fg);
+  --shiki-background: transparent;
+  --shiki-token-constant: var(--code-number);
+  --shiki-token-string: var(--code-string);
+  --shiki-token-string-expression: var(--code-string);
+  --shiki-token-comment: var(--code-comment);
+  --shiki-token-keyword: var(--code-keyword);
+  --shiki-token-parameter: var(--code-fg);
+  --shiki-token-function: var(--code-function);
+  --shiki-token-punctuation: var(--code-punctuation);
+  --shiki-token-link: var(--code-function);
+}
+
+/* Smooth scrolling for in-page anchors on the landing page. */
+html {
+  scroll-behavior: smooth;
 }

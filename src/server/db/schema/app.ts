@@ -120,6 +120,20 @@ export const questions = pgTable(
      * `@/lib/questions/schema` (CodeQuestionData / MultipleChoiceData / OpenQuestionData).
      */
     data: jsonb("data").$type<Record<string, unknown>>().default({}).notNull(),
+    /**
+     * Code questions: the last check of the model solution against all tests
+     * (written by the test builder, see `src/lib/questions/validate.ts`).
+     * `hash` fingerprints solution/tests/checks; when it no longer matches the
+     * current data, the solution has not been checked since the last edit.
+     */
+    solutionCheck: jsonb("solution_check").$type<{
+      hash: string;
+      passed: boolean;
+      passedTests: number;
+      totalTests: number;
+      checkedAt: string;
+      source: "server" | "browser";
+    }>(),
     ...timestamps,
   },
   (t) => [index("question_test_idx").on(t.testId, t.position)],
