@@ -53,8 +53,8 @@ function FactTile({
   hint?: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border bg-card p-4 shadow-xs">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+    <div className="flex items-start gap-3 rounded-xl border bg-card p-3.5 shadow-xs sm:p-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary max-sm:hidden">
         <Icon className="size-[18px]" aria-hidden="true" />
       </span>
       <div className="flex min-w-0 flex-col">

@@ -112,6 +112,15 @@ export class PythonWorkerClient {
   /** Bumped by stop() and by every new run/grade: older operations become no-ops. */
   private generation = 0;
 
+  constructor() {
+    if (typeof window !== "undefined") {
+      this.snapshot = {
+        ...SERVER_SNAPSHOT,
+        interactive: supportsInteractive(),
+      };
+    }
+  }
+
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => {
@@ -139,7 +148,9 @@ export class PythonWorkerClient {
 
   private spawn(): Promise<void> {
     const interactive = supportsInteractive();
-    this.inputBuffer = interactive ? new SharedArrayBuffer(8 + INPUT_BUFFER_BYTES) : null;
+    this.inputBuffer = interactive
+      ? new SharedArrayBuffer(8 + INPUT_BUFFER_BYTES)
+      : null;
     const worker = new Worker(new URL("./python.worker.ts", import.meta.url), {
       type: "module",
       name: "pensuma-python",
@@ -148,21 +159,24 @@ export class PythonWorkerClient {
     this.update({ status: "loading", interactive, loadError: null });
     const ready = new Promise<void>((resolve, reject) => {
       let isReady = false;
-      worker.addEventListener("message", (event: MessageEvent<WorkerResponse>) => {
-        if (worker !== this.worker) return;
-        const msg = event.data;
-        if (msg.t === "ready") {
-          isReady = true;
-          this.update({ status: this.active ? "running" : "ready" });
-          resolve();
-        } else if (msg.t === "load-error") {
-          this.killWorker();
-          this.update({ status: "error", loadError: LOAD_ERROR });
-          reject(new Error(msg.message));
-        } else {
-          this.active?.handle(msg);
-        }
-      });
+      worker.addEventListener(
+        "message",
+        (event: MessageEvent<WorkerResponse>) => {
+          if (worker !== this.worker) return;
+          const msg = event.data;
+          if (msg.t === "ready") {
+            isReady = true;
+            this.update({ status: this.active ? "running" : "ready" });
+            resolve();
+          } else if (msg.t === "load-error") {
+            this.killWorker();
+            this.update({ status: "error", loadError: LOAD_ERROR });
+            reject(new Error(msg.message));
+          } else {
+            this.active?.handle(msg);
+          }
+        },
+      );
       worker.addEventListener("error", (event) => {
         if (worker !== this.worker) return;
         event.preventDefault?.();
@@ -171,7 +185,11 @@ export class PythonWorkerClient {
           this.update({ status: "error", loadError: LOAD_ERROR });
           reject(new Error(event.message || "worker error"));
         } else {
-          this.active?.handle({ t: "fatal", id: this.active.id, message: event.message || "worker error" });
+          this.active?.handle({
+            t: "fatal",
+            id: this.active.id,
+            message: event.message || "worker error",
+          });
         }
       });
     });
@@ -233,17 +251,30 @@ export class PythonWorkerClient {
     Atomics.notify(ctrl, 0);
   }
 
-  private async runInWorker(request: HarnessRunRequest, options: RunOptions): Promise<WorkerRun> {
+  private async runInWorker(
+    request: HarnessRunRequest,
+    options: RunOptions,
+  ): Promise<WorkerRun> {
     this.active?.abort();
     try {
       await this.ensureWorker();
     } catch {
-      return { kind: "crashed", error: { ...internalError(), message: LOAD_ERROR }, durationMs: 0 };
+      return {
+        kind: "crashed",
+        error: { ...internalError(), message: LOAD_ERROR },
+        durationMs: 0,
+      };
     }
     const worker = this.worker;
-    if (!worker) return { kind: "crashed", error: internalError("geen worker"), durationMs: 0 };
+    if (!worker)
+      return {
+        kind: "crashed",
+        error: internalError("geen worker"),
+        durationMs: 0,
+      };
     const id = this.nextId++;
-    const interactive = options.interactive && this.inputBuffer !== null && !!options.onInput;
+    const interactive =
+      options.interactive && this.inputBuffer !== null && !!options.onInput;
     this.update({ status: "running" });
 
     return new Promise<WorkerRun>((resolve) => {
@@ -265,7 +296,8 @@ export class PythonWorkerClient {
       const startTimer = () => {
         started = performance.now();
         timer = setTimeout(
-          () => finish({ kind: "timeout", durationMs: options.timeLimitMs }, true),
+          () =>
+            finish({ kind: "timeout", durationMs: options.timeLimitMs }, true),
           Math.max(0, options.timeLimitMs - elapsed),
         );
       };
@@ -316,7 +348,11 @@ export class PythonWorkerClient {
               finish(
                 result
                   ? { kind: "result", result, durationMs }
-                  : { kind: "crashed", error: internalError("ongeldig resultaat"), durationMs },
+                  : {
+                      kind: "crashed",
+                      error: internalError("ongeldig resultaat"),
+                      durationMs,
+                    },
                 !result,
               );
               break;
@@ -365,11 +401,14 @@ export class PythonWorkerClient {
           if (msg.t !== "analysis" && msg.t !== "fatal") return;
           clearTimeout(timer);
           this.active = null;
-          const analysis = msg.t === "analysis" ? sanitizeAnalysis(msg.result) : null;
+          const analysis =
+            msg.t === "analysis" ? sanitizeAnalysis(msg.result) : null;
           if (analysis) resolve(analysis);
           else {
             this.restart();
-            reject(new Error(msg.t === "fatal" ? msg.message : "ongeldige analyse"));
+            reject(
+              new Error(msg.t === "fatal" ? msg.message : "ongeldige analyse"),
+            );
           }
         },
       };
@@ -391,7 +430,12 @@ export class PythonWorkerClient {
       }
     };
     const run = await this.runInWorker(
-      { code: input.code, stdin: input.stdin ?? "", mode: "io", maxOutput: DEFAULT_MAX_OUTPUT },
+      {
+        code: input.code,
+        stdin: input.stdin ?? "",
+        mode: "io",
+        maxOutput: DEFAULT_MAX_OUTPUT,
+      },
       {
         timeLimitMs,
         interactive: !!input.onInput,
@@ -408,15 +452,23 @@ export class PythonWorkerClient {
     const executor: GradingExecutor = {
       analyze: (code) => this.analyzeInWorker(code),
       run: async (request, timeLimitMs): Promise<TestOutcome> => {
-        if (stale()) return { kind: "crashed", error: STOPPED_ERROR, durationMs: 0 };
-        const run = await this.runInWorker(request, { timeLimitMs, interactive: false });
+        if (stale())
+          return { kind: "crashed", error: STOPPED_ERROR, durationMs: 0 };
+        const run = await this.runInWorker(request, {
+          timeLimitMs,
+          interactive: false,
+        });
         switch (run.kind) {
           case "result":
             return run;
           case "timeout":
             return { kind: "timeout", durationMs: run.durationMs };
           case "stopped":
-            return { kind: "crashed", error: STOPPED_ERROR, durationMs: run.durationMs };
+            return {
+              kind: "crashed",
+              error: STOPPED_ERROR,
+              durationMs: run.durationMs,
+            };
           case "crashed":
             return run;
         }
@@ -430,7 +482,11 @@ export class PythonWorkerClient {
   };
 }
 
-function toRunResult(run: WorkerRun, streamed: TranscriptSegment[], timeLimitMs: number): RunResult {
+function toRunResult(
+  run: WorkerRun,
+  streamed: TranscriptSegment[],
+  timeLimitMs: number,
+): RunResult {
   if (run.kind === "result") {
     const r = run.result;
     return {
@@ -446,9 +502,16 @@ function toRunResult(run: WorkerRun, streamed: TranscriptSegment[], timeLimitMs:
   }
   // Killed: keep what was printed before.
   const pick = (kind: TranscriptSegment["kind"]) =>
-    streamed.filter((s) => s.kind === kind).map((s) => s.text).join("");
+    streamed
+      .filter((s) => s.kind === kind)
+      .map((s) => s.text)
+      .join("");
   const error =
-    run.kind === "timeout" ? timeoutError(timeLimitMs) : run.kind === "stopped" ? STOPPED_ERROR : run.error;
+    run.kind === "timeout"
+      ? timeoutError(timeLimitMs)
+      : run.kind === "stopped"
+        ? STOPPED_ERROR
+        : run.error;
   return {
     stdout: pick("stdout"),
     stderr: pick("stderr"),

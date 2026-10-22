@@ -132,7 +132,7 @@ function ExamLoader({ attemptId }: { attemptId: string }) {
 
 type Backup = Record<string, { response: AnswerResponse; updatedAt: number }>;
 
-function initialState(data: AttemptData, serverOffsetMs: number) {
+function initialState(data: AttemptData) {
   const attemptId = data.attempt.id;
   const responses: Responses = {};
   const savedAt: Record<string, number> = {};
@@ -163,7 +163,6 @@ function initialState(data: AttemptData, serverOffsetMs: number) {
     Math.max(0, pos),
     Math.max(0, data.questions.length - 1),
   );
-  void serverOffsetMs;
   return { responses, restored, flagged, index };
 }
 
@@ -193,7 +192,7 @@ function ExamRunner({
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const [init] = useState(() => initialState(data, serverOffsetMs));
+  const [init] = useState(() => initialState(data));
   const [responses, setResponses] = useState<Responses>(init.responses);
   const [index, setIndex] = useState(init.index);
   const [flagged, setFlagged] = useState<Set<string>>(init.flagged);

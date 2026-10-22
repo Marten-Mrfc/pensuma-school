@@ -21,6 +21,7 @@ import { HighlightedCode } from "@/components/app/highlighted-code";
 import { Markdown } from "@/components/app/markdown";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingState } from "@/components/app/states";
+import { TestResultsList } from "@/components/python";
 import {
   Accordion,
   AccordionContent,
@@ -35,7 +36,6 @@ import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { formatGrade, formatMoment, formatNumber } from "./format";
 import { ModeBadge } from "./mode-badge";
-import { ResultTests } from "./result-tests";
 
 type Result = RouterOutputs["portal"]["getResult"];
 type VisibleResult = Extract<Result, { visible: true }>;
@@ -314,7 +314,7 @@ function QuestionReview({ q }: { q: ResultQuestion }) {
             ) : (
               <div className="flex flex-col gap-2">
                 <h4 className="text-sm font-semibold">Testresultaten</h4>
-                <ResultTests result={q.codeResult} />
+                <TestResultsList result={q.codeResult} />
               </div>
             )
           ) : null}

@@ -41,5 +41,9 @@ for (const file of FILES) {
   fs.utimesSync(to, a.atime, a.mtime);
   copied++;
 }
-const version = JSON.parse(fs.readFileSync(path.join(src, "package.json"), "utf8")).version;
-console.log(`[pyodide:copy] public/pyodide is up to date (pyodide ${version}, ${copied} file(s) copied)`);
+const version = JSON.parse(
+  fs.readFileSync(path.join(src, "package.json"), "utf8"),
+).version;
+console.log(
+  `[pyodide:copy] public/pyodide is up to date (pyodide ${version}, ${copied} file(s) copied)`,
+);

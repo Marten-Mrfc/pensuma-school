@@ -8,7 +8,11 @@
  * Atomics.wait; the main thread writes the UTF-8 line, sets state=DATA (or
  * EOF) and notifies.
  */
-import type { HarnessAnalysis, HarnessRunRequest, HarnessRunResult } from "./harness";
+import type {
+  HarnessAnalysis,
+  HarnessRunRequest,
+  HarnessRunResult,
+} from "./harness";
 import type { TranscriptSegment } from "./types";
 
 export const INPUT_STATE_IDLE = 0;
@@ -28,6 +32,14 @@ export type WorkerResponse =
   | { t: "started"; id: number }
   | { t: "segments"; id: number; segments: TranscriptSegment[] }
   | { t: "input-request"; id: number; prompt: string }
-  | { t: "analysis"; id: number; result: HarnessAnalysis | { internalError: string } }
-  | { t: "result"; id: number; result: HarnessRunResult | { internalError: string } }
+  | {
+      t: "analysis";
+      id: number;
+      result: HarnessAnalysis | { internalError: string };
+    }
+  | {
+      t: "result";
+      id: number;
+      result: HarnessRunResult | { internalError: string };
+    }
   | { t: "fatal"; id: number; message: string };

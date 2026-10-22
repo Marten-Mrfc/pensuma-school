@@ -97,6 +97,7 @@ export function AssignmentMonitor({
             ? monitor.data.students.length - monitor.data.summary.notStarted
             : a.counts.started
         }
+        inProgress={monitor.data?.summary.inProgress ?? a.counts.inProgress}
       />
       <AssignmentNav assignmentId={a.id} active="monitor" />
 
@@ -174,6 +175,20 @@ function useAssignmentMutations(assignment: Assignment) {
     });
     await queryClient.invalidateQueries({ queryKey: trpc.dashboard.pathKey() });
   };
+  /** After deleting: drop this afname's cached queries instead of refetching them. */
+  const forget = (id: string) => {
+    queryClient.removeQueries({
+      queryKey: trpc.assignment.get.queryKey({ id }),
+    });
+    queryClient.removeQueries({
+      queryKey: trpc.assignment.monitor.queryKey({ id }),
+    });
+    queryClient.removeQueries({ queryKey: trpc.review.pathKey() });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.assignment.list.queryKey(),
+    });
+    void queryClient.invalidateQueries({ queryKey: trpc.dashboard.pathKey() });
+  };
   const onError = (err: unknown) => toast.error(getErrorMessage(err));
   return {
     open: useMutation(
@@ -202,6 +217,7 @@ function useAssignmentMutations(assignment: Assignment) {
       }),
     ),
     invalidate,
+    forget,
     router,
   };
 }
@@ -209,9 +225,11 @@ function useAssignmentMutations(assignment: Assignment) {
 function MonitorHeader({
   assignment: a,
   monitorStarted,
+  inProgress,
 }: {
   assignment: Assignment;
   monitorStarted: number;
+  inProgress: number;
 }) {
   const m = useAssignmentMutations(a);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -350,8 +368,8 @@ function MonitorHeader({
         destructive
         title="Afname sluiten?"
         description={
-          a.counts.inProgress > 0
-            ? `${a.counts.inProgress} ${a.counts.inProgress === 1 ? "leerling is" : "leerlingen zijn"} nog bezig. Hun werk wordt nu automatisch ingeleverd en nagekeken. Daarna kan niemand meer beginnen.`
+          inProgress > 0
+            ? `${inProgress} ${inProgress === 1 ? "leerling is" : "leerlingen zijn"} nog bezig. Hun werk wordt nu automatisch ingeleverd en nagekeken. Daarna kan niemand meer beginnen.`
             : "Daarna kan niemand meer beginnen of verder werken. Je kunt de afname later heropenen."
         }
         confirmLabel="Sluiten en inleveren"
@@ -390,9 +408,9 @@ function MonitorHeader({
         confirmLabel="Verwijderen"
         onConfirm={async () => {
           await m.remove.mutateAsync({ id: a.id });
-          await m.invalidate();
           toast.success("De afname is verwijderd");
           m.router.push(routes.docent.assignments);
+          setTimeout(() => m.forget(a.id), 500);
         }}
       />
 

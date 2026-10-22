@@ -40,7 +40,9 @@ describe("formatFixedNl", () => {
 describe("formatDateTimeNl", () => {
   test("formats in Amsterdam time as dd-mm-jjjj uu:mm", () => {
     // 2026-10-22 13:05 UTC = 15:05 in Amsterdam (CEST, UTC+2)
-    expect(formatDateTimeNl(new Date("2026-10-22T13:05:00Z"))).toBe("22-10-2026 15:05");
+    expect(formatDateTimeNl(new Date("2026-10-22T13:05:00Z"))).toBe(
+      "22-10-2026 15:05",
+    );
     // Winter time (CET, UTC+1)
     expect(formatDateTimeNl("2026-12-01T08:00:00Z")).toBe("01-12-2026 09:00");
   });
@@ -87,7 +89,9 @@ describe("cellToText", () => {
     expect(cellToText(true)).toBe("ja");
     expect(cellToText(false)).toBe("nee");
     expect(cellToText("tekst")).toBe("tekst");
-    expect(cellToText(new Date("2026-10-22T13:05:00Z"))).toBe("22-10-2026 15:05");
+    expect(cellToText(new Date("2026-10-22T13:05:00Z"))).toBe(
+      "22-10-2026 15:05",
+    );
   });
 });
 
@@ -131,7 +135,9 @@ describe("toCsv", () => {
 
 describe("slugifyFilename", () => {
   test("creates safe file names", () => {
-    expect(slugifyFilename("Python basis – oefentoets")).toBe("python-basis-oefentoets");
+    expect(slugifyFilename("Python basis – oefentoets")).toBe(
+      "python-basis-oefentoets",
+    );
     expect(slugifyFilename("4H2 (demo)")).toBe("4h2-demo");
     expect(slugifyFilename("Zoë's toets")).toBe("zoe-s-toets");
     expect(slugifyFilename("———", "afname")).toBe("afname");

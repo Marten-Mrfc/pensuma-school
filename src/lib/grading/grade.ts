@@ -113,6 +113,8 @@ export function errorFeedback(error: PythonError): string {
     case "MemoryError":
     case "OutputLimitExceeded":
     case "InternalError":
+    case "Stopped":
+    case "SandboxCrash":
       return error.message;
     case "EOFError":
       return `${error.message}${error.line ? ` (regel ${error.line})` : ""}`;

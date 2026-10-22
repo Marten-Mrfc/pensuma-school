@@ -78,7 +78,8 @@ export type PythonRunner = {
   run: (
     input: RunInput & {
       onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
-      onInput?: (prompt: string) => Promise<string>;
+      /** Resolve with the typed line, or `null` for end of input (EOFError). */
+      onInput?: (prompt: string) => Promise<string | null>;
       /** Every transcript segment as it happens (stdout, stderr, prompt, input). */
       onSegment?: (segment: TranscriptSegment) => void;
     },

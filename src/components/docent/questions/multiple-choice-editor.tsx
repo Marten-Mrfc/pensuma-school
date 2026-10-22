@@ -329,7 +329,10 @@ function OptionRow({
         </Tooltip>
         <IssueDot issues={issues} className="sm:hidden" />
       </div>
-      <div ref={ref} className="order-last col-span-2 min-w-0 sm:order-none sm:col-span-1">
+      <div
+        ref={ref}
+        className="order-last col-span-2 min-w-0 sm:order-none sm:col-span-1"
+      >
         <AutoTextarea
           value={text}
           onValueChange={onText}

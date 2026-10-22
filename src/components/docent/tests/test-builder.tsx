@@ -146,7 +146,7 @@ function Builder({ test }: { test: BuilderTest }) {
   const searchParams = useSearchParams();
   const testKey = trpc.test.get.queryKey({ id: test.id });
 
-  const [selection, setSelection] = useState<BuilderSelection>(() => {
+  const [selectionState, setSelection] = useState<BuilderSelection>(() => {
     const fromUrl = searchParams.get("vraag");
     if (fromUrl === "instellingen") return { kind: "settings" };
     if (fromUrl && test.questions.some((q) => q.id === fromUrl))
@@ -304,6 +304,16 @@ function Builder({ test }: { test: BuilderTest }) {
     })),
   });
   const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
+  // A selected question may be missing for a moment (just added and the
+  // cache not yet re-rendered) or for good (deleted): fall back without
+  // overwriting the choice, so it reappears as soon as the data arrives.
+  const selection: BuilderSelection =
+    selectionState.kind === "question" &&
+    !questions.some((q) => q.id === selectionState.id)
+      ? questions[0]
+        ? { kind: "question", id: questions[0].id }
+        : { kind: "settings" }
+      : selectionState;
   const selectedIndex =
     selection.kind === "question"
       ? questions.findIndex((q) => q.id === selection.id)
@@ -333,19 +343,6 @@ function Builder({ test }: { test: BuilderTest }) {
     }
   }
 
-  // Keep the selection valid when questions disappear (deleted elsewhere / refetch).
-  useEffect(() => {
-    if (
-      selection.kind === "question" &&
-      !test.questions.some((q) => q.id === selection.id)
-    ) {
-      setSelection(
-        test.questions[0]
-          ? { kind: "question", id: test.questions[0].id }
-          : { kind: "settings" },
-      );
-    }
-  }, [selection, test.questions]);
 
   function selectRelative(delta: -1 | 1) {
     if (questions.length === 0) return;
@@ -581,7 +578,7 @@ function Builder({ test }: { test: BuilderTest }) {
       void invalidateAll();
       toast.success(
         status === "draft"
-          ? "De toets is weer een concept."
+          ? "De toets is weer een concept. Inplannen kan pas weer na publiceren."
           : "De toets is gearchiveerd.",
       );
     } catch (error) {

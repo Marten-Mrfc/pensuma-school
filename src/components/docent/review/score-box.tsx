@@ -66,7 +66,9 @@ export function ScoreBox({
     initialScore == null ? "" : String(initialScore),
   );
   const [feedback, setFeedback] = useState(answer.feedback ?? "");
-  const [showFeedback, setShowFeedback] = useState(!!answer.feedback?.trim() || !!compact);
+  const [showFeedback, setShowFeedback] = useState(
+    !!answer.feedback?.trim() || !!compact,
+  );
 
   const save = useMutation(
     trpc.review.setManualScore.mutationOptions({
@@ -169,7 +171,7 @@ export function ScoreBox({
         <>
           <div className="flex flex-col gap-2">
             <label htmlFor={`${id}-score`} className="text-sm font-medium">
-              Score aanpassen
+              {answer.autoScore == null ? "Score" : "Score aanpassen"}
             </label>
             <div className="flex flex-wrap items-center gap-2">
               <div className="w-28">
@@ -188,9 +190,8 @@ export function ScoreBox({
                   onChange={(e) => setScore(e.target.value)}
                 />
               </div>
-              <div
+              <fieldset
                 className="flex flex-wrap gap-1"
-                role="group"
                 aria-label="Snelle score"
               >
                 {quickScores(answer.maxScore).map((v) => (
@@ -207,7 +208,7 @@ export function ScoreBox({
                     {formatNumber(v)}
                   </button>
                 ))}
-              </div>
+              </fieldset>
             </div>
             {invalid ? (
               <p className="text-xs font-medium text-destructive">
@@ -215,14 +216,18 @@ export function ScoreBox({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Leeg laten = de automatische score telt. Halve punten mogen.
+                {answer.autoScore == null
+                  ? "Kies een score. Halve punten mogen."
+                  : "Leeg laten = de automatische score telt. Halve punten mogen."}
               </p>
             )}
           </div>
 
           {showFeedback ? (
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Feedback voor de leerling</span>
+              <span className="text-sm font-medium">
+                Feedback voor de leerling
+              </span>
               <MarkdownEditor
                 value={feedback}
                 onChange={setFeedback}
@@ -235,7 +240,12 @@ export function ScoreBox({
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             {!showFeedback ? (
-              <Button variant="ghost" size="sm" className="mr-auto" onClick={() => setShowFeedback(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mr-auto"
+                onClick={() => setShowFeedback(true)}
+              >
                 <MessageSquarePlus aria-hidden="true" />
                 Feedback toevoegen
               </Button>
@@ -264,12 +274,12 @@ export function ScoreBox({
                   className="motion-safe:animate-spin"
                   aria-hidden="true"
                 />
-              ) : dirty ? (
+              ) : dirty || needsReview ? (
                 <Save aria-hidden="true" />
               ) : (
                 <Check aria-hidden="true" />
               )}
-              {dirty ? saveLabel : "Opgeslagen"}
+              {dirty || needsReview ? saveLabel : "Opgeslagen"}
             </Button>
           </div>
         </>

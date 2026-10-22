@@ -18,7 +18,9 @@ import type { PythonRunner } from "./types";
  * true (the page is cross-origin isolated); otherwise `stdin` lines are used.
  * Pass `{ preload: true }` to start loading Pyodide when the component mounts.
  */
-export function usePythonRunner(options: { preload?: boolean } = {}): PythonRunner {
+export function usePythonRunner(
+  options: { preload?: boolean } = {},
+): PythonRunner {
   const client = getPythonClient();
   const snapshot = useSyncExternalStore(
     client.subscribe,

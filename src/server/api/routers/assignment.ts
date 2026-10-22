@@ -942,12 +942,7 @@ export const assignmentRouter = createTRPCRouter({
             count: sql<number>`count(*)::int`,
           })
           .from(answers)
-          .where(
-            and(
-              inArray(answers.attemptId, latestIds),
-              answeredCondition,
-            ),
-          )
+          .where(and(inArray(answers.attemptId, latestIds), answeredCondition))
           .groupBy(answers.attemptId);
         for (const r of rows) answered.set(r.attemptId, r.count);
       }

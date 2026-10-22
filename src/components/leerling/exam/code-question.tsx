@@ -2,9 +2,9 @@
 
 import {
   ClipboardX,
+  FlaskConical,
   RotateCcw,
   SquareTerminal,
-  TestTubeDiagonal,
 } from "lucide-react";
 import { useState } from "react";
 import { CodeEditor } from "@/components/app/code-editor";
@@ -129,7 +129,7 @@ export function CodeQuestion(props: QuestionViewProps) {
         ) : null}
         {settings.allowSelfTest ? (
           <TabsTrigger value="test" className="flex-1">
-            <TestTubeDiagonal aria-hidden="true" />
+            <FlaskConical aria-hidden="true" />
             Testen
             {data.tests.length ? (
               <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">
@@ -226,7 +226,7 @@ export function CodeQuestion(props: QuestionViewProps) {
             direction="vertical"
             autoSaveId="pensuma-exam-code-v"
           >
-            <ResizablePanel defaultSize={36} minSize={12}>
+            <ResizablePanel defaultSize={40} minSize={12}>
               <div className="h-full overflow-y-auto px-6 py-5">
                 <div className="flex flex-col gap-4">
                   {header}
@@ -235,7 +235,7 @@ export function CodeQuestion(props: QuestionViewProps) {
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={64} minSize={30}>
+            <ResizablePanel defaultSize={60} minSize={30}>
               <div className="flex h-full min-h-0 flex-col gap-2 px-4 pt-3 pb-4">
                 {editorToolbar}
                 {editor}

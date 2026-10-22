@@ -131,6 +131,12 @@ export function CodeQuestionEditor({
         timeLimitMs: data.timeLimitMs,
       });
       setLastRun({ result, hash, source: "browser" });
+      if (result.status === "internal_error") {
+        toast.error(
+          "Python in je browser werkt op dit moment niet. Gebruik “Vraag controleren” (server).",
+        );
+        return;
+      }
       const passedTests = result.tests.filter((t) => t.passed).length;
       const passed =
         result.tests.length === data.tests.length &&

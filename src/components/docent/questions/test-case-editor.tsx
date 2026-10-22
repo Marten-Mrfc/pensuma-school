@@ -37,6 +37,7 @@ import {
   type IoTest,
   OUTPUT_MATCH_MODE_LABELS,
   type OutputMatchMode,
+  type PythonError,
   type TestResult,
 } from "@/lib/questions/schema";
 import {
@@ -55,6 +56,7 @@ import {
 } from "./fields";
 import { IssueDot, IssueList } from "./issue-list";
 import { MATCH_MODE_HELP, MatchModeHelpContent } from "./match-mode-help";
+import { PythonErrorCard } from "./python";
 import {
   type GeneratedValue,
   useGenerateExpected,
@@ -83,6 +85,8 @@ export function testSummary(test: CodeTest): string {
   return `Invoer: ${firstLine(test.stdin.split("\n").join(", "), 30)} → ${out}`;
 }
 
+type GenError = { message: string; error: PythonError | null };
+
 export interface TestCaseEditorProps {
   tests: CodeTest[];
   onChange: (tests: CodeTest[]) => void;
@@ -103,7 +107,7 @@ export function TestCaseEditor({
 }: TestCaseEditorProps) {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [generating, setGenerating] = useState<Set<string>>(() => new Set());
-  const [genErrors, setGenErrors] = useState<Record<string, string>>({});
+  const [genErrors, setGenErrors] = useState<Record<string, GenError>>({});
   const generate = useGenerateExpected();
   const latest = useRef({ tests, onChange });
   useEffect(() => {
@@ -200,14 +204,14 @@ export function TestCaseEditor({
       for (const [i, t] of io.entries()) byId.set(t.id, ioResults[i]);
       for (const [i, t] of fn.entries()) byId.set(t.id, fnResults[i]);
 
-      const errors: Record<string, string> = {};
+      const errors: Record<string, GenError> = {};
       let filled = 0;
       // The teacher may have edited meanwhile: apply to the newest list.
       const next = latest.current.tests.map((t) => {
         const r = byId.get(t.id);
         if (!r) return t;
         if (!r.ok) {
-          errors[t.id] = r.message;
+          errors[t.id] = { message: r.message, error: r.error };
           return t;
         }
         filled++;
@@ -366,7 +370,7 @@ interface TestCardProps {
   issues: QuestionIssue[];
   result: TestResult | null;
   generating: boolean;
-  genError: string | null;
+  genError: GenError | null;
   canGenerate: boolean;
   onChange: (patch: Partial<IoTest> | Partial<FunctionTest>) => void;
   onMove: (delta: -1 | 1) => void;
@@ -541,16 +545,18 @@ function TestCard({
           <div className="flex flex-col gap-4 border-t px-3.5 py-4 sm:px-4">
             <IssueList issues={issues} />
             {genError ? (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-[0.8rem]"
-              >
-                <p className="font-medium text-destructive-ink">
-                  De modeloplossing gaf een fout bij deze test
+              <div role="alert" className="flex flex-col gap-2">
+                <p className="text-[0.8rem] font-medium text-destructive-ink">
+                  De modeloplossing gaf een fout bij deze test, dus er is niets
+                  ingevuld.
                 </p>
-                <pre className="mt-1 font-mono text-[0.75rem] whitespace-pre-wrap text-foreground/90">
-                  {genError}
-                </pre>
+                {genError.error ? (
+                  <PythonErrorCard error={genError.error} compact />
+                ) : (
+                  <p className="rounded-md border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-[0.8rem]">
+                    {genError.message}
+                  </p>
+                )}
               </div>
             ) : null}
             {result && !result.passed ? (

@@ -414,6 +414,13 @@ export const questionRouter = createTRPCRouter({
             "De nakijkserver is nu niet beschikbaar. Gebruik de snelle controle in de browser of probeer het later opnieuw.",
         });
       }
+      if (result.status === "internal_error") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            "De nakijkserver kon de code niet uitvoeren. Probeer het zo opnieuw of gebruik de snelle controle in de browser.",
+        });
+      }
       const check = buildCheck(data, result, "server");
       await ctx.db
         .update(questions)

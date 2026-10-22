@@ -5,7 +5,11 @@ import { AssignmentMonitor } from "@/components/docent/assignments/assignment-mo
 
 export const metadata: Metadata = { title: "Afname" };
 
-export default function AssignmentPage({ params }: { params: Promise<{ afnameId: string }> }) {
+export default function AssignmentPage({
+  params,
+}: {
+  params: Promise<{ afnameId: string }>;
+}) {
   return (
     <Suspense fallback={<LoadingState />}>
       <AssignmentMonitor params={params} />
