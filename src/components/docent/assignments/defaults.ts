@@ -19,6 +19,9 @@ const MODE_OVERRIDES: Record<AssignmentMode, Partial<AssignmentSettings>> = {
     showResults: "after_close",
     logFocusEvents: true,
     maxAttempts: 1,
+    allowHints: false,
+    showSolutions: "never",
+    codeTips: false,
   },
   practice: {
     showResults: "immediately",
@@ -26,6 +29,9 @@ const MODE_OVERRIDES: Record<AssignmentMode, Partial<AssignmentSettings>> = {
     requireFullscreen: false,
     blockPaste: false,
     maxAttempts: 5,
+    allowHints: true,
+    showSolutions: "after_attempts",
+    codeTips: true,
   },
 };
 

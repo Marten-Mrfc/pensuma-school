@@ -131,6 +131,18 @@ export const codeCheckSchema = z.object({
 });
 export type CodeCheck = z.infer<typeof codeCheckSchema>;
 
+/**
+ * A hint students may reveal while answering (when the assignment allows
+ * hints). `penalty` is the fraction (0..1) of the question's points that
+ * revealing it costs. The text is only sent once the hint is revealed.
+ */
+export const codeHintSchema = z.object({
+  id: z.string().min(1).max(64),
+  text: z.string().max(5000).default(""),
+  penalty: z.number().min(0).max(1).default(0),
+});
+export type CodeHint = z.infer<typeof codeHintSchema>;
+
 export const codeQuestionDataSchema = z.object({
   starterCode: z.string().default(""),
   /** Model solution. Never sent to students. */
@@ -139,6 +151,8 @@ export const codeQuestionDataSchema = z.object({
   checks: z.array(codeCheckSchema).default([]),
   /** Wall-clock limit per test run. */
   timeLimitMs: z.number().int().min(500).max(30_000).default(5_000),
+  /** Optional hints, revealed one by one (text never sent up front). */
+  hints: z.array(codeHintSchema).max(5).default([]),
 });
 export type CodeQuestionData = z.infer<typeof codeQuestionDataSchema>;
 
@@ -164,11 +178,21 @@ export const multipleChoiceDataSchema = z.object({
 });
 export type MultipleChoiceData = z.infer<typeof multipleChoiceDataSchema>;
 
+/** One criterion of an open question's rubric (teacher ticks it while grading). */
+export const rubricItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().max(300).default(""),
+  points: z.number().min(0).max(1000).default(1),
+});
+export type RubricItem = z.infer<typeof rubricItemSchema>;
+
 export const openQuestionDataSchema = z.object({
   /** Shown to teachers while grading. Never sent to students. */
   modelAnswer: z.string().default(""),
   rubric: z.string().default(""),
   maxLength: z.number().int().positive().optional(),
+  /** Scoring criteria for teachers. Never sent to students. */
+  rubricItems: z.array(rubricItemSchema).max(20).default([]),
 });
 export type OpenQuestionData = z.infer<typeof openQuestionDataSchema>;
 
@@ -352,31 +376,82 @@ export function redactCodeResultForStudent(
   };
 }
 
+/** Student-safe code question data (see `questionDataForStudent`). */
+export type StudentCodeQuestionData = {
+  starterCode: string;
+  timeLimitMs: number;
+  /** Visible tests only. */
+  tests: CodeTest[];
+  checks: Pick<CodeCheck, "id" | "kind" | "construct" | "value" | "message">[];
+  /** Hint ids and penalties; the text is fetched when a hint is revealed. */
+  hints: { id: string; penalty: number }[];
+  /** Names of the functions the function tests call (hidden tests included). */
+  functionNames: string[];
+  /** Whether any test (hidden included) compares printed output. */
+  hasIoTests: boolean;
+};
+/** Student-safe multiple choice data (options in stored order). */
+export type StudentMultipleChoiceData = {
+  multiple: boolean;
+  options: { id: string; text: string }[];
+};
+/** Student-safe open question data. */
+export type StudentOpenQuestionData = { maxLength?: number };
+
+export type StudentQuestionDataByType = {
+  code: StudentCodeQuestionData;
+  multiple_choice: StudentMultipleChoiceData;
+  open: StudentOpenQuestionData;
+};
+
+/** `gemiddelde([1, 2])` → "gemiddelde" (same rule as validate.ts). */
+function calledFunctionName(call: string): string | null {
+  const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(call);
+  return m ? m[1] : null;
+}
+
 /** Strip teacher-only fields from question data before sending to students. */
 export function questionDataForStudent(
   question: TypedQuestionData,
 ): Record<string, unknown> {
   switch (question.type) {
-    case "code":
+    case "code": {
+      const { data } = question;
+      const functionNames = [
+        ...new Set(
+          data.tests
+            .map((t) =>
+              t.kind === "function" ? calledFunctionName(t.call) : null,
+            )
+            .filter((name): name is string => !!name),
+        ),
+      ];
       return {
-        starterCode: question.data.starterCode,
-        timeLimitMs: question.data.timeLimitMs,
-        tests: question.data.tests.filter((t) => !t.hidden),
-        checks: question.data.checks.map(({ id, kind, construct, value, message }) => ({
+        starterCode: data.starterCode,
+        timeLimitMs: data.timeLimitMs,
+        tests: data.tests.filter((t) => !t.hidden),
+        checks: data.checks.map(({ id, kind, construct, value, message }) => ({
           id,
           kind,
           construct,
           value,
           message,
         })),
-      };
+        hints: data.hints.map(({ id, penalty }) => ({ id, penalty })),
+        functionNames,
+        hasIoTests: data.tests.some((t) => t.kind === "io"),
+      } satisfies StudentCodeQuestionData;
+    }
     case "multiple_choice":
       return {
         multiple: question.data.multiple,
         options: question.data.options.map(({ id, text }) => ({ id, text })),
-      };
+      } satisfies StudentMultipleChoiceData;
     case "open":
-      return { maxLength: question.data.maxLength };
+      // modelAnswer, rubric and rubricItems are teacher-only.
+      return {
+        maxLength: question.data.maxLength,
+      } satisfies StudentOpenQuestionData;
   }
 }
 
@@ -403,6 +478,29 @@ export const SHOW_RESULTS_LABELS: Record<ShowResults, string> = {
   never: "Nooit",
 };
 
+export const showSolutionsSchema = z.enum([
+  "never",
+  /** When every attempt is used up (or everything is correct). */
+  "after_attempts",
+  "after_close",
+]);
+export type ShowSolutions = z.infer<typeof showSolutionsSchema>;
+
+export const SHOW_SOLUTIONS_LABELS: Record<ShowSolutions, string> = {
+  never: "Nooit",
+  after_attempts: "Als alle pogingen op zijn (of alles goed is)",
+  after_close: "Na sluiten van de afname",
+};
+
+export const gradingMethodSchema = z.enum(["linear", "cesuur", "nterm"]);
+export type GradingMethod = z.infer<typeof gradingMethodSchema>;
+
+export const GRADING_METHOD_LABELS: Record<GradingMethod, string> = {
+  linear: "Lineair (1 + 9 × score/max)",
+  cesuur: "Met cesuur",
+  nterm: "N-term (zoals bij centrale examens)",
+};
+
 export const assignmentSettingsSchema = z.object({
   shuffleQuestions: z.boolean().default(false),
   showResults: showResultsSchema.default("after_close"),
@@ -412,11 +510,33 @@ export const assignmentSettingsSchema = z.object({
   allowSelfTest: z.boolean().default(true),
   /** Ask the browser for fullscreen and log every exit. */
   requireFullscreen: z.boolean().default(false),
-  /** Log tab switches / focus loss as attempt events. */
-  logFocusEvents: z.boolean().default(true),
+  /**
+   * Log tab switches / focus loss as attempt events.
+   * Privacy by default (AVG art. 25): off unless the teacher enables it; exam
+   * defaults in src/components/docent/assignments/defaults.ts set it
+   * explicitly.
+   */
+  logFocusEvents: z.boolean().default(false),
   /** Block paste into the editor (paste attempts are logged). */
   blockPaste: z.boolean().default(false),
   maxAttempts: z.number().int().min(1).max(100).default(1),
+  /** Students may reveal the hints of code questions. */
+  allowHints: z.boolean().default(true),
+  /** When students may see the model solutions. */
+  showSolutions: showSolutionsSchema.default("never"),
+  /** Show code tips (static checks) before handing in. */
+  codeTips: z.boolean().default(true),
+  /** How a score becomes a Dutch grade (see src/lib/grading/grade-scale.ts). */
+  grading: z
+    .object({
+      method: gradingMethodSchema.default("linear"),
+      /** Cesuur: the percentage of the points that gives a 5,5. */
+      passPercentage: z.number().min(10).max(90).default(55),
+      /** N-term (CvTE), 0..3. */
+      nTerm: z.number().min(0).max(3).default(1),
+    })
+    // zod v4: .default({}) would skip parsing, so nested defaults need .prefault.
+    .prefault({}),
 });
 export type AssignmentSettings = z.infer<typeof assignmentSettingsSchema>;
 
@@ -436,5 +556,6 @@ export const ASSIGNMENT_EVENT_TYPES = [
   "self_test",
   "time_extended",
   "reopened",
+  "hint_revealed",
 ] as const;
 export type AttemptEventType = (typeof ASSIGNMENT_EVENT_TYPES)[number];

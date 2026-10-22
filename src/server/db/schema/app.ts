@@ -10,6 +10,7 @@
  */
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
   doublePrecision,
@@ -134,9 +135,19 @@ export const questions = pgTable(
       checkedAt: string;
       source: "server" | "browser";
     }>(),
+    /** Free tags for the question bank, e.g. ["lussen", "lijsten"]. */
+    tags: text("tags").array().default(sql`'{}'::text[]`).notNull(),
+    /**
+     * The question this one was copied from (question bank lineage). No FK on
+     * purpose: the lineage survives deletes.
+     */
+    sourceQuestionId: uuid("source_question_id"),
     ...timestamps,
   },
-  (t) => [index("question_test_idx").on(t.testId, t.position)],
+  (t) => [
+    index("question_test_idx").on(t.testId, t.position),
+    index("question_tags_idx").using("gin", t.tags),
+  ],
 );
 
 /* ------------------------------- Assignments ------------------------------ */
@@ -176,6 +187,11 @@ export const assignments = pgTable(
       .notNull(),
     /** For showResults = "manual". */
     resultsReleased: boolean("results_released").default(false).notNull(),
+    /** The assignment this one is a herkansing/inhaaltoets of. */
+    retakeOfId: uuid("retake_of_id").references(
+      (): AnyPgColumn => assignments.id,
+      { onDelete: "set null" },
+    ),
     createdById: text("created_by_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -218,6 +234,8 @@ export const attempts = pgTable(
     /** Hard deadline (start + time limit + extra, capped by closesAt). */
     deadlineAt: timestamp("deadline_at", { withTimezone: true }),
     extraMinutes: integer("extra_minutes").default(0).notNull(),
+    /** Minutes of verlengde tijd (accommodation), snapshotted at start. */
+    accommodationMinutes: integer("accommodation_minutes").default(0).notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     /** True when the server auto-submitted at the deadline. */
     autoSubmitted: boolean("auto_submitted").default(false).notNull(),
@@ -228,9 +246,7 @@ export const attempts = pgTable(
       .notNull(),
     score: doublePrecision("score"),
     maxScore: doublePrecision("max_score"),
-    gradingStatus: gradingStatus("grading_status")
-      .default("pending")
-      .notNull(),
+    gradingStatus: gradingStatus("grading_status").default("pending").notNull(),
     /** Denormalised counter of focus/visibility losses for quick overview. */
     focusLossCount: integer("focus_loss_count").default(0).notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
@@ -282,6 +298,13 @@ export const answers = pgTable(
       onDelete: "set null",
     }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    /** Hints the student revealed: hint id + ISO time. */
+    hintsUsed: jsonb("hints_used")
+      .$type<{ id: string; at: string }[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    /** Open questions: ids of the rubric items the teacher ticked. */
+    rubricChecked: jsonb("rubric_checked").$type<string[]>(),
     ...timestamps,
   },
   (t) => [unique("answer_unique_question").on(t.attemptId, t.questionId)],

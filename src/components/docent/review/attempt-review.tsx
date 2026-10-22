@@ -14,6 +14,7 @@ import {
   Expand,
   FlaskConical,
   History,
+  Lightbulb,
   Loader2,
   type LucideIcon,
   MonitorX,
@@ -730,6 +731,7 @@ const EVENT_INFO: Record<
     status: "info",
   },
   reopened: { label: "Poging heropend", icon: RotateCcw, status: "info" },
+  hint_revealed: { label: "Hint bekeken", icon: Lightbulb, status: "info" },
 };
 
 function eventDescription(e: EventRow): string | null {

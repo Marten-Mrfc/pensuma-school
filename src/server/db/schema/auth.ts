@@ -32,6 +32,10 @@ export const user = pgTable("user", {
   // username plugin: students sign in with their student number
   username: text("username").unique(),
   displayUsername: text("display_username"),
+  /** Teachers with a temporary password must choose a new one first. */
+  passwordChangeRequired: boolean("password_change_required")
+    .default(false)
+    .notNull(),
 });
 
 export const session = pgTable(

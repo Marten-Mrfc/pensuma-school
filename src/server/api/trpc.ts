@@ -16,7 +16,13 @@ import { db } from "@/server/db";
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth.api.getSession({ headers: opts.headers });
-  return { db, session, headers: opts.headers };
+  return {
+    db,
+    session,
+    headers: opts.headers,
+    /** Set by auditFromCtx, read by the audit safety net (one per request). */
+    auditState: { written: false },
+  };
 };
 
 export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
@@ -53,7 +59,10 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 
 export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
   if (!ctx.session?.user) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "Je bent niet ingelogd." });
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Je bent niet ingelogd.",
+    });
   }
   const user = ctx.session.user as typeof ctx.session.user & {
     role?: string | null;
@@ -75,14 +84,20 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
 
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== ROLES.admin) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Alleen voor docenten." });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Alleen voor docenten.",
+    });
   }
   return next();
 });
 
 export const studentProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== ROLES.student) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Alleen voor leerlingen." });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Alleen voor leerlingen.",
+    });
   }
   return next();
 });

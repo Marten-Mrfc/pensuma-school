@@ -2,6 +2,7 @@
  * Pure helpers for assignment availability and attempt deadlines.
  * Shared by the teacher (assignments) and student (portal) routers.
  */
+import { computeGrade } from "@/lib/grading/grade-scale";
 import type { AssignmentSettings } from "@/lib/questions/schema";
 import { assignmentSettingsSchema } from "@/lib/questions/schema";
 
@@ -48,20 +49,28 @@ export function computeAttemptDeadline(
 ): Date | null {
   const candidates: number[] = [];
   if (a.timeLimitMinutes != null) {
-    candidates.push(startedAt.getTime() + (a.timeLimitMinutes + extraMinutes) * 60_000);
+    candidates.push(
+      startedAt.getTime() + (a.timeLimitMinutes + extraMinutes) * 60_000,
+    );
   }
   if (a.closesAt) candidates.push(a.closesAt.getTime() + extraMinutes * 60_000);
   return candidates.length ? new Date(Math.min(...candidates)) : null;
 }
 
 /** True when the deadline (plus grace) has passed. */
-export function isPastDeadline(deadlineAt: Date | null, now = new Date(), graceMs = DEADLINE_GRACE_MS): boolean {
+export function isPastDeadline(
+  deadlineAt: Date | null,
+  now = new Date(),
+  graceMs = DEADLINE_GRACE_MS,
+): boolean {
   return deadlineAt != null && now.getTime() > deadlineAt.getTime() + graceMs;
 }
 
 /** Whether a student may see their results for a submitted attempt. */
 export function resultsVisible(
-  a: Pick<AssignmentLike, "status" | "opensAt" | "closesAt" | "settings"> & { resultsReleased: boolean },
+  a: Pick<AssignmentLike, "status" | "opensAt" | "closesAt" | "settings"> & {
+    resultsReleased: boolean;
+  },
   now = new Date(),
 ): boolean {
   const { showResults } = parseAssignmentSettings(a.settings);
@@ -69,7 +78,9 @@ export function resultsVisible(
     case "immediately":
       return true;
     case "after_close":
-      return effectiveAssignmentStatus(a, now) === "closed" || a.resultsReleased;
+      return (
+        effectiveAssignmentStatus(a, now) === "closed" || a.resultsReleased
+      );
     case "manual":
       return a.resultsReleased;
     case "never":
@@ -77,11 +88,23 @@ export function resultsVisible(
   }
 }
 
-/** Common Dutch grade: 1 + 9 × (score / max), rounded to one decimal. */
-export function dutchGrade(score: number, maxScore: number): number | null {
-  if (!maxScore) return null;
-  const grade = 1 + 9 * Math.max(0, Math.min(1, score / maxScore));
-  return Math.round(grade * 10) / 10;
+/**
+ * Dutch grade (1,0 – 10,0) for a score, rounded to one decimal.
+ * `settings` is the assignment's raw settings jsonb: its `grading` scale
+ * (linear, cesuur or N-term) applies. Omitted → linear: 1 + 9 × score/max.
+ */
+export function dutchGrade(
+  score: number,
+  maxScore: number,
+  settings?: unknown,
+): number | null {
+  return computeGrade(
+    score,
+    maxScore,
+    settings === undefined
+      ? undefined
+      : parseAssignmentSettings(settings).grading,
+  );
 }
 
 /** Random access code without ambiguous characters (no 0/O, 1/I/L). */
