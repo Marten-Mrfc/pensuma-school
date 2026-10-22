@@ -1,7 +1,8 @@
 'use client'
 
+import { CircleAlert, CircleCheck, Info, type LucideIcon, TriangleAlert } from 'lucide-react'
 import * as React from 'react'
-import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogClose,
@@ -11,7 +12,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog/dialog'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
 type AlertIcon = 'info' | 'warning' | 'error' | 'success'
 
@@ -59,8 +59,8 @@ function isAlertIcon(value: unknown): value is AlertIcon {
 
 const iconColorClasses: Record<NonNullable<AlertModalProps['tone']>, string> = {
   destructive: 'text-destructive',
-  success: 'text-success',
-  warning: 'text-warning',
+  success: 'text-success-ink',
+  warning: 'text-warning-ink',
   default: 'text-muted-foreground',
 }
 
@@ -76,8 +76,8 @@ const AlertModal = ({
   onOpenChange,
   title = '',
   description = '',
-  actionLabel = 'Continue',
-  cancelLabel = 'Cancel',
+  actionLabel = 'Doorgaan',
+  cancelLabel = 'Annuleren',
   tone = 'default',
   icon = null,
   loading = false,
@@ -104,11 +104,11 @@ const AlertModal = ({
     if (!icon) return null
     if (isAlertIcon(icon)) {
       const IconComp = builtInIcons[icon]
-      return <IconComp className="size-5" />
+      return <IconComp className="size-5" aria-hidden="true" />
     }
     if (typeof icon === 'function') {
       const IconComp = icon as LucideIcon
-      return <IconComp className="size-5" />
+      return <IconComp className="size-5" aria-hidden="true" />
     }
     return icon
   }, [icon])

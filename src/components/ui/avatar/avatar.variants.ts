@@ -51,9 +51,9 @@ export const avatarVariants = cva('relative flex shrink-0 overflow-hidden', {
     { color: 'primary', variant: 'soft', class: 'bg-primary/20 text-primary' },
     { color: 'secondary', variant: 'soft', class: 'bg-secondary/20 text-secondary-foreground' },
     { color: 'destructive', variant: 'soft', class: 'bg-destructive/20 text-destructive' },
-    { color: 'success', variant: 'soft', class: 'bg-success/20 text-success' },
-    { color: 'warning', variant: 'soft', class: 'bg-warning/20 text-warning' },
-    { color: 'info', variant: 'soft', class: 'bg-info/20 text-info' },
+    { color: 'success', variant: 'soft', class: 'bg-success/20 text-success-ink' },
+    { color: 'warning', variant: 'soft', class: 'bg-warning/20 text-warning-ink' },
+    { color: 'info', variant: 'soft', class: 'bg-info/20 text-info-ink' },
     { color: 'error', variant: 'soft', class: 'bg-destructive/20 text-destructive' },
   ],
   defaultVariants: {

@@ -1,1 +1,1 @@
-export { UptimeTrackerChart, type UptimeTrackerChartProps, type StatusDay, type DayStatus } from './UptimeTrackerChart'
+export { type DayStatus, type StatusDay, UptimeTrackerChart, type UptimeTrackerChartProps } from './UptimeTrackerChart'

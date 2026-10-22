@@ -93,19 +93,23 @@
   --accent-foreground: oklch(0.24 0.014 150);
   --destructive: oklch(0.55 0.2 28);
   --destructive-foreground: oklch(0.985 0 0);
+  /* --border stays light: decorative separators (cards, rows). */
   --border: oklch(0.88 0.014 135);
-  --input: oklch(0.88 0.014 135);
+  /* Form-control boundary (text fields, switch track): 3.91:1 on card
+     (WCAG 1.4.11). */
+  --input: oklch(0.6 0.02 140);
   --ring: oklch(0.5 0.08 150);
   /* Chart palette held as hex (not OKLCH) so ECharts' canvas renderer
    * can hex-concat opacity (`color + '40'`) for gradient fills. Browsers
    * keep `oklch(...)` strings unchanged through canvas.fillStyle and
    * getComputedStyle, breaking those concat sites. Light mode: warm
-   * orange / teal / deep blue / amber / yellow. */
+   * orange / teal / deep blue / dark amber / burnt orange, each at least
+   * 3:1 against the card (WCAG 1.4.11). */
   --chart-1: #e76e50;
   --chart-2: #2a9d90;
   --chart-3: #264653;
-  --chart-4: #e9c468;
-  --chart-5: #f4a261;
+  --chart-4: #a07800;
+  --chart-5: #c96a1f;
 
   --sidebar: oklch(0.955 0.012 130);
   --sidebar-foreground: oklch(0.2 0.012 150);
@@ -117,7 +121,8 @@
   --sidebar-ring: oklch(0.5 0.08 150);
 
   /* App extensions (not part of shadcn) */
-  --success: oklch(0.55 0.18 145);
+  /* Dark enough for white text on a solid fill (5.32:1). */
+  --success: oklch(0.5 0.15 145);
   --warning: oklch(0.7 0.16 75);
   --info: oklch(0.55 0.22 260);
   /* Text on a solid status fill, and readable status text on paper. */
@@ -136,13 +141,13 @@
      Markdown code blocks (Shiki css-variables theme). Earthy, paper-friendly. */
   --code-bg: oklch(0.985 0.005 130);
   --code-fg: oklch(0.27 0.014 150);
-  --code-gutter: oklch(0.6 0.012 145);
+  --code-gutter: oklch(0.53 0.012 145);
   --code-active-line: oklch(0.46 0.08 145 / 0.06);
   --code-selection: oklch(0.46 0.08 145 / 0.18);
   --code-keyword: oklch(0.47 0.15 315);
   --code-string: oklch(0.5 0.11 160);
   --code-number: oklch(0.55 0.14 55);
-  --code-comment: oklch(0.6 0.02 140);
+  --code-comment: oklch(0.53 0.02 140);
   --code-function: oklch(0.48 0.13 252);
   --code-builtin: oklch(0.52 0.15 28);
   --code-class: oklch(0.5 0.12 200);
@@ -167,15 +172,16 @@
   --accent: oklch(0.3 0.018 80);
   --accent-foreground: oklch(0.94 0.008 130);
   --destructive: oklch(0.68 0.18 25);
-  --destructive-foreground: oklch(0.985 0 0);
+  /* Dark text on the light red fill (6.20:1). */
+  --destructive-foreground: oklch(0.16 0.01 150);
   --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 14%);
+  --input: oklch(0.55 0.012 150);
   --ring: oklch(0.6 0.1 145);
   /* Dark mode chart palette — same warm earthy family as light,
      lightened for visibility on dark backgrounds. */
   --chart-1: #e8997a;
   --chart-2: #5cbfb0;
-  --chart-3: #4a6b7a;
+  --chart-3: #6a8fa0;
   --chart-4: #f0d99a;
   --chart-5: #f5b87a;
 
@@ -202,7 +208,7 @@
 
   --code-bg: oklch(0.185 0.011 150);
   --code-fg: oklch(0.92 0.01 130);
-  --code-gutter: oklch(0.55 0.014 145);
+  --code-gutter: oklch(0.65 0.014 145);
   --code-active-line: oklch(1 0 0 / 0.04);
   --code-selection: oklch(0.72 0.1 145 / 0.25);
   --code-keyword: oklch(0.78 0.12 315);
@@ -218,7 +224,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
 
   body {
@@ -466,4 +472,154 @@ html {
 .dark [data-slot="sheet-overlay"],
 .dark [data-slot="command-dialog-overlay"] {
   background-color: oklch(0.05 0.01 150 / 0.65);
+}
+
+/* ------------------------------------------------------------------ */
+/* Accessibility (WCAG 2.2 AA)                                         */
+/* ------------------------------------------------------------------ */
+
+/* Focus not obscured (2.4.11): keep focused elements clear of the sticky
+   header, and of the leerling bottom navigation on phones. */
+html {
+  scroll-padding-top: 5rem;
+}
+
+@media (max-width: 48rem) {
+  html {
+    scroll-padding-bottom: 6rem;
+  }
+}
+
+/* The skip-link target only receives programmatic focus. */
+#inhoud:focus {
+  outline: none;
+}
+
+/* Windows High Contrast / forced colours: box-shadow rings are not painted
+   and `outline-none` removes outlines, so draw a real outline. Unlayered and
+   !important, so it beats every utility. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Backgrounds are forced to Canvas, which would hide these indicators. */
+  [data-slot="switch"],
+  [data-slot="progress"] {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+    background-color: Canvas;
+  }
+  [data-slot="switch"][data-state="checked"] {
+    background-color: CanvasText;
+  }
+  [data-slot="switch-thumb"],
+  [data-slot="progress-indicator"],
+  [data-slot="pin-input-slot"] > .rounded-full {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+  [data-slot="switch"][data-state="checked"] [data-slot="switch-thumb"] {
+    background-color: Canvas;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Display preferences (set on <html> by PreferencesSync)              */
+/* ------------------------------------------------------------------ */
+
+/* Tekstgrootte: everything in rem scales with the root font size. */
+html {
+  font-size: calc(100% * var(--app-font-scale, 1));
+}
+
+/* Goed leesbaar lettertype: Atkinson Hyperlegible for text, headings and
+   code. The @theme fonts are inlined, so swap the next/font variables. */
+html[data-font="readable"] {
+  --font-dm-sans: var(--font-readable), "Atkinson Hyperlegible Next";
+  --font-anybody: var(--font-readable), "Atkinson Hyperlegible Next";
+  --font-dm-mono: var(--font-readable-mono), "Atkinson Hyperlegible Mono";
+}
+
+html[data-font="readable"] .font-display-wide {
+  font-stretch: normal;
+  font-variation-settings: normal;
+  letter-spacing: normal;
+}
+
+/* Ruimere regelafstand (1.4.12 text spacing). Unlayered, so it also beats
+   the leading-* utilities on running text. Code keeps its own metrics. */
+html[data-spacing="wide"] body {
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+  word-spacing: 0.08em;
+}
+
+html[data-spacing="wide"]
+  :where(p, li, dd, dt, blockquote, td, th, label, figcaption, legend) {
+  line-height: 1.8;
+}
+
+html[data-spacing="wide"] :where(pre, code, kbd, .cm-editor) {
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+html[data-spacing="wide"] .cm-scroller {
+  line-height: 1.9 !important;
+}
+
+/* Extra contrast: secondary text and code at least 7:1, borders and
+   control boundaries at least 3:1. */
+:root[data-contrast="more"] {
+  --muted-foreground: oklch(0.4 0.014 150);
+  --border: oklch(0.62 0.014 135);
+  --sidebar-border: oklch(0.62 0.014 135);
+  --input: oklch(0.5 0.02 140);
+  --ring: oklch(0.42 0.08 150);
+  --code-fg: oklch(0.22 0.014 150);
+  --code-gutter: oklch(0.43 0.012 145);
+  --code-keyword: oklch(0.4 0.15 315);
+  --code-string: oklch(0.4 0.11 160);
+  --code-number: oklch(0.42 0.14 55);
+  --code-comment: oklch(0.42 0.02 140);
+  --code-function: oklch(0.4 0.13 252);
+  --code-builtin: oklch(0.42 0.15 28);
+  --code-class: oklch(0.4 0.12 200);
+  --code-operator: oklch(0.36 0.03 150);
+  --code-punctuation: oklch(0.38 0.015 150);
+}
+
+:root.dark[data-contrast="more"] {
+  --muted-foreground: oklch(0.84 0.012 140);
+  --border: oklch(0.5 0.012 150);
+  --sidebar-border: oklch(0.5 0.012 150);
+  --input: oklch(0.68 0.012 150);
+  --ring: oklch(0.76 0.1 145);
+  --code-fg: oklch(0.96 0.008 130);
+  --code-gutter: oklch(0.78 0.014 145);
+  --code-keyword: oklch(0.85 0.1 315);
+  --code-string: oklch(0.86 0.1 155);
+  --code-number: oklch(0.87 0.1 65);
+  --code-comment: oklch(0.8 0.02 140);
+  --code-function: oklch(0.86 0.08 245);
+  --code-builtin: oklch(0.85 0.1 35);
+  --code-class: oklch(0.87 0.08 195);
+  --code-operator: oklch(0.87 0.02 140);
+  --code-punctuation: oklch(0.82 0.015 140);
+}
+
+/* Altijd minder beweging: same floor as prefers-reduced-motion. */
+html[data-motion="reduce"] {
+  scroll-behavior: auto;
+}
+
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

@@ -1,10 +1,9 @@
 export {
   VerticalTabs,
-  VerticalTabsList,
-  VerticalTabsSection,
-  VerticalTabsTrigger,
   VerticalTabsContent,
+  VerticalTabsList,
   type VerticalTabsListProps,
+  VerticalTabsSection,
   type VerticalTabsSectionProps,
+  VerticalTabsTrigger,
 } from './vertical-tabs'
-

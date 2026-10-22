@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export interface NativeSelectOption {
@@ -42,7 +42,7 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProp
           disabled={disabled}
           className={cn(
             'border-input bg-background w-full appearance-none rounded-md border shadow-xs transition-[color,box-shadow]',
-            'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none',
+            'focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-[3px] focus-visible:outline-none',
             'disabled:bg-muted/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
             sizeClasses[sizeVariant],
             selectClassName,
@@ -78,4 +78,3 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProp
 )
 
 NativeSelect.displayName = 'NativeSelect'
-

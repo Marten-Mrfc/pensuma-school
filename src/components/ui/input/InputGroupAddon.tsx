@@ -29,4 +29,3 @@ export const InputGroupAddon = React.forwardRef<HTMLDivElement, InputGroupAddonP
 )
 
 InputGroupAddon.displayName = 'InputGroupAddon'
-

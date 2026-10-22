@@ -1,18 +1,18 @@
 export {
   Avatar,
-  AvatarImage,
   AvatarFallback,
-  AvatarGroup,
-  type AvatarProps,
   type AvatarFallbackProps,
+  AvatarGroup,
   type AvatarGroupProps,
+  AvatarImage,
+  type AvatarProps,
 } from './avatar'
 
 // Re-export variant API from the sibling file (kept separate to mirror the
 // Vue registry convention and avoid a component <-> index circular import).
 export {
-  avatarVariants,
-  avatarFallbackVariants,
-  type AvatarVariants,
   type AvatarFallbackVariants,
+  type AvatarVariants,
+  avatarFallbackVariants,
+  avatarVariants,
 } from './avatar.variants'

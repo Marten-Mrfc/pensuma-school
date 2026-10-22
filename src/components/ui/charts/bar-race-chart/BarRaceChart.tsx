@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // BarRaceChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ export interface BarRaceChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -127,7 +127,7 @@ export const BarRaceChart = React.forwardRef<HTMLDivElement, BarRaceChartProps>(
         ref={ref}
         height={height}
         className={className}
-        ariaLabel={ariaLabel || `Bar race chart, frame ${frame.label}`}
+        ariaLabel={ariaLabel || `Bewegend staafdiagram, stand ${frame.label}`}
       >
         <EChart option={mergedOption} />
       </ChartFrame>

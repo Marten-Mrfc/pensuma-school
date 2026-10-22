@@ -1,16 +1,16 @@
 'use client'
 
+import { Check, type LucideIcon, X } from 'lucide-react'
 import * as React from 'react'
-import { Check, X, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { stepperIndicatorVariants } from './stepper.variants'
 import {
   StepperContext,
-  useStepperContext,
   type StepperOrientation,
   type StepperSize,
   type StepperStatus,
+  useStepperContext,
 } from './context'
+import { stepperIndicatorVariants } from './stepper.variants'
 // Aliased: the standalone <StepperStep> component (below) owns the bare name.
 import type { StepperStep as StepperStepConfig } from './types'
 
@@ -160,13 +160,7 @@ const Stepper = React.forwardRef<HTMLDivElement, StepperProps>(
 
     return (
       <StepperContext.Provider value={ctx}>
-        <div
-          ref={ref}
-          className={cn('w-full', className)}
-          role="tablist"
-          aria-orientation={orientation}
-          data-orientation={orientation}
-        >
+        <div ref={ref} className={cn('w-full', className)} data-orientation={orientation}>
           {/* Header strip with steps */}
           {stepsSlot ??
             (steps.length > 0 && (
@@ -306,9 +300,7 @@ const StepperItem = React.forwardRef<HTMLLIElement, StepperItemProps>(({ step, i
         step.disabled && 'opacity-50',
         className,
       )}
-      role="tab"
-      aria-selected={status === 'active'}
-      aria-disabled={step.disabled || undefined}
+      aria-current={status === 'active' ? 'step' : undefined}
       data-status={status}
     >
       {/* Indicator row: contains the indicator + connector segments */}
@@ -513,9 +505,8 @@ const StepperStep = React.forwardRef<HTMLDivElement, StepperStepProps>(
       <div
         ref={ref}
         className={cn('stepper-step flex gap-3', className)}
-        role="tab"
-        aria-selected={active}
-        aria-disabled={disabled}
+        aria-current={active ? 'step' : undefined}
+        data-disabled={disabled || undefined}
       >
         {/* Indicator */}
         <div
@@ -552,4 +543,3 @@ export {
   StepperDescription,
   StepperStep,
 }
-

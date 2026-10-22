@@ -166,6 +166,7 @@ const Countdown = React.forwardRef<HTMLDivElement, CountdownProps>(
     onTickRef.current = onTick
 
     // Reset finished state only when the target changes.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: targetMs is the trigger; the body only resets state
     React.useEffect(() => {
       finishedRef.current = false
       setFinished(false)
@@ -284,4 +285,3 @@ const Countdown = React.forwardRef<HTMLDivElement, CountdownProps>(
 Countdown.displayName = 'Countdown'
 
 export { Countdown }
-

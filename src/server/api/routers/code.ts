@@ -18,12 +18,20 @@ import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import { gradeCode, runCode, runCodeBatch } from "@/server/grader";
 
 const MAX_CODE = 100_000;
+const MAX_STDIN = 100_000;
 const MAX_TESTS = 100;
+/** generateExpected: at most 50 inputs of at most 10.000 characters. */
+const MAX_STDINS = 50;
+const MAX_STDINS_ITEM = 10_000;
 
 const codeString = z
   .string()
   .max(MAX_CODE, "De code is te lang (maximaal 100.000 tekens).");
-const timeLimit = z.number().int().min(500).max(30_000);
+const timeLimit = z
+  .number()
+  .int()
+  .min(500, "De tijdslimiet is minstens 500 ms.")
+  .max(30_000, "De tijdslimiet is hoogstens 30 seconden.");
 
 const limitedQuestionData = codeQuestionDataSchema.extend({
   starterCode: z.string().max(MAX_CODE).default(""),
@@ -40,7 +48,10 @@ export const codeRouter = createTRPCRouter({
     .input(
       z.object({
         code: codeString,
-        stdin: z.string().max(MAX_CODE).optional(),
+        stdin: z
+          .string()
+          .max(MAX_STDIN, "De invoer is te lang (maximaal 100.000 tekens).")
+          .optional(),
         timeLimitMs: timeLimit.optional(),
       }),
     )
@@ -61,7 +72,17 @@ export const codeRouter = createTRPCRouter({
     .input(
       z.object({
         solution: codeString,
-        stdins: z.array(z.string().max(MAX_CODE)).min(1).max(MAX_TESTS),
+        stdins: z
+          .array(
+            z
+              .string()
+              .max(
+                MAX_STDINS_ITEM,
+                "Een invoer is te lang (maximaal 10.000 tekens).",
+              ),
+          )
+          .min(1)
+          .max(MAX_STDINS, "Maximaal 50 invoeren tegelijk."),
         timeLimitMs: timeLimit.optional(),
       }),
     )

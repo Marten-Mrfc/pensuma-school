@@ -1,15 +1,18 @@
 /**
  * Demo data: a demo class with students (and PINs), the demo Python test and
- * an open practice assignment. Used by `bun run db:seed` and by the teacher's
- * "Demodata laden" action. Idempotent: existing data is reused.
+ * an open practice assignment. Used by `bun run db:seed`, by the teacher's
+ * "Demodata laden" action and by the E2E seed (with fixed PINs).
+ * Idempotent: existing data is reused.
  */
 import { eq } from "drizzle-orm";
+import { STUDENT_NUMBER_REGEX, STUDENT_PIN_REGEX } from "@/lib/auth-shared";
 import { db } from "@/server/db";
 import { classes, classMembers } from "@/server/db/schema";
 import {
   createStudentAccount,
   findStudentByNumber,
   getStudentPin,
+  resetStudentPin,
 } from "@/server/services/accounts";
 import { DEMO_CLASS_NAME, DEMO_TEST_TITLE, seedDemoTest } from "./demo-test";
 
@@ -39,7 +42,39 @@ export type DemoDataResult = {
   assignmentCreated: boolean;
 };
 
-export async function loadDemoData(adminId: string): Promise<DemoDataResult> {
+export type DemoDataOptions = {
+  /**
+   * Fixed PINs per leerlingnummer (E2E runs). Students without an entry get
+   * a random PIN; an existing student whose PIN differs gets the fixed one.
+   */
+  pins?: Readonly<Record<string, string>>;
+  /** Extra students `[leerlingnummer, name]` for the demo class. */
+  extraStudents?: ReadonlyArray<readonly [string, string]>;
+};
+
+function checkOptions(opts: DemoDataOptions) {
+  for (const [nr, pin] of Object.entries(opts.pins ?? {})) {
+    if (!STUDENT_NUMBER_REGEX.test(nr) || !STUDENT_PIN_REGEX.test(pin)) {
+      throw new Error(`Ongeldige demo-pincode voor ${nr}`);
+    }
+  }
+  for (const [nr] of opts.extraStudents ?? []) {
+    if (!STUDENT_NUMBER_REGEX.test(nr)) {
+      throw new Error(`Ongeldig leerlingnummer ${nr}`);
+    }
+  }
+}
+
+export async function loadDemoData(
+  adminId: string,
+  opts: DemoDataOptions = {},
+): Promise<DemoDataResult> {
+  checkOptions(opts);
+  const roster = [...DEMO_STUDENTS];
+  for (const extra of opts.extraStudents ?? []) {
+    if (!roster.some(([nr]) => nr === extra[0])) roster.push(extra);
+  }
+
   let classCreated = false;
   let [klas] = await db
     .select()
@@ -58,7 +93,8 @@ export async function loadDemoData(adminId: string): Promise<DemoDataResult> {
   }
 
   const students: DemoDataResult["students"] = [];
-  for (const [studentNumber, name] of DEMO_STUDENTS) {
+  for (const [studentNumber, name] of roster) {
+    const fixedPin = opts.pins?.[studentNumber];
     const existing = await findStudentByNumber(studentNumber);
     let userId: string;
     let pin: string | null;
@@ -66,8 +102,15 @@ export async function loadDemoData(adminId: string): Promise<DemoDataResult> {
     if (existing) {
       userId = existing.id;
       pin = await getStudentPin(existing.id);
+      if (fixedPin && pin !== fixedPin) {
+        pin = await resetStudentPin(existing.id, fixedPin);
+      }
     } else {
-      const result = await createStudentAccount({ studentNumber, name });
+      const result = await createStudentAccount({
+        studentNumber,
+        name,
+        pin: fixedPin,
+      });
       userId = result.user.id;
       pin = result.pin;
       created = true;

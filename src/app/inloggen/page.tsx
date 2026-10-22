@@ -5,6 +5,7 @@ import { Logo } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { GradingDemo } from "@/components/layout/grading-demo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { routes } from "@/lib/routes";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -49,7 +50,7 @@ export default function LoginPage() {
         <div className="relative flex flex-1 flex-col justify-between gap-10 p-10 xl:p-14">
           <Link
             href="/"
-            className="inline-flex w-fit items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            className="inline-flex w-fit items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <svg viewBox="0 0 32 32" className="size-9" aria-hidden="true">
               <rect width="32" height="32" rx="9" fill="oklch(0.96 0.01 130)" />
@@ -76,11 +77,12 @@ export default function LoginPage() {
               <p className="text-sm font-medium tracking-[0.14em] text-[oklch(0.85_0.08_140)] uppercase">
                 Informatica · Python
               </p>
-              <h2 className="font-display-wide text-4xl leading-[1.05] font-bold text-balance xl:text-5xl">
+              {/* A tagline, not a heading: the page's h1 is "Inloggen". */}
+              <p className="font-display-wide text-4xl leading-[1.05] font-bold text-balance xl:text-5xl">
                 Je code telt. Je{" "}
                 <span className="text-[oklch(0.86_0.12_140)]">input()</span>
                 -vraag niet.
-              </h2>
+              </p>
               <p className="max-w-md text-base leading-relaxed text-[oklch(0.88_0.015_130)]">
                 Pensuma kijkt naar wat je programma écht doet. Een vraag als
                 “Wat is je naam?” wordt nooit meer als fout gerekend.
@@ -96,7 +98,11 @@ export default function LoginPage() {
       </aside>
 
       {/* Form */}
-      <main className="relative flex flex-col bg-background">
+      <main
+        id="inhoud"
+        tabIndex={-1}
+        className="relative flex flex-col bg-background"
+      >
         <div className="flex items-center justify-between px-5 pt-5 sm:px-8 lg:justify-end">
           <Logo size="sm" className="lg:hidden" />
           <ThemeToggle />
@@ -116,14 +122,30 @@ export default function LoginPage() {
             </Suspense>
           </div>
         </div>
-        <div className="px-5 pb-6 text-center text-xs text-muted-foreground sm:px-8">
-          <Link
-            href="/"
-            className="underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Terug naar de startpagina
-          </Link>
-        </div>
+        <footer className="flex flex-col items-center gap-2 px-5 pb-6 text-center text-xs text-muted-foreground sm:px-8">
+          <nav aria-label="Voettekst">
+            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+              {[
+                { href: routes.home, label: "Terug naar de startpagina" },
+                { href: routes.privacy, label: "Privacyverklaring" },
+                { href: routes.accessibility, label: "Toegankelijkheid" },
+              ].map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="inline-block rounded-sm py-1 underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <p>
+            Pensuma gebruikt alleen noodzakelijke cookies om je ingelogd te
+            houden.
+          </p>
+        </footer>
       </main>
     </div>
   );

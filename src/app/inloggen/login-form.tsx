@@ -15,7 +15,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { FormField } from "@/components/app/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +32,7 @@ import {
   PinInputSlot,
 } from "@/components/ui/pin-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { prefersReducedMotion } from "@/lib/a11y/use-prefers-reduced-motion";
 import { authClient, signOut, useSession } from "@/lib/auth-client";
 import {
   homeForRole,
@@ -33,6 +41,7 @@ import {
   STUDENT_NUMBER_REGEX,
   STUDENT_PIN_REGEX,
 } from "@/lib/auth-shared";
+import { clearLocalUserData } from "@/lib/local-data";
 import { cn, safeRedirectPath } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
 
@@ -79,9 +88,26 @@ function targetFor(role: string, next: string | null) {
   return candidate;
 }
 
-function ErrorMessage({ children }: { children: string }) {
+/** Restart a short horizontal shake (skipped when less motion is wanted). */
+function shake(el: HTMLElement | null) {
+  if (!el || prefersReducedMotion() || typeof el.animate !== "function") return;
+  el.animate(
+    [
+      { transform: "translateX(0)" },
+      { transform: "translateX(-6px)" },
+      { transform: "translateX(6px)" },
+      { transform: "translateX(-4px)" },
+      { transform: "translateX(4px)" },
+      { transform: "translateX(0)" },
+    ],
+    { duration: 400, easing: "cubic-bezier(0.36, 0.07, 0.19, 0.97)" },
+  );
+}
+
+function ErrorMessage({ id, children }: { id: string; children: string }) {
   return (
     <div
+      id={id}
       role="alert"
       className="flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3.5 py-3 text-sm text-destructive-ink"
     >
@@ -98,10 +124,19 @@ function ErrorMessage({ children }: { children: string }) {
 function StudentLoginForm({
   next,
   initialNumber,
+  focusOnMount,
 }: {
   next: string | null;
   initialNumber: string;
+  /** Focus the first empty field on first render (initial tab only). */
+  focusOnMount: boolean;
 }) {
+  const ids = {
+    number: useId(),
+    pin: useId(),
+    pinHelp: useId(),
+    serverError: useId(),
+  };
   const [studentNumber, setStudentNumber] = useState(initialNumber);
   const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
@@ -113,6 +148,20 @@ function StudentLoginForm({
   const [pending, setPending] = useState(false);
   const pinRef = useRef<HTMLInputElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
+
+  // Only on first mount, and only for the tab the page opened on: switching
+  // tabs with the arrow keys must never move focus (WCAG 3.2.1).
+  const [focusInitially] = useState(focusOnMount);
+  useLayoutEffect(() => {
+    if (!focusInitially) return;
+    if (initialNumber) pinRef.current?.focus();
+    else numberRef.current?.focus();
+  }, [focusInitially, initialNumber]);
+
+  // After a failed sign-in the PIN is cleared and re-enabled: focus it then.
+  useEffect(() => {
+    if (error && !pending) pinRef.current?.focus();
+  }, [error, pending]);
 
   async function submit(pinValue = pin) {
     if (pending) return;
@@ -141,13 +190,14 @@ function StudentLoginForm({
     const { data, error: authError } = await authClient.signIn.username({
       username: number,
       password: pinValue,
+      // Session cookie only: shared lab computers forget the login when the
+      // browser closes.
+      rememberMe: false,
     });
     if (authError || !data) {
       setPending(false);
       setError(loginErrorMessage(authError, "leerling"));
       setPin("");
-      // The PIN field is re-enabled on the next render; focus it after that.
-      requestAnimationFrame(() => pinRef.current?.focus());
       return;
     }
     const role = (data.user as { role?: string | null }).role ?? ROLES.student;
@@ -163,12 +213,13 @@ function StudentLoginForm({
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
       <FormField
         label="Leerlingnummer"
-        htmlFor="leerlingnummer"
+        htmlFor={ids.number}
         error={fieldError.number}
       >
         <Input
           ref={numberRef}
-          id="leerlingnummer"
+          id={ids.number}
+          aria-required
           name="username"
           size="large"
           inputMode="numeric"
@@ -178,20 +229,21 @@ function StudentLoginForm({
           value={studentNumber}
           onChange={(e) => setStudentNumber(e.target.value.replace(/\D/g, ""))}
           status={fieldError.number ? "error" : undefined}
-          autoFocus={!initialNumber}
           className="[&_input]:font-mono [&_input]:tracking-wider [&_input]:placeholder:font-sans [&_input]:placeholder:tracking-normal"
         />
       </FormField>
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <label htmlFor="pin" className="text-sm leading-none font-medium">
+          <label htmlFor={ids.pin} className="text-sm leading-none font-medium">
             PIN-code
           </label>
+          {/* Constant name + aria-pressed: "PIN-code tonen, ingedrukt". */}
           <button
             type="button"
             onClick={() => setShowPin((v) => !v)}
-            className="inline-flex items-center gap-1 rounded px-1 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="PIN-code tonen"
             aria-pressed={showPin}
           >
             {showPin ? (
@@ -199,12 +251,13 @@ function StudentLoginForm({
             ) : (
               <Eye className="size-3.5" aria-hidden="true" />
             )}
-            {showPin ? "Verbergen" : "Tonen"}
+            Tonen
           </button>
         </div>
         <PinInput
           ref={pinRef}
-          id="pin"
+          id={ids.pin}
+          type={showPin ? "text" : "password"}
           name="password"
           maxLength={6}
           value={pin}
@@ -221,12 +274,15 @@ function StudentLoginForm({
           pattern={REGEXP_ONLY_DIGITS}
           inputMode="numeric"
           autoComplete="current-password"
-          autoFocus={!!initialNumber}
           mask={!showPin}
           size="lg"
           status={fieldError.pin || error ? "error" : "default"}
           disabled={pending}
-          aria-describedby="pin-help"
+          aria-required
+          aria-invalid={fieldError.pin || error ? true : undefined}
+          aria-describedby={[ids.pinHelp, error ? ids.serverError : null]
+            .filter(Boolean)
+            .join(" ")}
           containerClassName="w-full"
         >
           <PinInputGroup className="w-full">
@@ -240,7 +296,7 @@ function StudentLoginForm({
           </PinInputGroup>
         </PinInput>
         <p
-          id="pin-help"
+          id={ids.pinHelp}
           className={cn(
             "text-xs",
             fieldError.pin
@@ -252,7 +308,7 @@ function StudentLoginForm({
         </p>
       </div>
 
-      {error ? <ErrorMessage>{error}</ErrorMessage> : null}
+      {error ? <ErrorMessage id={ids.serverError}>{error}</ErrorMessage> : null}
 
       <Button
         type="submit"
@@ -278,7 +334,26 @@ function StudentLoginForm({
 /* Teacher                                                             */
 /* ------------------------------------------------------------------ */
 
-function TeacherLoginForm({ next }: { next: string | null }) {
+function TeacherLoginForm({
+  next,
+  focusOnMount,
+}: {
+  next: string | null;
+  /** Focus the e-mail field on first render (initial tab only). */
+  focusOnMount: boolean;
+}) {
+  const ids = {
+    email: useId(),
+    password: useId(),
+    serverError: useId(),
+  };
+  const formRef = useRef<HTMLFormElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const [focusInitially] = useState(focusOnMount);
+  useLayoutEffect(() => {
+    if (focusInitially) emailRef.current?.focus();
+  }, [focusInitially]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -288,7 +363,12 @@ function TeacherLoginForm({ next }: { next: string | null }) {
     password?: string;
   }>({});
   const [pending, setPending] = useState(false);
-  const [shaking, setShaking] = useState(false);
+
+  // The submit button was disabled while signing in, which drops focus:
+  // after a failed attempt, put it on the password field to try again.
+  useEffect(() => {
+    if (error && !pending) passwordRef.current?.focus();
+  }, [error, pending]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -303,7 +383,14 @@ function TeacherLoginForm({ next }: { next: string | null }) {
     if (!password) errors.password = "Vul je wachtwoord in.";
     setFieldError(errors);
     setError(null);
-    if (errors.email || errors.password) return;
+    if (errors.email) {
+      emailRef.current?.focus();
+      return;
+    }
+    if (errors.password) {
+      passwordRef.current?.focus();
+      return;
+    }
 
     setPending(true);
     const { data, error: authError } = await authClient.signIn.email({
@@ -313,7 +400,7 @@ function TeacherLoginForm({ next }: { next: string | null }) {
     if (authError || !data) {
       setPending(false);
       setError(loginErrorMessage(authError, "docent"));
-      setShaking(true);
+      shake(formRef.current);
       return;
     }
     const role = (data.user as { role?: string | null }).role ?? ROLES.admin;
@@ -322,16 +409,20 @@ function TeacherLoginForm({ next }: { next: string | null }) {
 
   return (
     <form
+      ref={formRef}
       onSubmit={onSubmit}
       noValidate
-      onAnimationEnd={(e) => {
-        if (e.target === e.currentTarget) setShaking(false);
-      }}
-      className={cn("flex flex-col gap-5", shaking && "animate-shake")}
+      className="flex flex-col gap-5"
     >
-      <FormField label="E-mailadres" htmlFor="email" error={fieldError.email}>
+      <FormField
+        label="E-mailadres"
+        htmlFor={ids.email}
+        error={fieldError.email}
+      >
         <Input
-          id="email"
+          ref={emailRef}
+          id={ids.email}
+          aria-required
           name="email"
           type="email"
           size="large"
@@ -340,16 +431,18 @@ function TeacherLoginForm({ next }: { next: string | null }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           status={fieldError.email ? "error" : undefined}
-          autoFocus
+          aria-describedby={error ? ids.serverError : undefined}
         />
       </FormField>
       <FormField
         label="Wachtwoord"
-        htmlFor="password"
+        htmlFor={ids.password}
         error={fieldError.password}
       >
         <Input
-          id="password"
+          ref={passwordRef}
+          id={ids.password}
+          aria-required
           name="password"
           type={showPassword ? "text" : "password"}
           size="large"
@@ -361,11 +454,9 @@ function TeacherLoginForm({ next }: { next: string | null }) {
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              aria-label={
-                showPassword ? "Wachtwoord verbergen" : "Wachtwoord tonen"
-              }
+              aria-label="Wachtwoord tonen"
               aria-pressed={showPassword}
-              className="grid size-7 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="grid size-7 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               {showPassword ? (
                 <EyeOff className="size-4" aria-hidden="true" />
@@ -377,7 +468,7 @@ function TeacherLoginForm({ next }: { next: string | null }) {
         />
       </FormField>
 
-      {error ? <ErrorMessage>{error}</ErrorMessage> : null}
+      {error ? <ErrorMessage id={ids.serverError}>{error}</ErrorMessage> : null}
 
       <Button
         type="submit"
@@ -410,7 +501,7 @@ function SetupBanner() {
   return (
     <Link
       href={ROUTES.setup}
-      className="group mb-6 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/[0.07] p-3.5 text-sm outline-none transition-colors hover:bg-primary/[0.11] focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="group mb-6 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/[0.07] p-3.5 text-sm outline-none transition-colors hover:bg-primary/[0.11] focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
         <Sparkles className="size-4" aria-hidden="true" />
@@ -459,6 +550,9 @@ function SignedInNotice({ next }: { next: string | null }) {
           onClick={async () => {
             setSigningOut(true);
             await signOut();
+            // Shared school computers: leave nothing of the previous user
+            // (preference mirror, answer backups) in this browser.
+            clearLocalUserData();
             window.location.reload();
           }}
         >
@@ -485,6 +579,9 @@ export function LoginForm() {
       ? "docent"
       : "leerling";
   const [tab, setTab] = useState<LoginKind>(initialTab);
+  // Initial focus belongs to the tab the page opened on; once the user
+  // switches tabs, nothing moves focus automatically any more.
+  const [focusTab, setFocusTab] = useState<LoginKind | null>(initialTab);
 
   return (
     <div>
@@ -492,7 +589,10 @@ export function LoginForm() {
       <SignedInNotice next={next} />
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as LoginKind)}
+        onValueChange={(v) => {
+          setFocusTab(null);
+          setTab(v as LoginKind);
+        }}
         className="gap-6"
       >
         <TabsList
@@ -517,10 +617,14 @@ export function LoginForm() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="leerling">
-          <StudentLoginForm next={next} initialNumber={initialNumber} />
+          <StudentLoginForm
+            next={next}
+            initialNumber={initialNumber}
+            focusOnMount={focusTab === "leerling"}
+          />
         </TabsContent>
         <TabsContent value="docent">
-          <TeacherLoginForm next={next} />
+          <TeacherLoginForm next={next} focusOnMount={focusTab === "docent"} />
         </TabsContent>
       </Tabs>
     </div>

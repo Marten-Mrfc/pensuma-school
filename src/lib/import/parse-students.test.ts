@@ -218,3 +218,28 @@ describe("parseStudentList", () => {
     expect(r.errors[0].message).toContain("maximaal");
   });
 });
+
+describe("data minimisation", () => {
+  test("extra columns are ignored: rows hold only line, number and name", () => {
+    const r = parseStudentList(
+      [
+        "Leerlingnummer;Naam;Geboortedatum;E-mail;Adres",
+        "17053;Jan Jansen;2010-03-04;jan@example.nl;Dorpsstraat 1",
+        "17054;Sem de Vries;2010-07-08;sem@example.nl;Kerkweg 2",
+      ].join("\n"),
+    );
+    expect(r.headerDetected).toBe(true);
+    expect(r.rows).toHaveLength(2);
+    for (const row of r.rows) {
+      expect(Object.keys(row).sort()).toEqual([
+        "line",
+        "name",
+        "studentNumber",
+      ]);
+    }
+    const serialized = JSON.stringify(r.rows);
+    expect(serialized).not.toContain("2010-03-04");
+    expect(serialized).not.toContain("example.nl");
+    expect(serialized).not.toContain("Dorpsstraat");
+  });
+});

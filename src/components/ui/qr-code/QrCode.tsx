@@ -1,10 +1,8 @@
 'use client'
 
-import * as React from 'react'
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore -- qrcode ships no types unless @types/qrcode (a devDependency) is installed; @ts-ignore stays valid either way
+import { Check, Loader2, RotateCcw, ScanLine } from 'lucide-react'
 import QRCodeLib from 'qrcode'
-import { Loader2, RotateCcw, Check, ScanLine } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export type QRCodeType = 'canvas' | 'svg'
@@ -94,11 +92,11 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
     const statusOverlay = (() => {
       switch (status) {
         case 'expired':
-          return { Icon: RotateCcw, text: 'Expired', action: onRefresh ?? null }
+          return { Icon: RotateCcw, text: 'Verlopen', action: onRefresh ?? null }
         case 'scanned':
-          return { Icon: Check, text: 'Scanned', action: null }
+          return { Icon: Check, text: 'Gescand', action: null }
         case 'loading':
-          return { Icon: Loader2, text: 'Loading...', action: null }
+          return { Icon: Loader2, text: 'Laden…', action: null }
         default:
           return null
       }
@@ -122,9 +120,16 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
         >
           {/* QR Code */}
           {type === 'svg' && qrSvg ? (
-            <div className="size-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            <div
+              role="img"
+              aria-label="QR-code"
+              className="size-full"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG generated locally by the qrcode library
+              dangerouslySetInnerHTML={{ __html: qrSvg }}
+            />
           ) : qrDataUrl ? (
-            <img src={qrDataUrl} alt={`QR Code for ${value}`} className="size-full" />
+            // biome-ignore lint/performance/noImgElement: data: URL generated in the browser; next/image cannot optimise it
+            <img src={qrDataUrl} alt="QR-code" className="size-full" />
           ) : null}
 
           {/* Icon overlay */}
@@ -134,6 +139,7 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
                 className="bg-background overflow-hidden rounded-md shadow-sm"
                 style={{ width: `${iconDimensions.width}px`, height: `${iconDimensions.height}px` }}
               >
+                {/* biome-ignore lint/performance/noImgElement: small decorative logo from the consumer, often a data: URL */}
                 <img src={icon} alt="" className="size-full object-cover" />
               </div>
             </div>
@@ -142,7 +148,10 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
           {/* Status overlay */}
           {statusOverlay && (
             <div className="bg-background/90 absolute inset-0 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
-              <statusOverlay.Icon className={cn('size-8', status === 'loading' && 'animate-spin')} />
+              <statusOverlay.Icon
+                className={cn('size-8', status === 'loading' && 'motion-safe:animate-spin')}
+                aria-hidden="true"
+              />
               <span className="text-foreground text-sm font-medium">{statusOverlay.text}</span>
               {statusOverlay.action && (
                 <button
@@ -150,8 +159,8 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
                   className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none"
                   onClick={statusOverlay.action}
                 >
-                  <ScanLine className="size-3" />
-                  Refresh
+                  <ScanLine className="size-3" aria-hidden="true" />
+                  Vernieuwen
                 </button>
               )}
             </div>
@@ -169,7 +178,7 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
                 className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-xs underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:outline-none"
                 onClick={downloadQR}
               >
-                Download
+                Downloaden
               </button>
             )}
       </div>
@@ -179,4 +188,3 @@ const QrCode = React.forwardRef<HTMLDivElement, QrCodeProps>(
 QrCode.displayName = 'QrCode'
 
 export { QrCode }
-

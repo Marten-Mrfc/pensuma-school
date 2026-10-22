@@ -7,7 +7,7 @@ import type { AnswerResponse } from "@/lib/questions/schema";
 import { QUESTION_TYPE_LABELS } from "@/lib/questions/schema";
 import { cn } from "@/lib/utils";
 import { formatPoints } from "../format";
-import type { ClientEventType } from "./activity-logger";
+import type { ClientEventType, EventDetails } from "./activity-logger";
 import { ChoiceQuestion } from "./choice-question";
 import { CodeQuestion } from "./code-question";
 import { OpenQuestion } from "./open-question";
@@ -19,27 +19,35 @@ import {
 } from "./types";
 
 export interface QuestionViewProps {
+  attemptId: string;
   question: ExamQuestion;
   number: number;
   total: number;
+  /**
+   * Id for the question's h2 (from the runner's useId), focused on every
+   * question change.
+   */
+  headingId: string;
   response: AnswerResponse | undefined;
   onChange: (response: AnswerResponse) => void;
   flagged: boolean;
   onToggleFlag: () => void;
   settings: ExamSettings;
-  onLog: (type: ClientEventType, details?: Record<string, unknown>) => void;
+  onLog: (type: ClientEventType, details?: EventDetails) => void;
   disabled?: boolean;
 }
 
 export function QuestionHeader({
   question,
   number,
+  total,
+  headingId,
   flagged,
   onToggleFlag,
   className,
 }: Pick<
   QuestionViewProps,
-  "question" | "number" | "flagged" | "onToggleFlag"
+  "question" | "number" | "total" | "headingId" | "flagged" | "onToggleFlag"
 > & {
   className?: string;
 }) {
@@ -47,7 +55,10 @@ export function QuestionHeader({
     <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-xs font-semibold tracking-wide text-primary uppercase">
-          Vraag {number} · {QUESTION_TYPE_LABELS[question.type]}
+          <span aria-hidden="true">
+            Vraag {number} van {total} ·{" "}
+          </span>
+          {QUESTION_TYPE_LABELS[question.type]}
         </span>
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
           {formatPoints(question.points)}
@@ -73,7 +84,14 @@ export function QuestionHeader({
           </span>
         </Button>
       </div>
-      <h2 className="font-display text-xl leading-snug font-bold tracking-tight text-balance sm:text-2xl">
+      <h2
+        id={headingId}
+        tabIndex={-1}
+        className="scroll-mt-4 rounded-md font-display text-xl leading-snug font-bold tracking-tight text-balance outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:text-2xl"
+      >
+        <span className="sr-only">
+          Vraag {number} van {total}:{" "}
+        </span>
         {question.title}
       </h2>
     </div>
@@ -81,7 +99,8 @@ export function QuestionHeader({
 }
 
 export function QuestionView(props: QuestionViewProps) {
-  const { question, response, onChange, settings, onLog, disabled } = props;
+  const { question, number, response, onChange, settings, onLog, disabled } =
+    props;
 
   if (question.type === "code") {
     return <CodeQuestion {...props} />;
@@ -98,6 +117,7 @@ export function QuestionView(props: QuestionViewProps) {
         ) : null}
         {question.type === "multiple_choice" ? (
           <ChoiceQuestion
+            number={number}
             data={choiceData(question)}
             selected={
               response && "selected" in response ? response.selected : []
@@ -111,9 +131,10 @@ export function QuestionView(props: QuestionViewProps) {
             onChange={(text) => onChange({ text })}
             maxLength={openData(question).maxLength}
             blockPaste={settings.blockPaste}
-            onPaste={() =>
+            onPaste={(length) =>
               onLog("paste", {
                 questionId: question.id,
+                length,
                 blocked: settings.blockPaste,
               })
             }

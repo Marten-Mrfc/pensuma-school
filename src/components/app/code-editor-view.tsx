@@ -10,6 +10,7 @@ import {
   indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
 import { tags as t } from "@lezer/highlight";
 import CodeMirror, { EditorView, type Extension } from "@uiw/react-codemirror";
 import { useEffect, useId, useMemo, useRef } from "react";
@@ -21,7 +22,8 @@ const pensumaTheme = EditorView.theme({
   "&": {
     backgroundColor: "var(--code-bg)",
     color: "var(--code-fg)",
-    fontSize: "0.875rem",
+    // Display preference "Lettergrootte in de code-editor" (PreferencesSync).
+    fontSize: "var(--code-font-size, 0.875rem)",
     height: "100%",
   },
   "&.cm-focused": { outline: "none" },
@@ -147,6 +149,37 @@ const pensumaHighlight = HighlightStyle.define([
   { tag: t.invalid, color: "var(--destructive)" },
 ]);
 
+/** Dutch UI strings for CodeMirror (search panel, completions, …). */
+const DUTCH_PHRASES = EditorState.phrases.of({
+  Find: "Zoeken",
+  Replace: "Vervangen",
+  next: "volgende",
+  previous: "vorige",
+  all: "alle",
+  "match case": "hoofdlettergevoelig",
+  regexp: "regex",
+  "by word": "hele woorden",
+  replace: "vervang",
+  "replace all": "alles vervangen",
+  close: "sluiten",
+  "Go to line": "Ga naar regel",
+  go: "ga",
+  "Selection deleted": "Selectie verwijderd",
+  Completions: "Suggesties",
+  "Control character": "Stuurteken",
+  "current match": "huidige treffer",
+  "on line": "op regel",
+  "replaced $ matches": "$ treffers vervangen",
+  "replaced match on line $": "treffer op regel $ vervangen",
+  "folded code": "ingeklapte code",
+  unfold: "uitklappen",
+  Diagnostics: "Meldingen",
+  "No diagnostics": "Geen meldingen",
+});
+
+const EDIT_HINT =
+  "Tab springt in, Shift+Tab springt terug. Druk op Escape en daarna Tab, of op Ctrl+M, om de editor te verlaten.";
+
 function toCss(size: string | number | undefined) {
   return typeof size === "number" ? `${size}px` : size;
 }
@@ -164,6 +197,10 @@ export function CodeEditorView({
   placeholder,
   className,
   "aria-label": ariaLabel = "Code-editor",
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
+  escapeHint = "escape",
 }: CodeEditorProps) {
   const hintId = useId();
   const onPasteRef = useRef(onPaste);
@@ -175,11 +212,18 @@ export function CodeEditorView({
     () => [
       python(),
       indentUnit.of("    "),
+      DUTCH_PHRASES,
       pensumaTheme,
       syntaxHighlighting(pensumaHighlight),
       EditorView.contentAttributes.of({
-        "aria-label": ariaLabel,
-        "aria-describedby": hintId,
+        // aria-labelledby wins over aria-label when both are present.
+        ...(ariaLabelledBy
+          ? { "aria-labelledby": ariaLabelledBy }
+          : { "aria-label": ariaLabel }),
+        "aria-describedby": [ariaDescribedBy, hintId].filter(Boolean).join(" "),
+        ...(ariaInvalid ? { "aria-invalid": "true" } : {}),
+        ...(readOnly ? { "aria-readonly": "true" } : {}),
+        translate: "no",
         spellcheck: "false",
         autocorrect: "off",
         autocapitalize: "off",
@@ -210,7 +254,15 @@ export function CodeEditorView({
         },
       }),
     ],
-    [ariaLabel, blockPaste, hintId],
+    [
+      ariaLabel,
+      ariaLabelledBy,
+      ariaDescribedBy,
+      ariaInvalid,
+      readOnly,
+      blockPaste,
+      hintId,
+    ],
   );
 
   return (
@@ -218,14 +270,17 @@ export function CodeEditorView({
       data-slot="code-editor"
       data-readonly={readOnly ? "" : undefined}
       className={cn(
-        "group/editor relative overflow-hidden rounded-lg border border-input bg-[var(--code-bg)] shadow-xs transition-[box-shadow,border-color] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40",
+        "group/editor relative overflow-hidden rounded-lg border border-input bg-[var(--code-bg)] shadow-xs transition-[box-shadow,border-color] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring",
+        ariaInvalid && "border-destructive",
         className,
       )}
     >
       <CodeMirror
         value={value}
         onChange={readOnly ? undefined : (next) => onChange?.(next)}
-        editable={!readOnly}
+        // Stay editable (focusable, selectable, scrollable by keyboard) and
+        // block changes with readOnly instead.
+        editable
         readOnly={readOnly}
         autoFocus={autoFocus}
         placeholder={placeholder}
@@ -256,17 +311,17 @@ export function CodeEditorView({
         extensions={extensions}
       />
       <span id={hintId} className="sr-only">
-        {readOnly
-          ? "Alleen lezen."
-          : "Tab springt in, Shift+Tab springt terug. Druk op Escape en daarna Tab om de editor te verlaten."}
+        {readOnly ? "Alleen lezen." : EDIT_HINT}
       </span>
       {!readOnly ? (
         <span
           aria-hidden="true"
           className="pointer-events-none absolute right-2 bottom-2 hidden rounded-md border bg-background/90 px-1.5 py-0.5 font-sans text-[0.68rem] text-muted-foreground opacity-0 shadow-xs transition-opacity group-focus-within/editor:opacity-100 sm:block"
         >
-          <kbd className="font-mono">Esc</kbd> dan{" "}
-          <kbd className="font-mono">Tab</kbd> om te verlaten
+          <kbd className="font-mono">
+            {escapeHint === "ctrl-m" ? "Ctrl+M" : "Esc"}
+          </kbd>{" "}
+          dan <kbd className="font-mono">Tab</kbd> om te verlaten
         </span>
       ) : null}
     </div>

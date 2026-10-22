@@ -1,28 +1,17 @@
 'use client'
 
-import * as React from 'react'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { DayButton as RdpDayButton, type DateRange, type Matcher } from 'react-day-picker'
+import * as React from 'react'
+import { type DateRange, type Matcher, DayButton as RdpDayButton } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
-import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { RangeCalendar } from '@/components/ui/range-calendar'
 import { TimeColumns } from '@/components/ui/time-picker'
 import { cn } from '@/lib/utils'
 import {
   coerceDate,
   coerceShape,
-  defaultRangePresets,
-  fmtDate,
-  fmtMonth,
-  fmtTime,
-  stripTime,
-  toISODate,
-  toISODateTime,
-  parseTimeShape,
-  weekNumber,
-  weekStart,
-  withTime,
   type DatePickerLayout,
   type DatePickerPicker,
   type DatePickerPlacement,
@@ -31,29 +20,40 @@ import {
   type DatePickerStatus,
   type DatePickerType,
   type DisabledTimeResult,
+  defaultRangePresets,
   type FormatValue,
+  fmtDate,
+  fmtMonth,
+  fmtTime,
   type InternalMultiple,
   type InternalRange,
   type InternalSingle,
   type MultipleValue,
+  parseTimeShape,
   type RangeValue,
   type SingleValue,
+  stripTime,
   type TimeShape,
+  toISODate,
+  toISODateTime,
+  weekNumber,
+  weekStart,
+  withTime,
 } from './date-picker-utils'
 
 export type {
-  DatePickerType,
   DatePickerLayout,
   DatePickerPicker,
-  DatePickerStatus,
-  DatePickerSize,
   DatePickerPlacement,
+  DatePickerPreset,
+  DatePickerSize,
+  DatePickerStatus,
+  DatePickerType,
+  DisabledTimeResult,
   FormatValue,
-  SingleValue,
   MultipleValue,
   RangeValue,
-  DatePickerPreset,
-  DisabledTimeResult,
+  SingleValue,
 } from './date-picker-utils'
 
 type InternalValue = InternalSingle | InternalMultiple | InternalRange | undefined
@@ -186,15 +186,15 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
       defaultValue = null,
       onValueChange,
       type = 'single',
-      placeholder = 'Pick a date',
+      placeholder = 'Kies een datum',
       disabled = false,
       readOnly = false,
       clearable = true,
       format = 'medium',
       dateFormat,
-      locale = 'en-US',
+      locale = 'nl-NL',
       numberOfMonths,
-      weekStartsOn = 0,
+      weekStartsOn = 1,
       fixedWeeks = false,
       minValue,
       maxValue,
@@ -737,11 +737,12 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
             <CalendarIcon className="size-4" aria-hidden="true" />
             <span className="flex-1 truncate">{display || placeholder}</span>
             {clearable && hasValue && !disabled && !readOnly && (
+              // biome-ignore lint/a11y/useSemanticElements: sits inside the trigger <button>; a real <button> cannot be nested there
               <span
                 role="button"
                 tabIndex={0}
                 className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mr-1 inline-flex size-9 cursor-pointer items-center justify-center rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
-                aria-label="Clear date"
+                aria-label="Datum wissen"
                 onClick={(e) => {
                   e.stopPropagation()
                   clear(e)
@@ -767,7 +768,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
                 className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded px-2 py-1.5 text-xs focus-visible:ring-2 focus-visible:outline-none"
                 onClick={pickToday}
               >
-                Today
+                Vandaag
               </button>
             </div>
           )}
@@ -778,7 +779,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
                 <button
                   type="button"
                   className="border-input hover:bg-accent focus-visible:ring-ring inline-flex size-7 items-center justify-center rounded-md border bg-transparent transition-colors focus-visible:ring-1 focus-visible:outline-none"
-                  aria-label="Previous"
+                  aria-label={picker === 'week' ? 'Vorige maand' : 'Vorig jaar'}
                   onClick={() => shiftAnchor(-1)}
                 >
                   <ChevronLeft className="text-muted-foreground size-4" aria-hidden="true" />
@@ -787,7 +788,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
                 <button
                   type="button"
                   className="border-input hover:bg-accent focus-visible:ring-ring inline-flex size-7 items-center justify-center rounded-md border bg-transparent transition-colors focus-visible:ring-1 focus-visible:outline-none"
-                  aria-label="Next"
+                  aria-label={picker === 'week' ? 'Volgende maand' : 'Volgend jaar'}
                   onClick={() => shiftAnchor(1)}
                 >
                   <ChevronRight className="text-muted-foreground size-4" aria-hidden="true" />
@@ -956,7 +957,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
               {showTime && (
                 <div className="flex flex-col border-l">
                   <div className="flex items-center justify-between border-b px-3 py-2">
-                    <span className="text-muted-foreground text-xs tracking-widest uppercase">Time</span>
+                    <span className="text-muted-foreground text-xs tracking-widest uppercase">Tijd</span>
                     <button
                       type="button"
                       className="text-primary focus-visible:ring-ring rounded px-2 py-1.5 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none"
@@ -966,7 +967,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
                         else setOpen(false)
                       }}
                     >
-                      Done
+                      Klaar
                     </button>
                   </div>
                   <TimeColumns
@@ -993,7 +994,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
                 className="hover:bg-accent focus-visible:ring-ring rounded px-3 py-1.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 onClick={cancelPreview}
               >
-                Cancel
+                Annuleren
               </button>
               <button
                 type="button"
@@ -1012,4 +1013,3 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
 DatePicker.displayName = 'DatePicker'
 
 export { DatePicker }
-

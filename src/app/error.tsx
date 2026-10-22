@@ -26,7 +26,11 @@ export default function RootError({
   const tryAgain = retry ?? reset;
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 px-5 py-16 text-center">
+    <main
+      id="inhoud"
+      tabIndex={-1}
+      className="flex min-h-dvh flex-col items-center justify-center gap-8 px-5 py-16 text-center"
+    >
       <Logo />
       <div className="flex max-w-md flex-col gap-2">
         <h1 className="font-display-wide text-3xl font-bold tracking-tight">
@@ -53,6 +57,6 @@ export default function RootError({
           <Link href="/">Naar de startpagina</Link>
         </Button>
       </div>
-    </div>
+    </main>
   );
 }

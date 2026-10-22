@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import ReactECharts from 'echarts-for-react/esm/core'
 import { ChartFrame, EChart } from '../shared'
 import { useChartTheme } from '../useChartTheme'
 
@@ -16,7 +15,7 @@ export interface FunnelChartProps {
   /** ECharts option escape hatch -- merged on top of the computed option. */
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -32,7 +31,7 @@ export const FunnelChart = React.forwardRef<HTMLDivElement, FunnelChartProps>(
     const theme = useChartTheme()
 
     const mergedOption = React.useMemo(() => {
-      const topValue = Math.max(0, ...data.map(d => d.value))
+      const topValue = Math.max(0, ...data.map((d) => d.value))
       const series = [
         {
           type: 'funnel',

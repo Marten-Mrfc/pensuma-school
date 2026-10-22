@@ -10,10 +10,12 @@ import {
   EyeOff,
   PartyPopper,
   UserRound,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { use, useEffect, useEffectEvent, useId, useState } from "react";
+import { type RefObject, use, useId, useRef, useState } from "react";
+import { KeyCombo } from "@/components/a11y/key-combo";
 import { CodeEditor } from "@/components/app/code-editor";
 import { HighlightedCode } from "@/components/app/highlighted-code";
 import { Markdown } from "@/components/app/markdown";
@@ -22,8 +24,10 @@ import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { AssignmentNav } from "@/components/docent/assignments/assignment-nav";
 import { formatNumber } from "@/components/docent/assignments/format";
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/kbd";
 import { Switch } from "@/components/ui/switch";
+import { useShortcut } from "@/lib/a11y/shortcuts";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
+import { groupAnswers } from "@/lib/grading/answer-groups";
 import {
   type CodeGradingResult,
   QUESTION_TYPE_LABELS,
@@ -58,6 +62,10 @@ export function GradingView({
       { refetchInterval: 30_000 },
     ),
   );
+
+  useDocumentTitle([
+    assignment.data ? `Nakijken · ${assignment.data.title}` : "Nakijken",
+  ]);
 
   if (overview.isPending || assignment.isPending) return <LoadingState />;
   if (assignment.isError)
@@ -145,9 +153,8 @@ function QuestionPicker({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div
+    <nav
       className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
-      role="tablist"
       aria-label="Vragen om na te kijken"
     >
       {questions.map((q) => {
@@ -156,8 +163,7 @@ function QuestionPicker({
           <button
             key={q.id}
             type="button"
-            role="tab"
-            aria-selected={q.id === active}
+            aria-current={q.id === active ? "true" : undefined}
             onClick={() => onSelect(q.id)}
             className={cn(
               "flex min-w-52 shrink-0 flex-col gap-1 rounded-xl border bg-card p-3 text-left shadow-xs transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -187,16 +193,7 @@ function QuestionPicker({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-function isTypingTarget(el: EventTarget | null) {
-  if (!(el instanceof HTMLElement)) return false;
-  return (
-    el.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) ||
-    !!el.closest(".cm-editor")
+    </nav>
   );
 }
 
@@ -209,8 +206,10 @@ function QuestionGrader({
 }) {
   const trpc = useTRPC();
   const id = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [hideNames, setHideNames] = useState(false);
   const [onlyOpen, setOnlyOpen] = useState(question.needsReview > 0);
+  const [grouped, setGrouped] = useState(false);
   const [showContext, setShowContext] = useState(true);
   const query = useQuery(
     trpc.review.gradingQueue.queryOptions({
@@ -219,19 +218,36 @@ function QuestionGrader({
       includeGraded: true,
     }),
   );
+  const groups = useQuery(
+    trpc.feedback.groups.queryOptions({
+      assignmentId,
+      questionId: question.id,
+    }),
+  );
+
+  const info = new Map(
+    (groups.data?.items ?? []).map((g) => [g.answerId, g] as const),
+  );
+  const keyOf = (answerId: string) => info.get(answerId)?.groupKey ?? "";
 
   // A stable order for this question + filter, so saved answers don't jump away.
-  const filterKey = `${question.id}:${onlyOpen}`;
+  const filterKey = `${question.id}:${onlyOpen}:${grouped}`;
   const [snapshot, setSnapshot] = useState<{ key: string; ids: string[] }>({
     key: "",
     ids: [],
   });
   const [index, setIndex] = useState(0);
   const items = query.data?.items ?? [];
-  const filteredIds = items
-    .filter((i) => !onlyOpen || i.needsReview)
-    .map((i) => i.answerId);
-  if (query.data && snapshot.key !== filterKey) {
+  const filtered = items.filter((i) => !onlyOpen || i.needsReview);
+  const filteredIds = (
+    grouped
+      ? groupAnswers(filtered, (i) => keyOf(i.answerId))
+          // Biggest groups first: grading them saves the most clicks.
+          .sort((a, b) => b.items.length - a.items.length)
+          .flatMap((g) => g.items)
+      : filtered
+  ).map((i) => i.answerId);
+  if (query.data && groups.data && snapshot.key !== filterKey) {
     setSnapshot({ key: filterKey, ids: filteredIds });
     setIndex(0);
   }
@@ -244,22 +260,35 @@ function QuestionGrader({
   const current = order[index] ? byId.get(order[index]) : undefined;
   const reviewedCount = order.filter((x) => !byId.get(x)?.needsReview).length;
 
+  // Answers identical to the current one (all of this question's answers).
+  const currentKey = current ? keyOf(current.answerId) : "";
+  const sameAnswerIds = currentKey
+    ? items
+        .filter(
+          (i) =>
+            i.answerId !== current?.answerId &&
+            keyOf(i.answerId) === currentKey,
+        )
+        .map((i) => i.answerId)
+    : [];
+
   const goNext = () => setIndex((i) => Math.min(i + 1, order.length));
   const goPrev = () => setIndex((i) => Math.max(i - 1, 0));
-  const onKey = useEffectEvent((e: KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
-    if (e.key.toLowerCase() === "j") goNext();
-    if (e.key.toLowerCase() === "k") goPrev();
-  });
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => onKey(e);
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  const afterSave = ({ answerIds }: { answerIds: string[] }) => {
+    if (answerIds.length <= 1) return goNext();
+    // Graded a whole group: continue after the last of them.
+    const positions = answerIds
+      .map((x) => order.indexOf(x))
+      .filter((p) => p >= 0);
+    setIndex(Math.min(Math.max(index, ...positions) + 1, order.length));
+  };
 
-  if (query.isPending) return <LoadingState variant="list" />;
+  if (query.isPending || groups.isPending)
+    return <LoadingState variant="list" />;
   if (query.isError)
     return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
+  if (groups.isError)
+    return <ErrorState error={groups.error} onRetry={() => groups.refetch()} />;
 
   const label = (item: QueueItem) =>
     hideNames
@@ -267,7 +296,8 @@ function QuestionGrader({
       : item.student.name;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={panelRef} className="flex flex-col gap-4">
+      <GradingShortcuts scope={panelRef} onPrev={goPrev} onNext={goNext} />
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs md:flex-row md:items-center md:justify-between">
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -313,6 +343,17 @@ function QuestionGrader({
               onCheckedChange={setOnlyOpen}
             />
             Alleen nog te beoordelen
+          </label>
+          <label
+            htmlFor={`${id}-group`}
+            className="flex cursor-pointer items-center gap-2 text-sm"
+          >
+            <Switch
+              id={`${id}-group`}
+              checked={grouped}
+              onCheckedChange={setGrouped}
+            />
+            Groeperen op gelijke antwoorden
           </label>
         </div>
       </div>
@@ -372,29 +413,49 @@ function QuestionGrader({
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={goPrev}
                   disabled={index === 0}
+                  aria-keyshortcuts="Alt+ArrowUp"
                 >
                   <ChevronLeft aria-hidden="true" />
-                  Vorige
-                  <Kbd className="hidden sm:inline-flex">K</Kbd>
+                  Vorige leerling
+                  <span aria-hidden="true" className="hidden lg:inline-flex">
+                    <KeyCombo keys="Alt+↑" />
+                  </span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={goNext}>
-                  <Kbd className="hidden sm:inline-flex">J</Kbd>
-                  {index === order.length - 1 ? "Afronden" : "Volgende"}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goNext}
+                  aria-keyshortcuts="Alt+ArrowDown"
+                >
+                  {index === order.length - 1
+                    ? "Afronden"
+                    : "Volgende leerling"}
+                  <span aria-hidden="true" className="hidden lg:inline-flex">
+                    <KeyCombo keys="Alt+↓" />
+                  </span>
                   <ChevronRight aria-hidden="true" />
                 </Button>
               </div>
             </header>
+            {grouped && sameAnswerIds.length > 0 ? (
+              <p className="flex items-center gap-2 rounded-lg bg-info/10 px-3 py-2 text-sm text-info-ink">
+                <UsersRound className="size-4 shrink-0" aria-hidden="true" />
+                {sameAnswerIds.length === 1
+                  ? "Nog 1 leerling gaf precies hetzelfde antwoord."
+                  : `Nog ${sameAnswerIds.length} leerlingen gaven precies hetzelfde antwoord.`}
+              </p>
+            ) : null}
 
             <StudentAnswer item={current} questionType={question.type} />
 
             <ScoreBox
-              key={`${current.answerId}:${current.manualScore}:${current.feedback ?? ""}`}
+              key={`${current.answerId}:${current.manualScore}:${current.feedback ?? ""}:${(info.get(current.answerId)?.rubricChecked ?? []).join(",")}`}
               answer={{
                 id: current.answerId,
                 autoScore: current.autoScore,
@@ -402,10 +463,16 @@ function QuestionGrader({
                 maxScore: current.maxScore,
                 feedback: current.feedback,
                 status: current.status,
+                rubricChecked:
+                  info.get(current.answerId)?.rubricChecked ?? null,
               }}
               compact
               saveLabel="Opslaan en volgende"
-              onSaved={goNext}
+              questionId={question.id}
+              questionNumber={question.number}
+              rubricItems={groups.data.rubricItems}
+              sameAnswerIds={sameAnswerIds}
+              onSaved={afterSave}
             />
             {!hideNames ? (
               <Link
@@ -462,7 +529,7 @@ function QuestionGrader({
               {question.rubric ? (
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    Beoordelingsmodel
+                    Toelichting voor het nakijken
                   </span>
                   <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
                     <Markdown>{question.rubric}</Markdown>
@@ -490,6 +557,33 @@ function QuestionGrader({
       )}
     </div>
   );
+}
+
+/** Alt+↑ / Alt+↓: previous / next student, while focus is in the panel. */
+function GradingShortcuts({
+  scope,
+  onPrev,
+  onNext,
+}: {
+  scope: RefObject<HTMLDivElement | null>;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  useShortcut({
+    id: "docent-review-navigate",
+    label: "Vorige leerling",
+    keys: { key: "ArrowUp", alt: true },
+    scope,
+    handler: onPrev,
+  });
+  useShortcut({
+    id: "docent-review-navigate-next",
+    label: "Volgende leerling",
+    keys: { key: "ArrowDown", alt: true },
+    scope,
+    handler: onNext,
+  });
+  return null;
 }
 
 function StudentAnswer({

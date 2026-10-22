@@ -11,7 +11,10 @@ import "server-only";
  *   return <HydrateClient><ClassList /></HydrateClient>;
  */
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import { createTRPCOptionsProxy, type TRPCQueryOptions } from "@trpc/tanstack-react-query";
+import {
+  createTRPCOptionsProxy,
+  type TRPCQueryOptions,
+} from "@trpc/tanstack-react-query";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { appRouter, createCaller } from "@/server/api/root";
@@ -37,11 +40,17 @@ export const getCaller = cache(async () => createCaller(await createContext()));
 
 export function HydrateClient({ children }: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
-  return <HydrationBoundary state={dehydrate(queryClient)}>{children}</HydrationBoundary>;
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      {children}
+    </HydrationBoundary>
+  );
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: generic passthrough
-export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(queryOptions: T) {
+export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
+  queryOptions: T,
+) {
   const queryClient = getQueryClient();
   if (queryOptions.queryKey[1]?.type === "infinite") {
     // biome-ignore lint/suspicious/noExplicitAny: infinite query passthrough

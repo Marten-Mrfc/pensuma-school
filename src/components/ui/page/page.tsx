@@ -50,4 +50,3 @@ const PageHeaderHeading = React.forwardRef<HTMLDivElement, PageHeaderHeadingProp
 PageHeaderHeading.displayName = 'PageHeaderHeading'
 
 export { Page, PageBody, PageHeader, PageHeaderHeading }
-

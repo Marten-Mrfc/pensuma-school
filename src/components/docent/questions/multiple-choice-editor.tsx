@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  ArrowDown,
-  ArrowUp,
   Check,
   Eye,
   ListChecks,
@@ -11,7 +9,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -41,6 +40,7 @@ export function MultipleChoiceEditor({
   issues: readonly QuestionIssue[];
   prompt: string;
 }) {
+  const uid = useId();
   const [showAnswers, setShowAnswers] = useState(false);
   const [previewSelected, setPreviewSelected] = useState<string[]>([]);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -111,6 +111,7 @@ export function MultipleChoiceEditor({
           {options.map((option, index) => (
             <OptionRow
               key={option.id}
+              itemKey={option.id}
               index={index}
               count={options.length}
               text={option.text}
@@ -220,12 +221,14 @@ export function MultipleChoiceEditor({
         actions={
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Switch
-              id="mc-show-answers"
+              id={`${uid}-mc-show-answers`}
               size="sm"
               checked={showAnswers}
               onCheckedChange={setShowAnswers}
             />
-            <label htmlFor="mc-show-answers">Toon goede antwoorden</label>
+            <label htmlFor={`${uid}-mc-show-answers`}>
+              Toon goede antwoorden
+            </label>
           </div>
         }
       >
@@ -269,9 +272,11 @@ function OptionRow({
   onToggle,
   onMove,
   onRemove,
+  itemKey,
 }: {
   index: number;
   count: number;
+  itemKey: string;
   text: string;
   correct: boolean;
   multiple: boolean;
@@ -345,29 +350,16 @@ function OptionRow({
         <IssueList issues={issues} compact className="mt-1.5" />
       </div>
       <div className="flex items-center justify-end gap-0.5 sm:pt-0.5">
+        <ReorderButtons
+          index={index}
+          count={count}
+          itemLabel={`Optie ${letter}`}
+          itemKey={itemKey}
+          onMove={(from, to) => onMove(to > from ? 1 : -1)}
+        />
         <Button
           variant="ghost"
-          size="icon-xs"
-          aria-label={`Optie ${letter} omhoog`}
-          disabled={index === 0}
-          onClick={() => onMove(-1)}
-          className="text-muted-foreground"
-        >
-          <ArrowUp className="size-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`Optie ${letter} omlaag`}
-          disabled={index === count - 1}
-          onClick={() => onMove(1)}
-          className="text-muted-foreground"
-        >
-          <ArrowDown className="size-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
+          size="icon-sm"
           aria-label={`Optie ${letter} verwijderen`}
           onClick={onRemove}
           className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"

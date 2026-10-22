@@ -1,5 +1,7 @@
 'use client'
 
+import type { Table } from '@tanstack/react-table'
+import { Check, SlidersHorizontal, X } from 'lucide-react'
 /**
  * Popover variant of DataTableFilterSheet. Same filter UI (text /
  * multiselect / date) packed into a Popover instead of a side Sheet.
@@ -18,18 +20,16 @@
  * simply discards the draft.
  */
 import * as React from 'react'
-import type { Table } from '@tanstack/react-table'
 import type { DateRange } from 'react-day-picker'
-import { Check, SlidersHorizontal, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { dateToIso, isoToDate } from './date-utils'
 import { type FilterDefinition, resolveOption } from './types'
-import { isoToDate, dateToIso } from './date-utils'
 
 type DraftDateValue = { from?: string; to?: string }
 type DraftValue = string[] | string | DraftDateValue | undefined
@@ -151,8 +151,8 @@ export function DataTableFilterPopover({
   function formatDraftDateRange(column: string): string {
     const dr = getDraftDate(column)
     if (dr.from && dr.to) return `${dr.from} - ${dr.to}`
-    if (dr.from) return `From ${dr.from}`
-    if (dr.to) return `Until ${dr.to}`
+    if (dr.from) return `Vanaf ${dr.from}`
+    if (dr.to) return `Tot ${dr.to}`
     return ''
   }
 
@@ -218,7 +218,7 @@ export function DataTableFilterPopover({
             activeFilterCount > 0 ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10' : '',
           ].join(' ')}
         >
-          <SlidersHorizontal className="size-4" />
+          <SlidersHorizontal className="size-4" aria-hidden="true" />
           Filters
           {activeFilterCount > 0 && (
             <Badge className="bg-primary text-primary-foreground ml-0.5 size-5 rounded-full p-0 text-xs font-semibold">
@@ -232,23 +232,23 @@ export function DataTableFilterPopover({
         <div className="border-b px-4 pt-3.5 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="bg-muted flex size-7 items-center justify-center rounded-md">
-              <SlidersHorizontal className="text-muted-foreground size-3.5" />
+              <SlidersHorizontal className="text-muted-foreground size-3.5" aria-hidden="true" />
             </div>
             <div className="flex-1">
               <p className="text-sm leading-none font-semibold">Filters</p>
               <p className="text-muted-foreground mt-1 text-xs">
                 {activeFilterCount > 0 ? (
                   <>
-                    {activeFilterCount} active
+                    {activeFilterCount} actief
                     {!isServerSide && (
                       <>
                         {' '}
-                        &middot; {filteredRowCount} result{filteredRowCount !== 1 ? 's' : ''}
+                        &middot; {filteredRowCount} {filteredRowCount === 1 ? 'resultaat' : 'resultaten'}
                       </>
                     )}
                   </>
                 ) : (
-                  'Narrow down results'
+                  'Verfijn de resultaten'
                 )}
               </p>
             </div>
@@ -272,12 +272,12 @@ export function DataTableFilterPopover({
                           className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                           onClick={() => clearDraftSection(filter)}
                         >
-                          Clear
+                          Wissen
                         </button>
                       )}
                     </div>
                     <Input
-                      placeholder={`Filter by ${filter.label.toLowerCase()}...`}
+                      placeholder={`Filter op ${filter.label.toLowerCase()}…`}
                       value={getDraftText(filter.column)}
                       className="h-8 text-sm"
                       onChange={(e) => setDraftText(filter.column, e.target.value ?? '')}
@@ -316,14 +316,14 @@ export function DataTableFilterPopover({
                           className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                           onClick={() => clearDraftSection(filter)}
                         >
-                          Clear
+                          Wissen
                         </button>
                       )}
                     </div>
                     <Command className="[&_[data-slot=command-input-wrapper]]:border-input overflow-visible bg-transparent [&_[data-slot=command-input-wrapper]]:h-8 [&_[data-slot=command-input-wrapper]]:rounded-md [&_[data-slot=command-input-wrapper]]:border [&_[data-slot=command-input-wrapper]]:px-2.5">
-                      <CommandInput className="h-7 text-sm" placeholder={`Search ${filter.label.toLowerCase()}...`} />
+                      <CommandInput className="h-7 text-sm" placeholder={`Zoek ${filter.label.toLowerCase()}…`} />
                       <CommandList className="mt-1 max-h-[132px]">
-                        <CommandEmpty>No results.</CommandEmpty>
+                        <CommandEmpty>Geen resultaten.</CommandEmpty>
                         <CommandGroup className="p-0">
                           {filter.options?.map((rawOpt) => {
                             const opt = resolveOption(rawOpt)
@@ -343,9 +343,9 @@ export function DataTableFilterPopover({
                                       : 'border-muted-foreground/40 [&_svg]:invisible',
                                   ].join(' ')}
                                 >
-                                  <Check className="size-3" />
+                                  <Check className="size-3" aria-hidden="true" />
                                 </div>
-                                {OptIcon && <OptIcon className="text-muted-foreground size-4" />}
+                                {OptIcon && <OptIcon className="text-muted-foreground size-4" aria-hidden="true" />}
                                 <span>{opt.label}</span>
                               </CommandItem>
                             )
@@ -388,7 +388,7 @@ export function DataTableFilterPopover({
                           className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                           onClick={() => clearDraftSection(filter)}
                         >
-                          Clear
+                          Wissen
                         </button>
                       )}
                     </div>
@@ -415,15 +415,14 @@ export function DataTableFilterPopover({
         {/* Footer */}
         <div className="flex gap-2 border-t px-3 py-2.5">
           <Button variant="outline" size="sm" className="h-8 flex-1" disabled={!isDraftDirty} onClick={resetDraft}>
-            <X className="size-3.5" />
-            Reset
+            <X className="size-3.5" aria-hidden="true" />
+            Wissen
           </Button>
           <Button size="sm" className="h-8 flex-1" onClick={applyAndClose}>
-            Apply
+            Toepassen
           </Button>
         </div>
       </PopoverContent>
     </Popover>
   )
 }
-

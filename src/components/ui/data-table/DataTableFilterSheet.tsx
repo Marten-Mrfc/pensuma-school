@@ -1,16 +1,16 @@
 'use client'
 
-import * as React from 'react'
 import type { Table } from '@tanstack/react-table'
-import type { DateRange } from 'react-day-picker'
 import { Check, SlidersHorizontal, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import * as React from 'react'
+import type { DateRange } from 'react-day-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
-import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RangeCalendar } from '@/components/ui/range-calendar'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { type FilterDefinition, resolveOption } from './types'
 
 export interface DataTableFilterSheetProps {
@@ -78,7 +78,7 @@ export function DataTableFilterSheet({
         <div className={borderless ? 'px-5 pt-5 pb-2' : 'border-b px-5 pt-5 pb-4'}>
           <div className="flex items-center gap-3">
             <div className="bg-muted flex size-9 items-center justify-center rounded-lg">
-              <SlidersHorizontal className="text-muted-foreground size-4" />
+              <SlidersHorizontal className="text-muted-foreground size-4" aria-hidden="true" />
             </div>
             <div className="flex-1">
               <SheetHeader className="space-y-0.5 p-0">
@@ -86,16 +86,16 @@ export function DataTableFilterSheet({
                 <SheetDescription className="text-xs">
                   {activeFilterCount > 0 ? (
                     <>
-                      {activeFilterCount} active filter{activeFilterCount > 1 ? 's' : ''}
+                      {activeFilterCount} {activeFilterCount === 1 ? 'actief filter' : 'actieve filters'}
                       {!isServerSide && (
                         <>
                           {' '}
-                          &middot; {filteredRowCount} result{filteredRowCount !== 1 ? 's' : ''}
+                          &middot; {filteredRowCount} {filteredRowCount === 1 ? 'resultaat' : 'resultaten'}
                         </>
                       )}
                     </>
                   ) : (
-                    'Narrow down results'
+                    'Verfijn de resultaten'
                   )}
                 </SheetDescription>
               </SheetHeader>
@@ -125,12 +125,12 @@ export function DataTableFilterSheet({
                           className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                           onClick={() => onTextFilterUpdate(filter.column, undefined)}
                         >
-                          Clear
+                          Wissen
                         </button>
                       )}
                     </div>
                     <Input
-                      placeholder={`Filter by ${filter.label.toLowerCase()}...`}
+                      placeholder={`Filter op ${filter.label.toLowerCase()}…`}
                       value={textValue}
                       className="h-8 text-sm"
                       onChange={(e) => onTextFilterUpdate(filter.column, e.target.value || undefined)}
@@ -172,14 +172,14 @@ export function DataTableFilterSheet({
                           className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                           onClick={() => onClearFilter(filter)}
                         >
-                          Clear
+                          Wissen
                         </button>
                       )}
                     </div>
                     <Command className="[&_[data-slot=command-input-wrapper]]:border-input overflow-visible bg-transparent [&_[data-slot=command-input-wrapper]]:h-8 [&_[data-slot=command-input-wrapper]]:rounded-md [&_[data-slot=command-input-wrapper]]:border [&_[data-slot=command-input-wrapper]]:px-2.5">
-                      <CommandInput className="h-7 text-sm" placeholder={`Search ${filter.label.toLowerCase()}...`} />
+                      <CommandInput className="h-7 text-sm" placeholder={`Zoek ${filter.label.toLowerCase()}…`} />
                       <CommandList className="mt-1 max-h-[132px]">
-                        <CommandEmpty>No results.</CommandEmpty>
+                        <CommandEmpty>Geen resultaten.</CommandEmpty>
                         <CommandGroup className="p-0">
                           {filter.options?.map((rawOpt) => {
                             const opt = resolveOption(rawOpt)
@@ -199,9 +199,9 @@ export function DataTableFilterSheet({
                                       : 'border-muted-foreground/40 [&_svg]:invisible',
                                   ].join(' ')}
                                 >
-                                  <Check className="size-3" />
+                                  <Check className="size-3" aria-hidden="true" />
                                 </div>
-                                {OptIcon && <OptIcon className="text-muted-foreground size-4" />}
+                                {OptIcon && <OptIcon className="text-muted-foreground size-4" aria-hidden="true" />}
                                 <span>{opt.label}</span>
                               </CommandItem>
                             )
@@ -246,7 +246,7 @@ export function DataTableFilterSheet({
                           className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                           onClick={() => onClearDateFilter(filter)}
                         >
-                          Clear
+                          Wissen
                         </button>
                       )}
                     </div>
@@ -277,15 +277,15 @@ export function DataTableFilterSheet({
         {/* Footer */}
         <div className={['flex gap-2 px-4 py-3', borderless ? '' : 'border-t'].join(' ')}>
           <Button variant="outline" size="sm" className="flex-1" disabled={!isAnyFilterActive} onClick={onClearAll}>
-            <X className="size-3.5" />
-            Reset All
+            <X className="size-3.5" aria-hidden="true" />
+            Alles wissen
           </Button>
           <Button size="sm" className="flex-1" onClick={onApply}>
             {isServerSide ? (
-              'Apply Filters'
+              'Filters toepassen'
             ) : (
               <>
-                Show {filteredRowCount} result{filteredRowCount !== 1 ? 's' : ''}
+                Toon {filteredRowCount} {filteredRowCount === 1 ? 'resultaat' : 'resultaten'}
               </>
             )}
           </Button>
@@ -294,4 +294,3 @@ export function DataTableFilterSheet({
     </Sheet>
   )
 }
-

@@ -1,9 +1,9 @@
 'use client'
 
-import * as React from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Command as CommandPrimitive } from 'cmdk'
 import { Search } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const Command = React.forwardRef<
@@ -29,8 +29,8 @@ interface CommandDialogProps extends React.ComponentPropsWithoutRef<typeof Dialo
 }
 
 const CommandDialog = ({
-  title = 'Command Palette',
-  description = 'Search for a command to run...',
+  title = 'Opdrachten',
+  description = 'Zoek een opdracht om uit te voeren…',
   children,
   ...props
 }: CommandDialogProps) => (
@@ -72,7 +72,7 @@ const CommandInput = React.forwardRef<
       data-uipkge=""
       data-slot="command-input"
       className={cn(
-        'placeholder:text-muted-foreground focus-visible:ring-ring/40 flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+        'placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}
@@ -178,4 +178,3 @@ export {
   CommandShortcut,
   CommandSeparator,
 }
-

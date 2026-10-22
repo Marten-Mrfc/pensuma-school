@@ -1,11 +1,10 @@
 export {
   Pagination,
+  PaginationEllipsis,
+  PaginationFirst,
+  PaginationLast,
   PaginationList,
   PaginationListItem,
-  PaginationFirst,
-  PaginationPrev,
   PaginationNext,
-  PaginationLast,
-  PaginationEllipsis,
+  PaginationPrev,
 } from './pagination'
-

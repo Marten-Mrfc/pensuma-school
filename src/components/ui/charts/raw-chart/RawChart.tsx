@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import ReactECharts from 'echarts-for-react/esm/core'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { ChartFrame, echartsCoreModule, heightToStyle } from '../shared'
 
@@ -14,7 +14,7 @@ export interface RawChartProps {
   /** Auto-resize on container width change. Default true. */
   autoresize?: boolean
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -137,7 +137,6 @@ export const SegmentedGauge = React.forwardRef<HTMLDivElement, SegmentedGaugePro
         ref={ref}
         data-uipkge=""
         data-slot="segmented-gauge"
-        tabIndex={0}
         style={{ height: heightToStyle(height) }}
         className={cn(
           'focus-visible:ring-ring relative w-full focus-visible:ring-2 focus-visible:outline-none',
@@ -149,7 +148,7 @@ export const SegmentedGauge = React.forwardRef<HTMLDivElement, SegmentedGaugePro
           className="block h-full w-full"
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          aria-label="Chart"
+          aria-label="Grafiek"
         >
           {showTrack && (
             <path
@@ -275,7 +274,6 @@ export const SmoothFunnel = React.forwardRef<HTMLDivElement, SmoothFunnelProps>(
         ref={ref}
         data-uipkge=""
         data-slot="smooth-funnel"
-        tabIndex={0}
         style={{ height: heightToStyle(height) }}
         className={cn('focus-visible:ring-ring w-full focus-visible:ring-2 focus-visible:outline-none', className)}
       >
@@ -284,7 +282,7 @@ export const SmoothFunnel = React.forwardRef<HTMLDivElement, SmoothFunnelProps>(
           className="block h-full w-full"
           preserveAspectRatio="none"
           role="img"
-          aria-label="Chart"
+          aria-label="Grafiek"
         >
           {segments.map((seg, i) => (
             <g key={i}>

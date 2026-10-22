@@ -3,16 +3,16 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import {
-  TimelineContext,
-  TimelineItemContext,
   type TimelineAlign,
+  TimelineContext,
   type TimelineDensity,
   type TimelineDirection,
+  TimelineItemContext,
   type TimelineItemContextValue,
   type TimelineSide,
   type TimelineStatus,
 } from './context'
-import { timelineMediaVariants, type TimelineMediaVariant } from './timeline.variants'
+import { type TimelineMediaVariant, timelineMediaVariants } from './timeline.variants'
 
 // React's own useId -- SSR-safe and avoids a module-level counter that would
 // hydrate-mismatch. (React 19's useRef requires an initial arg.)
@@ -139,12 +139,14 @@ function TimelineItem({ className, side, status = 'default', children, ...props 
     ensureTimelineStyles()
   }, [])
 
+  // Depend on the stable callbacks, not on the context object (it changes on every registration).
+  const register = ctx?.register
+  const unregister = ctx?.unregister
   React.useEffect(() => {
-    if (!ctx) return
-    ctx.register(id)
-    return () => ctx.unregister(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, ctx?.register, ctx?.unregister])
+    if (!register || !unregister) return
+    register(id)
+    return () => unregister(id)
+  }, [id, register, unregister])
 
   const index = ctx ? ctx.indexOf(id) : 0
   const isFirst = index === 0
@@ -466,4 +468,3 @@ export {
   TimelineDescription,
   TimelineDate,
 }
-

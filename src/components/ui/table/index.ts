@@ -1,14 +1,13 @@
 export {
   Table,
-  TableHeader,
   TableBody,
+  TableCaption,
+  TableCell,
+  TableEmpty,
+  type TableEmptyProps,
   TableFooter,
   TableHead,
-  TableRow,
-  TableCell,
-  TableCaption,
-  TableEmpty,
+  TableHeader,
   type TableProps,
-  type TableEmptyProps,
+  TableRow,
 } from './table'
-

@@ -1,10 +1,9 @@
 export {
+  RadioButton,
+  type RadioButtonProps,
   RadioGroup,
   RadioGroupItem,
-  RadioButton,
-  type RadioGroupProps,
   type RadioGroupItemProps,
-  type RadioButtonProps,
+  type RadioGroupProps,
   type RadioOption,
 } from './radio-group'
-

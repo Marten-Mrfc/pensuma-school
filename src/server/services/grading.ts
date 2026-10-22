@@ -1,16 +1,32 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { applyHintPenalty, type HintUse } from "@/lib/grading/hint-penalty";
+import {
+  effectiveScore,
+  isBlankResponse,
+  type NeutralizationMode,
+  neutralizedScores,
+  round2,
+  scoreMultipleChoice,
+} from "@/lib/grading/scoring";
 import {
   type CodeGradingResult,
+  type CodeHint,
   type GradingResult,
-  type MultipleChoiceData,
   parseQuestionData,
   type QuestionType,
 } from "@/lib/questions/schema";
 import { db } from "@/server/db";
-import { answers, attempts, questions } from "@/server/db/schema";
+import {
+  answers,
+  attempts,
+  questionNeutralizations,
+  questions,
+} from "@/server/db/schema";
 import { gradeCode, gradeCodeBatch } from "@/server/grader";
+
+export { effectiveScore, isBlankResponse, scoreMultipleChoice };
 
 /**
  * Grading orchestration: turns stored answers into scores.
@@ -21,17 +37,12 @@ import { gradeCode, gradeCodeBatch } from "@/server/grader";
  *
  * Grading never touches `manualScore` / `feedback`: the teacher's override
  * always wins (see `effectiveScore`).
+ *
+ * Revealed hints cost points on code questions (`applyHintPenalty`), and a
+ * question that "vervalt" for an assignment (`question_neutralization`) keeps
+ * its neutralised score on every regrade: drop → max 0, full points →
+ * autoScore = points.
  */
-
-/** Score that counts: the teacher's override wins over the automatic score. */
-export function effectiveScore(answer: {
-  autoScore: number | null;
-  manualScore: number | null;
-}): number {
-  return answer.manualScore ?? answer.autoScore ?? 0;
-}
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 type AnswerStatus = "empty" | "saved" | "graded" | "needs_review";
 
@@ -40,55 +51,6 @@ type GradeOutcome = {
   autoScore: number | null;
   result: GradingResult | null;
 };
-
-/** Is this response blank for its question type? */
-export function isBlankResponse(
-  type: QuestionType,
-  response: unknown,
-  starterCode = "",
-): boolean {
-  const r = (response ?? {}) as Record<string, unknown>;
-  switch (type) {
-    case "code": {
-      const code = typeof r.code === "string" ? r.code : "";
-      return code.trim() === "" || code.trim() === starterCode.trim();
-    }
-    case "multiple_choice":
-      return !Array.isArray(r.selected) || r.selected.length === 0;
-    case "open":
-      return typeof r.text !== "string" || r.text.trim() === "";
-  }
-}
-
-/** Pure multiple-choice scoring (exported for tests and previews). */
-export function scoreMultipleChoice(
-  data: MultipleChoiceData,
-  selectedIds: readonly string[],
-): { correct: boolean; fraction: number } {
-  const validIds = new Set(data.options.map((o) => o.id));
-  const selected = new Set(selectedIds.filter((id) => validIds.has(id)));
-  const correctIds = new Set(
-    data.options.filter((o) => o.correct).map((o) => o.id),
-  );
-  const exact =
-    selected.size === correctIds.size &&
-    [...selected].every((id) => correctIds.has(id));
-
-  if (!data.multiple || data.scoring === "all_or_nothing") {
-    return { correct: exact, fraction: exact ? 1 : 0 };
-  }
-  if (correctIds.size === 0) {
-    return { correct: exact, fraction: exact ? 1 : 0 };
-  }
-  let right = 0;
-  let wrong = 0;
-  for (const id of selected) {
-    if (correctIds.has(id)) right++;
-    else wrong++;
-  }
-  const fraction = Math.max(0, Math.min(1, (right - wrong) / correctIds.size));
-  return { correct: exact, fraction };
-}
 
 function internalErrorResult(message: string): CodeGradingResult {
   return {
@@ -109,12 +71,23 @@ function internalErrorResult(message: string): CodeGradingResult {
   };
 }
 
+/** Code answers: the fraction after the hint penalty, as points. */
+function codeScore(
+  fraction: number,
+  points: number,
+  hints: readonly CodeHint[],
+  hintsUsed: readonly HintUse[] | null | undefined,
+): number {
+  return round2(applyHintPenalty(fraction, hints, hintsUsed) * points);
+}
+
 async function computeOutcome(
   type: QuestionType,
   rawData: unknown,
   response: unknown,
   points: number,
   hasManualScore: boolean,
+  hintsUsed: readonly HintUse[] | null = null,
 ): Promise<GradeOutcome> {
   const gradedAt = new Date().toISOString();
   const reviewStatus: AnswerStatus = hasManualScore ? "graded" : "needs_review";
@@ -141,7 +114,7 @@ async function computeOutcome(
         }
         return {
           status: "graded",
-          autoScore: round2(result.fraction * points),
+          autoScore: codeScore(result.fraction, points, data.hints, hintsUsed),
           result,
         };
       } catch (err) {
@@ -184,11 +157,47 @@ async function computeOutcome(
   }
 }
 
+/**
+ * Apply a neutralisation ("vraag laten vervallen") to a grading outcome:
+ * the grading result is kept for reference, the score follows the mode.
+ */
+function neutralizeOutcome(
+  outcome: GradeOutcome,
+  mode: NeutralizationMode | undefined,
+  points: number,
+): { outcome: GradeOutcome; maxScore: number } {
+  const scores = neutralizedScores(mode, points);
+  if (!scores) return { outcome, maxScore: points };
+  return {
+    outcome: {
+      status: "graded",
+      autoScore: scores.autoScore,
+      result: outcome.result,
+    },
+    maxScore: scores.maxScore,
+  };
+}
+
+/** Neutralised questions of an assignment: questionId → mode. */
+export async function neutralizationModes(
+  assignmentId: string,
+): Promise<Map<string, NeutralizationMode>> {
+  const rows = await db
+    .select({
+      questionId: questionNeutralizations.questionId,
+      mode: questionNeutralizations.mode,
+    })
+    .from(questionNeutralizations)
+    .where(eq(questionNeutralizations.assignmentId, assignmentId));
+  return new Map(rows.map((r) => [r.questionId, r.mode]));
+}
+
 /** Grade one answer (code → server grader, MC → auto, open → needs review). */
 export async function gradeAnswer(answerId: string): Promise<void> {
   const [row] = await db
     .select({
       answer: answers,
+      assignmentId: attempts.assignmentId,
       question: {
         type: questions.type,
         data: questions.data,
@@ -197,20 +206,31 @@ export async function gradeAnswer(answerId: string): Promise<void> {
     })
     .from(answers)
     .innerJoin(questions, eq(questions.id, answers.questionId))
+    .innerJoin(attempts, eq(attempts.id, answers.attemptId))
     .where(eq(answers.id, answerId));
   if (!row) throw new Error(`Answer ${answerId} not found`);
 
   const { answer, question } = row;
   const points = question.points;
+  const [neutralization] = await db
+    .select({ mode: questionNeutralizations.mode })
+    .from(questionNeutralizations)
+    .where(
+      and(
+        eq(questionNeutralizations.assignmentId, row.assignmentId),
+        eq(questionNeutralizations.questionId, answer.questionId),
+      ),
+    );
   const outcome = await computeOutcome(
     question.type,
     question.data,
     answer.response,
     points,
     answer.manualScore != null,
+    answer.hintsUsed,
   );
-
-  await saveOutcome(answerId, outcome, points);
+  const applied = neutralizeOutcome(outcome, neutralization?.mode, points);
+  await saveOutcome(answerId, applied.outcome, applied.maxScore);
 }
 
 /** Recompute attempt.score / maxScore / gradingStatus from its answers. */
@@ -269,11 +289,11 @@ export function isGradingInFlight(attemptId: string): boolean {
   return inFlight.has(attemptId);
 }
 
-/** Persist a grading outcome on an answer. */
+/** Persist a grading outcome on an answer (`maxScore`: 0 for a dropped question). */
 async function saveOutcome(
   answerId: string,
   outcome: GradeOutcome,
-  points: number,
+  maxScore: number,
 ) {
   await db
     .update(answers)
@@ -281,7 +301,7 @@ async function saveOutcome(
       status: outcome.status,
       autoScore: outcome.autoScore,
       result: outcome.result,
-      maxScore: points,
+      maxScore,
       gradedAt: new Date(),
     })
     .where(eq(answers.id, answerId));
@@ -294,31 +314,45 @@ async function saveOutcome(
  * fresh sandbox per question.
  */
 async function gradeAttemptNow(attemptId: string): Promise<void> {
-  const rows = await db
-    .select({
-      answer: {
-        id: answers.id,
-        response: answers.response,
-        manualScore: answers.manualScore,
-      },
-      question: {
-        type: questions.type,
-        data: questions.data,
-        points: questions.points,
-      },
-    })
-    .from(answers)
-    .innerJoin(questions, eq(questions.id, answers.questionId))
-    .where(eq(answers.attemptId, attemptId));
+  const [attempt] = await db
+    .select({ assignmentId: attempts.assignmentId })
+    .from(attempts)
+    .where(eq(attempts.id, attemptId));
+  if (!attempt) return;
+  const [rows, neutralized] = await Promise.all([
+    db
+      .select({
+        answer: {
+          id: answers.id,
+          questionId: answers.questionId,
+          response: answers.response,
+          manualScore: answers.manualScore,
+          hintsUsed: answers.hintsUsed,
+        },
+        question: {
+          type: questions.type,
+          data: questions.data,
+          points: questions.points,
+        },
+      })
+      .from(answers)
+      .innerJoin(questions, eq(questions.id, answers.questionId))
+      .where(eq(answers.attemptId, attemptId)),
+    neutralizationModes(attempt.assignmentId),
+  ]);
 
   const codeJobs: Array<{
     answerId: string;
     points: number;
+    mode: NeutralizationMode | undefined;
+    hints: CodeHint[];
+    hintsUsed: HintUse[];
     reviewStatus: AnswerStatus;
     input: Parameters<typeof gradeCodeBatch>[0][number];
   }> = [];
 
   for (const { answer, question } of rows) {
+    const mode = neutralized.get(answer.questionId);
     try {
       if (question.type === "code") {
         const data = parseQuestionData("code", question.data);
@@ -326,6 +360,9 @@ async function gradeAttemptNow(attemptId: string): Promise<void> {
           codeJobs.push({
             answerId: answer.id,
             points: question.points,
+            mode,
+            hints: data.hints,
+            hintsUsed: answer.hintsUsed ?? [],
             reviewStatus:
               answer.manualScore != null ? "graded" : "needs_review",
             input: {
@@ -344,12 +381,13 @@ async function gradeAttemptNow(attemptId: string): Promise<void> {
         answer.response,
         question.points,
         answer.manualScore != null,
+        answer.hintsUsed,
       );
-      await saveOutcome(answer.id, outcome, question.points);
+      const applied = neutralizeOutcome(outcome, mode, question.points);
+      await saveOutcome(answer.id, applied.outcome, applied.maxScore);
     } catch (err) {
       console.error(`[grading] answer ${answer.id} failed`, err);
-      await saveOutcome(
-        answer.id,
+      const applied = neutralizeOutcome(
         {
           status: "needs_review",
           autoScore: null,
@@ -357,8 +395,12 @@ async function gradeAttemptNow(attemptId: string): Promise<void> {
             err instanceof Error ? err.message : String(err),
           ),
         },
+        mode,
         question.points,
-      ).catch(() => {});
+      );
+      await saveOutcome(answer.id, applied.outcome, applied.maxScore).catch(
+        () => {},
+      );
     }
   }
 
@@ -388,10 +430,20 @@ async function gradeAttemptNow(attemptId: string): Promise<void> {
               }
             : {
                 status: "graded",
-                autoScore: round2(result.fraction * job.points),
+                autoScore: codeScore(
+                  result.fraction,
+                  job.points,
+                  job.hints,
+                  job.hintsUsed,
+                ),
                 result,
               };
-        return saveOutcome(job.answerId, outcome, job.points).catch((err) =>
+        const applied = neutralizeOutcome(outcome, job.mode, job.points);
+        return saveOutcome(
+          job.answerId,
+          applied.outcome,
+          applied.maxScore,
+        ).catch((err) =>
           console.error(`[grading] saving answer ${job.answerId} failed`, err),
         );
       }),
@@ -417,4 +469,109 @@ export async function gradeAttempt(attemptId: string): Promise<void> {
   } finally {
     if (inFlight.get(attemptId) === run) inFlight.delete(attemptId);
   }
+}
+
+/* ------------------------------ Quick rescoring ---------------------------- */
+
+/**
+ * Recompute the automatic scores of submitted answers from what is already
+ * stored, without running the sandbox again: code answers reuse their stored
+ * grading result (the code cannot change after submitting), multiple choice
+ * and open questions are cheap anyway. Answers without a usable code result
+ * fall back to `gradeAnswer`. Applies hint penalties and neutralisations.
+ * Does not recompute the attempts' totals (call `recomputeAttemptScore`).
+ */
+export async function rescoreAnswers(
+  answerIds: readonly string[],
+): Promise<{ rescored: number; regraded: number; attemptIds: string[] }> {
+  if (answerIds.length === 0)
+    return { rescored: 0, regraded: 0, attemptIds: [] };
+  const rows = await db
+    .select({
+      answer: {
+        id: answers.id,
+        questionId: answers.questionId,
+        response: answers.response,
+        manualScore: answers.manualScore,
+        hintsUsed: answers.hintsUsed,
+        result: answers.result,
+      },
+      attempt: {
+        id: attempts.id,
+        status: attempts.status,
+        assignmentId: attempts.assignmentId,
+      },
+      question: {
+        type: questions.type,
+        data: questions.data,
+        points: questions.points,
+      },
+    })
+    .from(answers)
+    .innerJoin(attempts, eq(attempts.id, answers.attemptId))
+    .innerJoin(questions, eq(questions.id, answers.questionId))
+    .where(inArray(answers.id, [...answerIds]));
+
+  const modesByAssignment = new Map<string, Map<string, NeutralizationMode>>();
+  for (const id of new Set(rows.map((r) => r.attempt.assignmentId))) {
+    modesByAssignment.set(id, await neutralizationModes(id));
+  }
+
+  let rescored = 0;
+  const fallback: string[] = [];
+  for (const { answer, attempt, question } of rows) {
+    if (attempt.status !== "submitted") continue;
+    const mode = modesByAssignment
+      .get(attempt.assignmentId)
+      ?.get(answer.questionId);
+    let outcome: GradeOutcome;
+    if (question.type === "code") {
+      const data = parseQuestionData("code", question.data);
+      const stored = answer.result;
+      if (isBlankResponse("code", answer.response, data.starterCode)) {
+        outcome = { status: "graded", autoScore: 0, result: null };
+      } else if (
+        stored?.kind === "code" &&
+        stored.status !== "internal_error"
+      ) {
+        outcome = {
+          status: "graded",
+          autoScore: codeScore(
+            stored.fraction,
+            question.points,
+            data.hints,
+            answer.hintsUsed,
+          ),
+          result: stored,
+        };
+      } else {
+        fallback.push(answer.id);
+        continue;
+      }
+    } else {
+      outcome = await computeOutcome(
+        question.type,
+        question.data,
+        answer.response,
+        question.points,
+        answer.manualScore != null,
+        answer.hintsUsed,
+      );
+    }
+    const applied = neutralizeOutcome(outcome, mode, question.points);
+    await saveOutcome(answer.id, applied.outcome, applied.maxScore);
+    rescored++;
+  }
+  for (const id of fallback) {
+    try {
+      await gradeAnswer(id);
+    } catch (err) {
+      console.error(`[grading] regrading answer ${id} failed`, err);
+    }
+  }
+  return {
+    rescored,
+    regraded: fallback.length,
+    attemptIds: [...new Set(rows.map((r) => r.attempt.id))],
+  };
 }

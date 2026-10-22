@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, School } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { ClassFormDialog } from "./class-form-dialog";
 
 /** /docent/klassen: all classes as cards. */
 export function ClassesPage() {
+  const uid = useId();
   const trpc = useTRPC();
   const router = useRouter();
   const [showArchived, setShowArchived] = useState(false);
@@ -40,11 +41,11 @@ export function ClassesPage() {
         actions={
           <>
             <label
-              htmlFor="show-archived"
+              htmlFor={`${uid}-show-archived`}
               className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-muted-foreground select-none hover:text-foreground"
             >
               <Switch
-                id="show-archived"
+                id={`${uid}-show-archived`}
                 checked={showArchived}
                 onCheckedChange={setShowArchived}
                 size="sm"
@@ -101,11 +102,11 @@ export function ClassesPage() {
           )}
           {showArchived && archived.length > 0 ? (
             <section
-              aria-labelledby="archived-heading"
+              aria-labelledby={`${uid}-archived-heading`}
               className="flex flex-col gap-3"
             >
               <h2
-                id="archived-heading"
+                id={`${uid}-archived-heading`}
                 className="text-sm font-medium tracking-wide text-muted-foreground uppercase"
               >
                 Gearchiveerd

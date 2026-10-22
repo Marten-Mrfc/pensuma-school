@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -49,6 +49,7 @@ export function ClassFormDialog(props: ClassFormDialogProps) {
 }
 
 function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
+  const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const editing = Boolean(klas);
@@ -107,9 +108,14 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
       </DialogHeader>
 
       <div className="flex flex-col gap-4">
-        <FormField label="Naam" htmlFor="class-name" required error={nameError}>
+        <FormField
+          label="Naam"
+          htmlFor={`${uid}-class-name`}
+          required
+          error={nameError}
+        >
           <Input
-            id="class-name"
+            id={`${uid}-class-name`}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Bijvoorbeeld 4H2"
@@ -120,11 +126,11 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
         </FormField>
         <FormField
           label="Schooljaar"
-          htmlFor="class-year"
+          htmlFor={`${uid}-class-year`}
           description="Optioneel, bijvoorbeeld 2026-2027."
         >
           <Input
-            id="class-year"
+            id={`${uid}-class-year`}
             value={schoolYear}
             onChange={(e) => setSchoolYear(e.target.value)}
             placeholder={currentSchoolYear()}
@@ -134,11 +140,11 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
         </FormField>
         <FormField
           label="Omschrijving"
-          htmlFor="class-description"
+          htmlFor={`${uid}-class-description`}
           description="Optioneel, alleen zichtbaar voor docenten."
         >
           <textarea
-            id="class-description"
+            id={`${uid}-class-description`}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}

@@ -18,7 +18,7 @@ export interface WordCloudChartProps {
   /** Optional palette override. Defaults to chart-1..5 tokens. */
   colors?: string[]
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 

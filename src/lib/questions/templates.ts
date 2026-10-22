@@ -101,8 +101,9 @@ export function cloneTest<T extends CodeTest>(test: T): T {
 }
 
 /**
- * Give every test, check and option a fresh id. Used when copying questions
- * between tests so ids never collide with answers/results of the original.
+ * Give every test, check, hint, option and rubric item a fresh id. Used when
+ * copying questions between tests so ids never collide with answers/results
+ * of the original.
  */
 export function refreshDataIds<T extends QuestionType>(
   type: T,
@@ -114,6 +115,7 @@ export function refreshDataIds<T extends QuestionType>(
       ...d,
       tests: d.tests.map((t) => ({ ...t, id: createLocalId("t") })),
       checks: d.checks.map((c) => ({ ...c, id: createLocalId("c") })),
+      hints: (d.hints ?? []).map((h) => ({ ...h, id: createLocalId("h") })),
     } as QuestionDataByType[T];
   }
   if (type === "multiple_choice") {
@@ -123,7 +125,14 @@ export function refreshDataIds<T extends QuestionType>(
       options: d.options.map((o) => ({ ...o, id: createLocalId("o") })),
     } as QuestionDataByType[T];
   }
-  return data;
+  const d = data as OpenQuestionData;
+  return {
+    ...d,
+    rubricItems: (d.rubricItems ?? []).map((r) => ({
+      ...r,
+      id: createLocalId("r"),
+    })),
+  } as QuestionDataByType[T];
 }
 
 /* -------------------------------------------------------------------------- */

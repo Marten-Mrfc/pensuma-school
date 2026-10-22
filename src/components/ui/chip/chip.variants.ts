@@ -21,8 +21,8 @@ export const chipVariants = cva(
         outlined: 'border border-current bg-transparent hover:bg-accent',
         outline: 'border border-current bg-transparent hover:bg-accent',
         elevated: 'bg-primary/10 text-primary shadow-sm hover:bg-primary/20',
-        success: 'bg-success/10 text-success dark:text-success hover:bg-success/20',
-        warning: 'bg-warning/10 text-warning dark:text-warning hover:bg-warning/20',
+        success: 'bg-success/10 text-success-ink hover:bg-success/20',
+        warning: 'bg-warning/10 text-warning-ink hover:bg-warning/20',
         destructive: 'bg-destructive/10 text-destructive dark:text-destructive hover:bg-destructive/20',
       },
       size: {
@@ -44,4 +44,3 @@ export const chipVariants = cva(
 )
 
 export type ChipVariants = VariantProps<typeof chipVariants>
-

@@ -17,4 +17,3 @@ export function resolveOption(opt: string | FilterOption): FilterOption {
   if (typeof opt === 'string') return { value: opt, label: opt }
   return opt
 }
-

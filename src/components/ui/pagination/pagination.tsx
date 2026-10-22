@@ -1,5 +1,5 @@
-import * as React from 'react'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoreHorizontal } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 
 const Pagination = ({ className, 'aria-label': ariaLabel, ...props }: React.ComponentPropsWithoutRef<'nav'>) => (
   <nav
-    aria-label={ariaLabel ?? 'Pagination'}
+    aria-label={ariaLabel ?? 'Paginering'}
     data-uipkge=""
     data-slot="pagination"
     className={cn('flex items-center gap-1', className)}
@@ -43,7 +43,7 @@ PaginationListItem.displayName = 'PaginationListItem'
 
 const PaginationFirst = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
   ({ children, ...props }, ref) => (
-    <button ref={ref} type="button" aria-label="Go to first page" {...props}>
+    <button ref={ref} type="button" aria-label="Naar eerste pagina" {...props}>
       {children ?? <ChevronsLeft className="size-4" aria-hidden="true" />}
     </button>
   ),
@@ -52,7 +52,7 @@ PaginationFirst.displayName = 'PaginationFirst'
 
 const PaginationPrev = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
   ({ children, ...props }, ref) => (
-    <button ref={ref} type="button" aria-label="Go to previous page" {...props}>
+    <button ref={ref} type="button" aria-label="Naar vorige pagina" {...props}>
       {children ?? <ChevronLeft className="size-4" aria-hidden="true" />}
     </button>
   ),
@@ -61,7 +61,7 @@ PaginationPrev.displayName = 'PaginationPrev'
 
 const PaginationNext = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
   ({ children, ...props }, ref) => (
-    <button ref={ref} type="button" aria-label="Go to next page" {...props}>
+    <button ref={ref} type="button" aria-label="Naar volgende pagina" {...props}>
       {children ?? <ChevronRight className="size-4" aria-hidden="true" />}
     </button>
   ),
@@ -70,7 +70,7 @@ PaginationNext.displayName = 'PaginationNext'
 
 const PaginationLast = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
   ({ children, ...props }, ref) => (
-    <button ref={ref} type="button" aria-label="Go to last page" {...props}>
+    <button ref={ref} type="button" aria-label="Naar laatste pagina" {...props}>
       {children ?? <ChevronsRight className="size-4" aria-hidden="true" />}
     </button>
   ),
@@ -94,4 +94,3 @@ export {
   PaginationLast,
   PaginationEllipsis,
 }
-

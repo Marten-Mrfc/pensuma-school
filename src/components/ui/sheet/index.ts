@@ -1,12 +1,11 @@
 export {
   Sheet,
-  SheetTrigger,
   SheetClose,
-  SheetOverlay,
   SheetContent,
-  SheetHeader,
-  SheetFooter,
-  SheetTitle,
   SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetOverlay,
+  SheetTitle,
+  SheetTrigger,
 } from './sheet'
-

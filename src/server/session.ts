@@ -9,11 +9,18 @@ import { auth } from "@/server/auth";
 /**
  * Data Access Layer for the current session (deduped per request).
  *
+ * Reads the session from the database (no 60-second cookie cache), so a
+ * deactivated student, a reset PIN or a removed teacher is signed out at
+ * once.
+ *
  * With `cacheComponents` enabled, anything that calls these reads request
  * data, so it must render inside a <Suspense> boundary.
  */
 export const getSession = cache(async () =>
-  auth.api.getSession({ headers: await headers() }),
+  auth.api.getSession({
+    headers: await headers(),
+    query: { disableCookieCache: true },
+  }),
 );
 
 export type CurrentUser = {
@@ -23,6 +30,8 @@ export type CurrentUser = {
   role: string;
   username: string | null;
   impersonatedBy: string | null;
+  /** Teacher signed in with a temporary password (see PasswordChangeGate). */
+  passwordChangeRequired: boolean;
 };
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
@@ -31,6 +40,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const u = session.user as typeof session.user & {
     role?: string | null;
     username?: string | null;
+    passwordChangeRequired?: boolean | null;
   };
   return {
     id: u.id,
@@ -41,6 +51,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     impersonatedBy:
       (session.session as { impersonatedBy?: string | null }).impersonatedBy ??
       null,
+    passwordChangeRequired: u.passwordChangeRequired === true,
   };
 });
 

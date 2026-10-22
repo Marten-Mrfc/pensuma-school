@@ -38,7 +38,7 @@ export const accordionItemVariants = cva('', {
 })
 
 export const accordionTriggerVariants = cva(
-  'group/accordion-trigger flex w-full items-center justify-between gap-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 hover:text-primary disabled:pointer-events-none disabled:opacity-50',
+  'group/accordion-trigger flex w-full items-center justify-between gap-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -58,4 +58,3 @@ export type AccordionVariants = VariantProps<typeof accordionVariants>
 export type AccordionItemVariants = VariantProps<typeof accordionItemVariants>
 
 export type AccordionTriggerVariants = VariantProps<typeof accordionTriggerVariants>
-

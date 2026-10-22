@@ -28,4 +28,3 @@ export const stepperIndicatorVariants = cva('flex items-center justify-center ro
 })
 
 export type StepperIndicatorVariants = VariantProps<typeof stepperIndicatorVariants>
-

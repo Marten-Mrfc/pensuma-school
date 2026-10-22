@@ -43,7 +43,7 @@ const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgressProps>
       indeterminate = false,
       showValue = false,
       suffix = '%',
-      ariaLabel = 'Progress',
+      ariaLabel = 'Voortgang',
       children,
       ...props
     },
@@ -154,7 +154,7 @@ const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgressProps>
   }
 }
 `}</style>
-        <svg width={sizePx} height={sizePx} viewBox={viewBox} className="block">
+        <svg width={sizePx} height={sizePx} viewBox={viewBox} className="block" aria-hidden="true">
           {/* Track */}
           <circle cx={center} cy={center} r={radius} fill="none" stroke={resolvedTrackColor} strokeWidth={thickness} />
           {/* Progress arc */}
@@ -200,4 +200,3 @@ const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgressProps>
 CircularProgress.displayName = 'CircularProgress'
 
 export { CircularProgress }
-

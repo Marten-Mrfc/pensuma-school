@@ -4,7 +4,14 @@ export type DatePickerPicker = 'day' | 'week' | 'month' | 'quarter' | 'year'
 export type DatePickerStatus = 'error' | 'warning'
 export type DatePickerSize = 'small' | 'middle' | 'large'
 export type DatePickerPlacement =
-  'top' | 'bottom' | 'left' | 'right' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'topLeft'
+  | 'topRight'
+  | 'bottomLeft'
+  | 'bottomRight'
 
 export type FormatValue = 'short' | 'medium' | 'long' | 'full' | Intl.DateTimeFormatOptions
 
@@ -120,13 +127,13 @@ export function defaultRangePresets(): DatePickerPreset[] {
   const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1)
   const ytd = new Date(t.getFullYear(), 0, 1)
   return [
-    { label: 'Today', value: { start: t, end: t } },
-    { label: 'Yesterday', value: { start: yesterday, end: yesterday } },
-    { label: 'Last 7 days', value: { start: last7, end: t } },
-    { label: 'Last 30 days', value: { start: last30, end: t } },
-    { label: 'This month', value: { start: monthStart, end: t } },
-    { label: 'Last month', value: { start: lastMonthStart, end: lastMonthEnd } },
-    { label: 'Year to date', value: { start: ytd, end: t } },
+    { label: 'Vandaag', value: { start: t, end: t } },
+    { label: 'Gisteren', value: { start: yesterday, end: yesterday } },
+    { label: 'Afgelopen 7 dagen', value: { start: last7, end: t } },
+    { label: 'Afgelopen 30 dagen', value: { start: last30, end: t } },
+    { label: 'Deze maand', value: { start: monthStart, end: t } },
+    { label: 'Vorige maand', value: { start: lastMonthStart, end: lastMonthEnd } },
+    { label: 'Dit jaar tot nu', value: { start: ytd, end: t } },
   ]
 }
 
@@ -164,4 +171,3 @@ export function fmtTime(d: Date, showSeconds: boolean, use24Hour: boolean) {
     : { hour: '2-digit', minute: '2-digit', hour12: !use24Hour }
   return new Intl.DateTimeFormat(undefined, opts).format(d)
 }
-

@@ -9,9 +9,11 @@ type Bin = { label: string; from: number; to: number; count: number };
 export function GradeDistributionChart({
   bins,
   height = 240,
+  ariaLabel = "Verdeling van de cijfers",
 }: {
   bins: Bin[];
   height?: number;
+  ariaLabel?: string;
 }) {
   const theme = useChartTheme();
   const data = bins.map((b) => ({ x: b.label, y: b.count, fail: b.to <= 5 }));
@@ -20,7 +22,7 @@ export function GradeDistributionChart({
       data={data}
       height={height}
       radius={4}
-      ariaLabel="Verdeling van de cijfers"
+      ariaLabel={ariaLabel}
       option={{
         grid: { top: 16, bottom: 8, left: 4, right: 8 },
         yAxis: {
@@ -51,9 +53,11 @@ export function GradeDistributionChart({
 export function QuestionAverageChart({
   items,
   height = 240,
+  ariaLabel = "Gemiddelde score per vraag in procenten",
 }: {
   items: { label: string; title: string; percentage: number | null }[];
   height?: number;
+  ariaLabel?: string;
 }) {
   const theme = useChartTheme();
   const data = items.map((i) => ({
@@ -65,7 +69,7 @@ export function QuestionAverageChart({
       data={data}
       height={height}
       radius={4}
-      ariaLabel="Gemiddelde score per vraag in procenten"
+      ariaLabel={ariaLabel}
       option={{
         grid: { top: 16, bottom: 8, left: 4, right: 8 },
         yAxis: { max: 100, axisLabel: { formatter: (v: number) => `${v}%` } },

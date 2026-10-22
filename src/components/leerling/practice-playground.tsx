@@ -7,7 +7,7 @@ import {
   Eraser,
   Lightbulb,
 } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { CodeEditor } from "@/components/app/code-editor";
 import { PageHeader } from "@/components/app/page-header";
@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
+import { CodeTipsButton } from "./exam/code-tips";
 import { CodeRunTab, type RunHandle } from "./exam/code-tools";
 import { readStorage, writeStorage } from "./exam/types";
 
@@ -74,6 +75,9 @@ const SNIPPETS: { id: string; label: string; hint: string; code: string }[] = [
 
 const DEFAULT_CODE = SNIPPETS[1].code;
 
+/** No assignment here: only the general tips apply. */
+const PLAYGROUND_TIP_OPTIONS = {};
+
 function loadCode(): string {
   if (typeof window === "undefined") return DEFAULT_CODE;
   return readStorage<string>(STORAGE_KEY) ?? DEFAULT_CODE;
@@ -88,6 +92,7 @@ export function PracticePlayground() {
     () => true,
     () => false,
   );
+  const tipsTitleId = useId();
   const [code, setCode] = useState<string>(loadCode);
   const [runHandle, setRunHandle] = useState<RunHandle | null>(null);
 
@@ -169,6 +174,7 @@ export function PracticePlayground() {
               </DropdownMenuContent>
             </DropdownMenu>
             <div className="ml-auto flex items-center gap-1">
+              <CodeTipsButton code={code} options={PLAYGROUND_TIP_OPTIONS} />
               <Button
                 variant="ghost"
                 size="sm"
@@ -228,10 +234,10 @@ export function PracticePlayground() {
 
       <section
         className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6"
-        aria-labelledby="tips-title"
+        aria-labelledby={tipsTitleId}
       >
         <h2
-          id="tips-title"
+          id={tipsTitleId}
           className="mb-3 flex items-center gap-2 font-display text-base font-semibold"
         >
           <Lightbulb className="size-5 text-warning-ink" aria-hidden="true" />

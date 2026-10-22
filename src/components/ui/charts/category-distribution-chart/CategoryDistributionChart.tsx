@@ -24,7 +24,7 @@ export interface CategoryDistributionChartProps {
   showLegend?: boolean
   colors?: string[]
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -53,7 +53,13 @@ export const CategoryDistributionChart = React.forwardRef<HTMLDivElement, Catego
     }))
 
     return (
-      <ChartFrame ref={ref} height={height} focusable={false} className={cn('flex flex-col justify-center', className)}>
+      <ChartFrame
+        ref={ref}
+        height={height}
+        focusable={false}
+        ariaLabel={ariaLabel}
+        className={cn('flex flex-col justify-center', className)}
+      >
         <div className="flex items-baseline gap-2">
           <span className="text-foreground text-3xl font-bold tabular-nums">{primaryValue}</span>
           {trend && (

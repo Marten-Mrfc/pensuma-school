@@ -24,4 +24,3 @@ export const spinnerVariants = cva('motion-safe:animate-spin text-muted-foregrou
 })
 
 export type SpinnerVariants = VariantProps<typeof spinnerVariants>
-

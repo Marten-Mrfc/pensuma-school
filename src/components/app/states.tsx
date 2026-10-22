@@ -26,15 +26,14 @@ export function LoadingState({
 }: LoadingStateProps) {
   if (variant === "inline") {
     return (
-      // biome-ignore lint/a11y/useSemanticElements: a live loading region, not form output
-      <div
-        role="status"
+      <output
+        aria-busy="true"
         className={cn("flex items-center gap-3 py-3", className)}
       >
         <Skeleton className="size-4 rounded-full" />
         <Skeleton className="h-4 w-40" />
         <span className="sr-only">{label}</span>
-      </div>
+      </output>
     );
   }
 
@@ -54,9 +53,7 @@ export function LoadingState({
   );
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a live loading region, not form output
-    <div
-      role="status"
+    <output
       aria-busy="true"
       className={cn("flex w-full flex-col gap-6", className)}
     >
@@ -81,7 +78,7 @@ export function LoadingState({
         </>
       ) : null}
       {rows}
-    </div>
+    </output>
   );
 }
 

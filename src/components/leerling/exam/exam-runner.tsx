@@ -4,23 +4,43 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
+  CheckCircle2,
   Eye,
+  EyeOff,
   Flag,
   LayoutGrid,
+  Lightbulb,
   Loader2,
   Maximize,
   Send,
+  Timer,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  use,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { CountdownTimer } from "@/components/app/countdown-timer";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { ExamShell } from "@/components/layout/exam-shell";
+import { DisplayPreferencesButton } from "@/components/preferences/display-preferences-dialog";
+import { usePreferences } from "@/components/preferences/use-preferences";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import {
   Sheet,
@@ -29,17 +49,28 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useShortcut } from "@/lib/a11y/shortcuts";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
+import { countWarnings, getCodeTips } from "@/lib/python/code-tips";
 import type { AnswerResponse } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
-import { cn } from "@/lib/utils";
 import { useTRPC, useTRPCClient } from "@/trpc/react";
-import { ActivityLogger, type ClientEventType } from "./activity-logger";
-import { AnswerSaver } from "./answer-saver";
+import { MonitoringIndicator } from "../monitoring/monitoring-indicator";
+import {
+  ActivityLogger,
+  attachMonitoring,
+  type ClientEventType,
+  type EventDetails,
+} from "./activity-logger";
+import { AnswerSaver, type SaveState } from "./answer-saver";
+import { focusAfterDialogs } from "./focus-after-dialogs";
 import { QuestionNavigator } from "./question-navigator";
 import { QuestionView } from "./question-view";
 import { SaveIndicator } from "./save-indicator";
 import {
   type AttemptData,
+  codeData,
+  type ExamQuestion,
   isAnswered,
   type Responses,
   readStorage,
@@ -47,6 +78,9 @@ import {
   storageKey,
   writeStorage,
 } from "./types";
+
+/** Toasts on the exam page never cover the footer navigation. */
+const TOAST = { position: "top-center" } as const;
 
 /* -------------------------------------------------------------------------- */
 /*                                   Loader                                   */
@@ -59,6 +93,12 @@ export function ExamPage({
 }) {
   const { pogingId } = use(params);
   return <ExamLoader attemptId={pogingId} />;
+}
+
+function forgetAttempt(attemptId: string) {
+  removeStorage(storageKey(attemptId));
+  removeStorage(storageKey(attemptId, "flags"));
+  removeStorage(storageKey(attemptId, "pos"));
 }
 
 function ExamLoader({ attemptId }: { attemptId: string }) {
@@ -76,10 +116,18 @@ function ExamLoader({ attemptId }: { attemptId: string }) {
     ),
   );
   const submitted = query.data?.attempt.status === "submitted";
+  const contentHidden = !!query.data?.contentHidden;
+  useDocumentTitle([
+    submitted ? "Ingeleverd" : null,
+    query.data?.assignment.title ?? "Toets",
+  ]);
 
   useEffect(() => {
-    if (submitted) router.replace(routes.leerling.result(attemptId));
-  }, [submitted, attemptId, router]);
+    if (!submitted) return;
+    // Shared school PCs: nothing of a handed-in attempt stays behind.
+    forgetAttempt(attemptId);
+    if (!contentHidden) router.replace(routes.leerling.result(attemptId));
+  }, [submitted, contentHidden, attemptId, router]);
 
   if (query.isPending) {
     return (
@@ -100,6 +148,32 @@ function ExamLoader({ attemptId }: { attemptId: string }) {
           <Link href={routes.leerling.dashboard}>Terug naar mijn toetsen</Link>
         </Button>
       </div>
+    );
+  }
+  if (submitted && contentHidden) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
+        <span className="grid size-14 place-items-center rounded-2xl bg-success/12 text-success-ink">
+          <CheckCircle2 className="size-7" aria-hidden="true" />
+        </span>
+        <h1 className="font-display text-2xl font-bold tracking-tight">
+          Je hebt deze toets ingeleverd.
+        </h1>
+        <p className="max-w-md text-muted-foreground">
+          Je antwoorden zijn veilig opgeslagen. Op de statuspagina zie je
+          wanneer je je resultaat kunt bekijken.
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button asChild>
+            <Link href={routes.leerling.dashboard}>Naar mijn toetsen</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.leerling.result(attemptId)}>
+              Bekijk de status
+            </Link>
+          </Button>
+        </div>
+      </main>
     );
   }
   if (submitted) {
@@ -177,6 +251,21 @@ function useFullscreenElement() {
   );
 }
 
+/** macOS/iOS: Option+arrows move by word; Back is Cmd+[ there. */
+function isApplePlatform() {
+  return /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+}
+
+/** Keep Escape inside the page while in fullscreen (where supported). */
+function lockEscapeKey() {
+  const keyboard = (
+    navigator as Navigator & {
+      keyboard?: { lock?: (keys: string[]) => Promise<void> };
+    }
+  ).keyboard;
+  keyboard?.lock?.(["Escape"]).catch(() => {});
+}
+
 function ExamRunner({
   data,
   serverOffsetMs,
@@ -191,6 +280,10 @@ function ExamRunner({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const announce = useAnnounce();
+  const { prefs } = usePreferences();
+  const headingId = useId();
+  const scopeRef = useRef<HTMLDivElement>(null);
 
   const [init] = useState(() => initialState(data));
   const [responses, setResponses] = useState<Responses>(init.responses);
@@ -202,13 +295,14 @@ function ExamRunner({
   );
   const [navOpen, setNavOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
+  const [timerRevealed, setTimerRevealed] = useState(false);
   const [finishing, setFinishing] = useState<null | "manual" | "auto">(null);
   const finishingRef = useRef(false);
   const offsetRef = useRef(serverOffsetMs);
 
   const handlers = useRef({ locked: (_err: unknown) => {} });
   const indexRef = useRef(index);
-  const goToRef = useRef((_next: number) => {});
 
   const [saver] = useState(
     () =>
@@ -228,8 +322,9 @@ function ExamRunner({
   );
   const [logger] = useState(
     () =>
-      new ActivityLogger((events) =>
-        trpcClient.portal.logEvents.mutate({ attemptId, events }),
+      new ActivityLogger(
+        (events) => trpcClient.portal.logEvents.mutate({ attemptId, events }),
+        settings,
       ),
   );
   const snapshot = useSyncExternalStore(
@@ -241,21 +336,27 @@ function ExamRunner({
   const fullscreenSupported =
     typeof document !== "undefined" && document.fullscreenEnabled;
   const mustFullscreen = settings.requireFullscreen && fullscreenSupported;
+  const showOverlay =
+    mustFullscreen && !isFullscreen && !finishing && !overlayDismissed;
 
   const question = questions[index];
   const answered = new Set(
     questions.filter((q) => isAnswered(q, responses[q.id])).map((q) => q.id),
   );
 
-  const log = (type: ClientEventType, details?: Record<string, unknown>) =>
+  useDocumentTitle([
+    question ? `Vraag ${index + 1} van ${questions.length}` : null,
+    data.assignment.title,
+  ]);
+
+  const log = (type: ClientEventType, details?: EventDetails) =>
     logger.log(type, details);
 
   /* ------------------------------ lifecycle ------------------------------ */
 
   const goToResult = () => {
-    removeStorage(storageKey(attemptId));
-    removeStorage(storageKey(attemptId, "flags"));
-    removeStorage(storageKey(attemptId, "pos"));
+    saver.clearBackup();
+    forgetAttempt(attemptId);
     if (document.fullscreenElement)
       void document.exitFullscreen().catch(() => {});
     void queryClient.invalidateQueries({ queryKey: trpc.portal.pathKey() });
@@ -266,7 +367,13 @@ function ExamRunner({
     if (finishingRef.current) return;
     finishingRef.current = true;
     setFinishing(mode);
-    if (mode === "auto") toast.info("De tijd is om! We leveren je werk nu in…");
+    if (mode === "auto") {
+      announce("De tijd is om. Je antwoorden worden ingeleverd.", {
+        politeness: "assertive",
+        dedupeKey: "time-up",
+      });
+      toast.info("De tijd is om! We leveren je werk nu in…", TOAST);
+    }
     const flushed = await Promise.race([
       saver.flush(),
       new Promise<boolean>((r) => setTimeout(() => r(false), 8000)),
@@ -274,6 +381,7 @@ function ExamRunner({
     if (!flushed && mode === "manual" && !saver.isLocked) {
       toast.warning(
         "Niet alles kon worden opgeslagen. We leveren in wat er op de server staat.",
+        TOAST,
       );
     }
     await logger.flush();
@@ -292,6 +400,7 @@ function ExamRunner({
           setFinishing(null);
           toast.error(
             getErrorMessage(err, "Inleveren lukte niet. Probeer het opnieuw."),
+            TOAST,
           );
           return;
         }
@@ -306,7 +415,10 @@ function ExamRunner({
     handlers.current.locked = () => {
       if (finishingRef.current) return;
       finishingRef.current = true;
-      toast.info("Deze toets is ingeleverd. Je kunt niets meer wijzigen.");
+      toast.info(
+        "Deze toets is ingeleverd. Je kunt niets meer wijzigen.",
+        TOAST,
+      );
       logger.stop();
       goToResult();
     };
@@ -322,7 +434,7 @@ function ExamRunner({
       if (r) saver.update(questionId, r, { backup: false });
     }
     if (init.restored.length) {
-      toast.success("We hebben je laatste wijzigingen teruggezet.");
+      toast.success("We hebben je laatste wijzigingen teruggezet.", TOAST);
     }
   }, [init, saver]);
 
@@ -364,56 +476,36 @@ function ExamRunner({
     };
   }, [saver, logger]);
 
-  // Anti-cheat: focus / visibility (one "away" episode = one logged loss).
-  useEffect(() => {
-    if (!settings.logFocusEvents) return;
-    let away = false;
-    const goAway = (type: "focus_lost" | "visibility_hidden") => {
-      if (away || finishingRef.current) return;
-      away = true;
-      logger.log(type, { questionId: questions[indexRef.current]?.id });
-    };
-    const comeBack = (type: "focus_gained" | "visibility_visible") => {
-      if (!away) return;
-      away = false;
-      logger.log(type);
-    };
-    const onBlur = () => goAway("focus_lost");
-    const onFocus = () => comeBack("focus_gained");
-    const onVisibility = () =>
-      document.visibilityState === "hidden"
-        ? goAway("visibility_hidden")
-        : comeBack("visibility_visible");
-    const onCopy = () => logger.log("copy");
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    document.addEventListener("copy", onCopy);
-    return () => {
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      document.removeEventListener("copy", onCopy);
-    };
-  }, [settings.logFocusEvents, logger, questions]);
+  // Monitoring: only the listeners the (effective) settings ask for.
+  useEffect(
+    () =>
+      attachMonitoring(
+        logger,
+        {
+          logFocusEvents: settings.logFocusEvents,
+          requireFullscreen: settings.requireFullscreen,
+        },
+        { window, document },
+        { isFinishing: () => finishingRef.current },
+      ),
+    [logger, settings.logFocusEvents, settings.requireFullscreen],
+  );
 
-  // Anti-cheat: fullscreen enter/exit.
+  // Announce save problems and their recovery, never routine autosaves.
+  const lastSaveState = useRef<SaveState>(snapshot.state);
   useEffect(() => {
-    if (!settings.requireFullscreen) return;
-    let wasFullscreen = !!document.fullscreenElement;
-    const onChange = () => {
-      const now = !!document.fullscreenElement;
-      if (now === wasFullscreen || finishingRef.current) {
-        wasFullscreen = now;
-        return;
-      }
-      wasFullscreen = now;
-      logger.log(now ? "fullscreen_enter" : "fullscreen_exit");
-      if (!now) void logger.flush();
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [settings.requireFullscreen, logger]);
+    const previous = lastSaveState.current;
+    lastSaveState.current = snapshot.state;
+    if (previous === snapshot.state) return;
+    if (snapshot.state === "offline") {
+      announce(
+        "Je antwoord is nog niet opgeslagen: geen verbinding. We proberen het opnieuw.",
+        { politeness: "assertive", dedupeKey: "save-offline" },
+      );
+    } else if (previous === "offline" && snapshot.state === "saved") {
+      announce("Alles is weer opgeslagen.", { dedupeKey: "save-online" });
+    }
+  }, [snapshot.state, announce]);
 
   // Heartbeat: last activity for the teacher + time extensions / force-submit.
   useEffect(() => {
@@ -442,7 +534,7 @@ function ExamRunner({
     return () => clearInterval(id);
   }, [trpcClient, attemptId]);
 
-  // Five- and one-minute warnings.
+  // Five- and one-minute warnings (visual; the timer announces them).
   useEffect(() => {
     if (!deadlineAt) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -451,7 +543,7 @@ function ExamRunner({
       if (remaining > ms)
         timers.push(
           setTimeout(
-            () => toast.warning(text, { duration: 8000 }),
+            () => toast.warning(text, { ...TOAST, duration: 8000 }),
             remaining - ms,
           ),
         );
@@ -467,11 +559,40 @@ function ExamRunner({
     writeStorage(storageKey(attemptId, "pos"), index);
   }, [index, attemptId]);
 
+  // Move focus to the new question's heading after every question change.
+  const focusTarget = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusTarget.current !== index) return;
+    focusTarget.current = null;
+    // After a sheet or dialog (navigator, hand-in) has closed, if one was open.
+    focusAfterDialogs(headingId);
+  }, [index, headingId]);
+
+  // Fullscreen overlay: remember where focus was, and return it there once
+  // fullscreen is back.
+  const focusBeforeOverlay = useRef<HTMLElement | null>(null);
+  const overlayWasShown = useRef(false);
+  useEffect(() => {
+    if (showOverlay && !overlayWasShown.current) {
+      overlayWasShown.current = true;
+      focusBeforeOverlay.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    } else if (!showOverlay && overlayWasShown.current) {
+      overlayWasShown.current = false;
+    }
+  }, [showOverlay]);
+  useEffect(() => {
+    if (!submitOpen) setOverlayDismissed(false);
+  }, [submitOpen]);
+
   /* ------------------------------- actions ------------------------------- */
 
   const goTo = (next: number) => {
     if (next < 0 || next >= questions.length || next === index) return;
     void saver.flush();
+    focusTarget.current = next;
     setIndex(next);
     setNavOpen(false);
   };
@@ -491,35 +612,59 @@ function ExamRunner({
     });
   };
 
-  // Keyboard: Alt+←/→ switch questions, Ctrl/Cmd+S saves.
+  // Keyboard: Alt+←/→ switch questions (not while typing), Ctrl/Cmd+S saves.
+  useShortcut({
+    id: "exam-navigate",
+    label: "Vorige vraag",
+    keys: { key: "ArrowLeft", alt: true },
+    scope: scopeRef,
+    handler: () => goTo(indexRef.current - 1),
+  });
+  useShortcut({
+    id: "exam-navigate",
+    label: "Volgende vraag",
+    keys: { key: "ArrowRight", alt: true },
+    scope: scopeRef,
+    handler: () => goTo(indexRef.current + 1),
+  });
+  // Alt+←/→ is also the browser's Back/Forward on Windows and Linux. The
+  // question shortcuts skip text fields and answer options, so keep the
+  // browser from leaving the exam there (macOS uses Option+arrows for
+  // moving by word, which must keep working).
   useEffect(() => {
+    if (isApplePlatform()) return;
     const onKey = (e: KeyboardEvent) => {
-      if (
-        e.altKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        (e.key === "ArrowLeft" || e.key === "ArrowRight")
-      ) {
-        e.preventDefault();
-        goToRef.current(indexRef.current + (e.key === "ArrowRight" ? 1 : -1));
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        void saver.flush();
-      }
+      if (e.defaultPrevented || !e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [saver]);
-  useEffect(() => {
-    goToRef.current = goTo;
+  }, []);
+  useShortcut({
+    id: "exam-save",
+    label: "Nu opslaan",
+    keys: { key: "s", mod: true },
+    allowInEditable: true,
+    handler: () => {
+      void saver.flush().then((ok) => {
+        if (ok) announce("Opgeslagen.", { dedupeKey: "save-now" });
+      });
+    },
   });
 
   const enterFullscreen = () => {
     void document.documentElement
       .requestFullscreen({ navigationUI: "hide" })
+      .then(() => {
+        lockEscapeKey();
+        // Back in fullscreen: return focus to where the student was.
+        const target = focusBeforeOverlay.current;
+        focusAfterDialogs(target?.isConnected ? target : headingId);
+      })
       .catch(() => {
         toast.error(
           "Volledig scherm lukte niet. Probeer F11 of vraag je docent om hulp.",
+          TOAST,
         );
       });
   };
@@ -531,7 +676,26 @@ function ExamRunner({
   const isLast = index === questions.length - 1;
   const monitored = settings.logFocusEvents || settings.requireFullscreen;
 
-  const jumpChip = (q: (typeof questions)[number]) => {
+  // Code tips at hand-in time (never blocks submitting).
+  const withTips = settings.codeTips
+    ? questions.filter((q) => {
+        if (q.type !== "code") return false;
+        const r = responses[q.id];
+        const code = r && "code" in r ? r.code : "";
+        const d = codeData(q);
+        return (
+          countWarnings(
+            getCodeTips(code, {
+              starterCode: d.starterCode,
+              functionNames: d.functionNames,
+              hasIoTests: d.hasIoTests,
+            }),
+          ) > 0
+        );
+      })
+    : [];
+
+  const jumpChip = (q: ExamQuestion) => {
     const i = questions.indexOf(q);
     return (
       <button
@@ -541,7 +705,8 @@ function ExamRunner({
           setSubmitOpen(false);
           goTo(i);
         }}
-        className="inline-flex h-7 min-w-7 items-center justify-center rounded-md border bg-card px-2 text-sm font-semibold tabular-nums transition-colors hover:border-primary/50 hover:bg-accent"
+        aria-label={`Naar vraag ${i + 1}: ${q.title}`}
+        className="inline-flex h-9 min-w-9 items-center justify-center rounded-md border bg-card px-2 text-sm font-semibold tabular-nums transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring"
         title={q.title}
       >
         {i + 1}
@@ -563,120 +728,148 @@ function ExamRunner({
     <p className="flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
       <Eye className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
       <span>
-        Tijdens deze toets wordt bijgehouden wanneer je{" "}
-        {settings.requireFullscreen ? "het volledige scherm of " : ""}
-        het venster verlaat.
+        Logboek aan: je docent kan zien wanneer je het toetsvenster verlaat.
       </span>
     </p>
   ) : null;
 
+  const timerHidden = !prefs.showTimer && !timerRevealed;
+  const timer = deadlineAt ? (
+    <div className="flex items-center gap-1">
+      <CountdownTimer
+        deadline={deadlineAt}
+        serverOffsetMs={offset}
+        onExpire={() => void finish("auto")}
+        hidden={timerHidden}
+      />
+      {!prefs.showTimer ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setTimerRevealed((v) => !v)}
+          aria-pressed={timerRevealed}
+          className="text-muted-foreground"
+        >
+          {timerRevealed ? (
+            <EyeOff aria-hidden="true" />
+          ) : (
+            <Timer aria-hidden="true" />
+          )}
+          <span className="max-sm:sr-only">
+            {timerRevealed ? "Verberg timer" : "Toon timer"}
+          </span>
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
+
   return (
     <>
-      <ExamShell
-        title={data.assignment.title}
-        subtitle={
-          <>
-            Vraag {index + 1} van {questions.length}
-            <span className="hidden sm:inline">
-              {" "}
-              · {answered.size} beantwoord
-            </span>
-          </>
-        }
-        bodyMode="fixed"
-        timer={
-          deadlineAt ? (
-            <CountdownTimer
-              deadline={deadlineAt}
-              serverOffsetMs={offset}
-              onExpire={() => void finish("auto")}
-            />
-          ) : null
-        }
-        actions={
-          <>
-            <SaveIndicator snapshot={snapshot} />
-            <Button
-              onClick={() => setSubmitOpen(true)}
-              disabled={!!finishing}
-              className="max-sm:px-3"
-              aria-label="Inleveren"
-            >
-              {finishing ? (
-                <Loader2 className="animate-spin" aria-hidden="true" />
-              ) : (
-                <Send aria-hidden="true" />
-              )}
-              <span className="max-sm:sr-only">Inleveren</span>
-            </Button>
-          </>
-        }
-        footer={
-          <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-5">
-            <Button
-              variant="outline"
-              onClick={() => goTo(index - 1)}
-              disabled={index === 0}
-            >
-              <ArrowLeft aria-hidden="true" />
-              <span className="max-sm:sr-only">Vorige</span>
-            </Button>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                className="xl:hidden"
-                onClick={() => setNavOpen(true)}
-              >
-                <LayoutGrid aria-hidden="true" />
-                <span className="tabular-nums">
-                  {index + 1}/{questions.length}
-                </span>
-              </Button>
-              <span className="hidden items-center gap-1.5 text-xs text-muted-foreground xl:flex">
-                <Kbd>Alt</Kbd>+<Kbd>←</Kbd>/<Kbd>→</Kbd> vorige/volgende vraag
+      <div ref={scopeRef} className="contents">
+        <ExamShell
+          title={data.assignment.title}
+          subtitle={
+            <>
+              Vraag {index + 1} van {questions.length}
+              <span className="hidden sm:inline">
+                {" "}
+                · {answered.size} beantwoord
               </span>
-            </div>
-            {isLast ? (
+            </>
+          }
+          bodyMode="fixed"
+          timer={timer}
+          actions={
+            <>
+              <MonitoringIndicator active={monitored} />
+              <SaveIndicator snapshot={snapshot} />
+              <DisplayPreferencesButton variant="icon" />
               <Button
                 onClick={() => setSubmitOpen(true)}
                 disabled={!!finishing}
+                className="max-sm:px-3"
+                aria-label="Inleveren"
               >
-                <span className="max-sm:sr-only">Naar inleveren</span>
-                <Send aria-hidden="true" />
+                {finishing ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Send aria-hidden="true" />
+                )}
+                <span className="max-sm:sr-only">Inleveren</span>
               </Button>
-            ) : (
-              <Button onClick={() => goTo(index + 1)}>
-                <span className="max-sm:sr-only">Volgende</span>
-                <ArrowRight aria-hidden="true" />
+            </>
+          }
+          footer={
+            <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-5">
+              <Button
+                variant="outline"
+                onClick={() => goTo(index - 1)}
+                disabled={index === 0}
+              >
+                <ArrowLeft aria-hidden="true" />
+                <span className="max-sm:sr-only">Vorige</span>
               </Button>
-            )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  className="xl:hidden"
+                  onClick={() => setNavOpen(true)}
+                  aria-label={`Vragenoverzicht, vraag ${index + 1} van ${questions.length}`}
+                >
+                  <LayoutGrid aria-hidden="true" />
+                  <span className="tabular-nums" aria-hidden="true">
+                    {index + 1}/{questions.length}
+                  </span>
+                </Button>
+                <span className="hidden items-center gap-1.5 text-xs text-muted-foreground xl:flex">
+                  <Kbd>Alt</Kbd>+<Kbd>←</Kbd>/<Kbd>→</Kbd> vorige/volgende vraag
+                </span>
+              </div>
+              {isLast ? (
+                <Button
+                  onClick={() => setSubmitOpen(true)}
+                  disabled={!!finishing}
+                >
+                  <span className="max-sm:sr-only">Naar inleveren</span>
+                  <Send aria-hidden="true" />
+                </Button>
+              ) : (
+                <Button onClick={() => goTo(index + 1)}>
+                  <span className="max-sm:sr-only">Volgende</span>
+                  <ArrowRight aria-hidden="true" />
+                </Button>
+              )}
+            </div>
+          }
+        >
+          <div className="flex h-full min-h-0">
+            <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-card/40 p-4 xl:flex">
+              {navigator}
+              <div className="mt-auto">{monitoringNote}</div>
+            </aside>
+            <div className="min-h-0 min-w-0 flex-1">
+              {question ? (
+                <QuestionView
+                  key={question.id}
+                  attemptId={attemptId}
+                  question={question}
+                  number={index + 1}
+                  total={questions.length}
+                  headingId={headingId}
+                  response={responses[question.id]}
+                  onChange={(r) => setResponse(question.id, r)}
+                  flagged={flagged.has(question.id)}
+                  onToggleFlag={() => toggleFlag(question.id)}
+                  settings={settings}
+                  onLog={log}
+                  disabled={!!finishing || snapshot.state === "locked"}
+                />
+              ) : null}
+            </div>
           </div>
-        }
-      >
-        <div className="flex h-full min-h-0">
-          <aside className="hidden w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-card/40 p-4 xl:flex">
-            {navigator}
-            <div className="mt-auto">{monitoringNote}</div>
-          </aside>
-          <div className="min-h-0 min-w-0 flex-1">
-            {question ? (
-              <QuestionView
-                key={question.id}
-                question={question}
-                number={index + 1}
-                total={questions.length}
-                response={responses[question.id]}
-                onChange={(r) => setResponse(question.id, r)}
-                flagged={flagged.has(question.id)}
-                onToggleFlag={() => toggleFlag(question.id)}
-                settings={settings}
-                onLog={log}
-                disabled={!!finishing || snapshot.state === "locked"}
-              />
-            ) : null}
-          </div>
-        </div>
-      </ExamShell>
+        </ExamShell>
+      </div>
 
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetContent
@@ -722,6 +915,20 @@ function ExamRunner({
               Je hebt alle {questions.length} vragen beantwoord. Goed bezig!
             </p>
           )}
+          {withTips.length ? (
+            <div className="flex flex-col gap-2 rounded-lg border p-3">
+              <p className="flex items-center gap-1.5 font-medium">
+                <Lightbulb
+                  className="size-4 text-warning-ink"
+                  aria-hidden="true"
+                />
+                Misschien wil je dit nog nakijken:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {withTips.map(jumpChip)}
+              </div>
+            </div>
+          ) : null}
           {flaggedList.length ? (
             <div className="flex flex-col gap-2 rounded-lg border p-3">
               <p className="flex items-center gap-1.5 font-medium">
@@ -742,53 +949,55 @@ function ExamRunner({
         </div>
       </ConfirmDialog>
 
-      {mustFullscreen && !isFullscreen && !finishing ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="fullscreen-title"
-          className="fixed inset-0 z-50 grid place-items-center bg-background/95 p-6 backdrop-blur-sm"
+      <Dialog open={showOverlay}>
+        <DialogContent
+          role="alertdialog"
+          showCloseButton={false}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => {
+            // Focus goes back to where the student was (see enterFullscreen),
+            // or into the hand-in dialog.
+            e.preventDefault();
+          }}
+          className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
         >
-          <div className="flex max-w-md flex-col items-center gap-4 text-center">
-            <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
-              <Maximize className="size-7" aria-hidden="true" />
-            </span>
-            <h2
-              id="fullscreen-title"
-              className="font-display text-2xl font-bold tracking-tight"
-            >
-              Ga terug naar volledig scherm om verder te gaan
-            </h2>
-            <p className="text-muted-foreground">
-              Deze toets werkt alleen in volledig scherm. Het verlaten ervan
-              wordt bijgehouden. Je antwoorden zijn veilig opgeslagen.
-            </p>
-            <Button
-              size="lg"
-              className="h-12 px-6 text-base"
-              onClick={enterFullscreen}
-              autoFocus
-            >
-              <Maximize aria-hidden="true" />
-              Volledig scherm
-            </Button>
-            <button
-              type="button"
-              onClick={() => setSubmitOpen(true)}
-              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Ik ben klaar en wil inleveren
-            </button>
-          </div>
-        </div>
-      ) : null}
+          <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
+            <Maximize className="size-7" aria-hidden="true" />
+          </span>
+          <DialogTitle className="font-display text-2xl leading-tight font-bold tracking-tight">
+            Ga terug naar volledig scherm om verder te gaan
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Deze toets werkt alleen in volledig scherm. Het verlaten ervan wordt
+            bijgehouden. Je antwoorden zijn veilig opgeslagen.
+          </DialogDescription>
+          <Button
+            size="lg"
+            className="h-12 px-6 text-base"
+            onClick={enterFullscreen}
+            autoFocus
+          >
+            <Maximize aria-hidden="true" />
+            Volledig scherm
+          </Button>
+          <Button
+            variant="link"
+            className="text-muted-foreground"
+            onClick={() => {
+              setOverlayDismissed(true);
+              setSubmitOpen(true);
+            }}
+          >
+            Ik ben klaar en wil inleveren
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {finishing ? (
         <div
-          className={cn(
-            "fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm",
-          )}
-          aria-live="polite"
+          className="fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm"
           aria-busy="true"
         >
           <div className="flex flex-col items-center gap-3 text-center">

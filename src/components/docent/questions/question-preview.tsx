@@ -143,17 +143,22 @@ export function StudentQuestionPreview({
   total,
 }: {
   question: PreviewQuestion;
-  number: number;
-  total: number;
+  /** Omit both to leave out "Vraag 3 van 12" (e.g. in the question bank). */
+  number?: number;
+  total?: number;
 }) {
   return (
     <article className="flex flex-col gap-5">
       <header className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
-          <span>
-            Vraag {number} van {total}
-          </span>
-          <span aria-hidden="true">·</span>
+          {number !== undefined && total !== undefined ? (
+            <>
+              <span>
+                Vraag {number} van {total}
+              </span>
+              <span aria-hidden="true">·</span>
+            </>
+          ) : null}
           <span>{formatPoints(question.points)}</span>
         </div>
         <h2 className="font-display text-xl leading-tight font-bold tracking-tight sm:text-2xl">
@@ -246,14 +251,15 @@ function ChoiceAnswerPreview({ data }: { data: MultipleChoiceData }) {
 
 function OpenAnswerPreview({ data }: { data: OpenQuestionData }) {
   const [text, setText] = useState("");
+  const id = useId();
   const max = data.maxLength;
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="preview-open" className="text-sm font-medium">
+      <label htmlFor={`${id}-open`} className="text-sm font-medium">
         Jouw antwoord
       </label>
       <textarea
-        id="preview-open"
+        id={`${id}-open`}
         value={text}
         maxLength={max}
         onChange={(e) => setText(e.target.value)}

@@ -1,7 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Anybody, DM_Mono, DM_Sans } from "next/font/google";
+import {
+  Anybody,
+  Atkinson_Hyperlegible_Mono,
+  Atkinson_Hyperlegible_Next,
+  DM_Mono,
+  DM_Sans,
+} from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { LiveAnnouncerProvider } from "@/components/a11y/live-announcer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +35,27 @@ const anybody = Anybody({
   axes: ["wdth"],
   variable: "--font-anybody",
   display: "swap",
+});
+
+/* Display preference "Goed leesbaar lettertype" (data-font="readable" on
+   <html>). Not preloaded: only people who switch it on download it. next/font
+   self-hosts the files at build time, so browsers never contact Google. */
+const readable = Atkinson_Hyperlegible_Next({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-readable",
+  display: "swap",
+  preload: false,
+  // No metric overrides are known for this family; skip the fallback font.
+  adjustFontFallback: false,
+});
+
+const readableMono = Atkinson_Hyperlegible_Mono({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-readable-mono",
+  display: "swap",
+  preload: false,
+  // No metric overrides are known for this family; skip the fallback font.
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
@@ -60,14 +88,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         dmSans.variable,
         dmMono.variable,
         anybody.variable,
+        readable.variable,
+        readableMono.variable,
       )}
     >
       <body className="flex min-h-full flex-col">
+        <a
+          href="#inhoud"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+        >
+          Naar de inhoud
+        </a>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TRPCReactProvider>
             <TooltipProvider delayDuration={400}>
-              {children}
-              <Toaster />
+              <LiveAnnouncerProvider>
+                {children}
+                <Toaster />
+              </LiveAnnouncerProvider>
             </TooltipProvider>
           </TRPCReactProvider>
         </ThemeProvider>

@@ -2,6 +2,7 @@
 
 import type { Table } from '@tanstack/react-table'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { useId } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -15,6 +16,7 @@ export interface DataTablePaginationProps {
 export function DataTablePagination({ table, totalRows, isServerSide, borderless = false }: DataTablePaginationProps) {
   const selected = table.getFilteredSelectedRowModel().rows.length
   const total = isServerSide ? totalRows : table.getFilteredRowModel().rows.length
+  const pageSizeLabelId = useId()
 
   return (
     <div
@@ -24,11 +26,14 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
       ].join(' ')}
     >
       <div className="text-muted-foreground text-sm tabular-nums">
-        <span className="text-foreground font-medium">{selected}</span> of {total} row(s) selected
+        <span className="text-foreground font-medium">{selected}</span> van {total} {total === 1 ? 'rij' : 'rijen'}{' '}
+        geselecteerd
       </div>
       <div className="flex flex-wrap items-center gap-4 sm:gap-6">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-medium whitespace-nowrap">Rows per page</p>
+          <span id={pageSizeLabelId} className="text-sm font-medium whitespace-nowrap">
+            Rijen per pagina
+          </span>
           <Select
             value={`${table.getState().pagination.pageSize}`}
             onValueChange={(value) => {
@@ -36,7 +41,7 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
               table.setPageIndex(0)
             }}
           >
-            <SelectTrigger className="h-8 w-[4.5rem]">
+            <SelectTrigger className="h-8 w-[4.5rem]" aria-labelledby={pageSizeLabelId}>
               <SelectValue placeholder={`${table.getState().pagination.pageSize}`} />
             </SelectTrigger>
             <SelectContent side="top">
@@ -49,7 +54,7 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
           </Select>
         </div>
         <div className="text-sm font-medium whitespace-nowrap tabular-nums">
-          Page {table.getState().pagination.pageIndex + 1} of {Math.max(table.getPageCount(), 1)}
+          Pagina {table.getState().pagination.pageIndex + 1} van {Math.max(table.getPageCount(), 1)}
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -60,7 +65,7 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
             onClick={() => table.setPageIndex(0)}
           >
             <ChevronsLeft className="size-4" aria-hidden="true" />
-            <span className="sr-only">First page</span>
+            <span className="sr-only">Eerste pagina</span>
           </Button>
           <Button
             variant="outline"
@@ -70,7 +75,7 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
             onClick={() => table.previousPage()}
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
-            <span className="sr-only">Previous page</span>
+            <span className="sr-only">Vorige pagina</span>
           </Button>
           <Button
             variant="outline"
@@ -80,7 +85,7 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
             onClick={() => table.nextPage()}
           >
             <ChevronRight className="size-4" aria-hidden="true" />
-            <span className="sr-only">Next page</span>
+            <span className="sr-only">Volgende pagina</span>
           </Button>
           <Button
             variant="outline"
@@ -90,11 +95,10 @@ export function DataTablePagination({ table, totalRows, isServerSide, borderless
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
           >
             <ChevronsRight className="size-4" aria-hidden="true" />
-            <span className="sr-only">Last page</span>
+            <span className="sr-only">Laatste pagina</span>
           </Button>
         </div>
       </div>
     </div>
   )
 }
-

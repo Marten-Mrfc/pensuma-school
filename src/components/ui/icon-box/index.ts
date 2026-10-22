@@ -1,3 +1,2 @@
-export { IconBox, type IconBoxProps, type IconBoxVariant, type IconBoxSize, type IconBoxShape } from './icon-box'
-export { IconStack, type IconStackProps, type IconStackVariant, type IconStackSize } from './IconStack'
-
+export { IconStack, type IconStackProps, type IconStackSize, type IconStackVariant } from './IconStack'
+export { IconBox, type IconBoxProps, type IconBoxShape, type IconBoxSize, type IconBoxVariant } from './icon-box'

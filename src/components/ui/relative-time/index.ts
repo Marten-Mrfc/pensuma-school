@@ -1,12 +1,11 @@
-export { RelativeTime, type RelativeTimeProps } from './relative-time'
 export {
   formatAbsoluteTime,
   formatRelativeTime,
   formatVisibleTime,
-  toDate,
   type RelativeTimeDisplay,
   type RelativeTimeNumeric,
   type RelativeTimeParseAs,
   type RelativeTimeStyle,
+  toDate,
 } from './format-relative-time'
-
+export { RelativeTime, type RelativeTimeProps } from './relative-time'

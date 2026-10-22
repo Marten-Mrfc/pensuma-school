@@ -13,6 +13,7 @@ import {
   MessageSquareText,
   Plus,
   Search,
+  Sparkles,
   SquareCode,
   Trash2,
   Upload,
@@ -41,10 +42,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { markdownExcerpt as excerpt } from "@/lib/questions/excerpt";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { downloadTestJson } from "./download";
+import { ExampleTestsDialog } from "./example-tests-dialog";
 import { ImportTestDialog } from "./import-test-dialog";
 import { NewTestDialog } from "./new-test-dialog";
 import { formatPoints } from "./question-list";
@@ -61,16 +64,6 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 const FILTER_STORAGE_KEY = "pensuma:toetsen:filter";
-
-/** Strip markdown to a short plain-text excerpt. */
-function excerpt(markdown: string, max = 160) {
-  const text = markdown
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/[`*_>#[\]()!-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
-}
 
 export function TestsPage() {
   const trpc = useTRPC();
@@ -116,6 +109,7 @@ export function TestsPage() {
         description="Bouw toetsen met programmeer-, meerkeuze- en open vragen. Publiceer een toets en plan daarna een afname voor een klas."
         actions={
           <>
+            <ExampleTestsDialog />
             <ImportTestDialog />
             <NewTestDialog />
           </>
@@ -192,12 +186,20 @@ export function TestsPage() {
           <EmptyBlock
             icon={ClipboardList}
             title="Nog geen toetsen"
-            description="Maak je eerste toets. Je voegt vragen toe vanuit sjablonen, zoals een invoer-en-uitvoeropdracht of een meerkeuzevraag."
+            description="Maak je eerste toets, of begin met een kant-en-klare voorbeeldtoets en pas die aan. Je voegt vragen toe vanuit sjablonen of uit de vragenbank."
             action={
               <>
-                <NewTestDialog
+                <ExampleTestsDialog
                   trigger={
                     <Button>
+                      <Sparkles aria-hidden="true" />
+                      Begin met een voorbeeldtoets
+                    </Button>
+                  }
+                />
+                <NewTestDialog
+                  trigger={
+                    <Button variant="outline">
                       <Plus aria-hidden="true" />
                       Nieuwe toets
                     </Button>

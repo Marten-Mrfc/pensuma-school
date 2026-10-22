@@ -24,4 +24,3 @@ export function useStepperContext(): StepperContextValue {
   if (!ctx) throw new Error('StepperItem must be used inside <Stepper>')
   return ctx
 }
-

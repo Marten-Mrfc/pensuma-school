@@ -29,4 +29,3 @@ const LabeledValue = React.forwardRef<HTMLDivElement, LabeledValueProps>(
 LabeledValue.displayName = 'LabeledValue'
 
 export { LabeledValue }
-

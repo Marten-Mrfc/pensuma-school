@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import ReactECharts from 'echarts-for-react/esm/core'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // BarChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -25,7 +24,7 @@ export interface BarChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -64,7 +63,6 @@ export const BarChart = React.forwardRef<HTMLDivElement, BarChartProps>(
         ...userRest
       } = userOption
 
-      const isHorizontal = userXAxis?.type === 'value' || userYAxis?.type === 'category'
       const hasUserStack = Array.isArray(userSeries) && userSeries.some((s: any) => Boolean(s?.stack))
       const gapColor = stackGapColor ?? theme.bgColor
       const defaultRadius = [radius, radius, radius, radius]
@@ -175,7 +173,7 @@ export const BarChart = React.forwardRef<HTMLDivElement, BarChartProps>(
         series: mergedSeries,
         ...userRest,
       }
-    }, [data, xField, yField, stacked, valueLabels, radius, option, theme])
+    }, [data, xField, yField, stacked, stackGap, stackGapColor, valueLabels, radius, option, theme])
 
     return (
       <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel}>

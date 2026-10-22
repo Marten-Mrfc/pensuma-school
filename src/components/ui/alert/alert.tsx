@@ -1,7 +1,7 @@
-import * as React from 'react'
 import { AlertCircle, CheckCircle, Info, TriangleAlert } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { alertVariants, type AlertVariants } from './alert.variants'
+import { type AlertVariants, alertVariants } from './alert.variants'
 
 export interface AlertProps extends React.HTMLAttributes<HTMLDivElement>, AlertVariants {
   icon?: 'info' | 'warning' | 'error' | 'success'
@@ -86,4 +86,3 @@ const AlertDescription = React.forwardRef<HTMLDivElement, React.HTMLAttributes<H
 AlertDescription.displayName = 'AlertDescription'
 
 export { Alert, AlertTitle, AlertDescription }
-

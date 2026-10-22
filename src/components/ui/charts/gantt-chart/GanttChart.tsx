@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // GanttChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ export interface GanttChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -103,7 +103,7 @@ export const GanttChart = React.forwardRef<HTMLDivElement, GanttChartProps>(
                 silent: true,
                 symbol: 'none',
                 lineStyle: { type: 'dashed', color: theme.textColor, width: 1 },
-                label: { formatter: 'Today', color: theme.textColor, fontSize: 10, position: 'insideEndTop' },
+                label: { formatter: 'Vandaag', color: theme.textColor, fontSize: 10, position: 'insideEndTop' },
                 data: [{ xAxis: today }],
               }
             : undefined,

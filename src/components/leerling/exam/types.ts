@@ -1,7 +1,6 @@
 import type {
   AnswerResponse,
-  CodeCheck,
-  CodeTest,
+  StudentCodeQuestionData,
 } from "@/lib/questions/schema";
 import type { RouterOutputs } from "@/trpc/react";
 
@@ -9,13 +8,12 @@ export type AttemptData = RouterOutputs["portal"]["getAttempt"];
 export type ExamQuestion = AttemptData["questions"][number];
 export type ExamSettings = AttemptData["assignment"]["settings"];
 
-/** Student-safe question data as sent by `portal.getAttempt`. */
-export type CodeData = {
-  starterCode: string;
-  timeLimitMs: number;
-  tests: CodeTest[];
-  checks: CodeCheck[];
-};
+/**
+ * Student-safe code question data as sent by `portal.getAttempt`: visible
+ * tests, checks, hint ids + penalties (no text), the function names the
+ * tests call and whether output is compared.
+ */
+export type CodeData = StudentCodeQuestionData;
 export type ChoiceData = {
   multiple: boolean;
   options: { id: string; text: string }[];
@@ -48,8 +46,29 @@ export function isAnswered(
   }
 }
 
+/** Every local key of an attempt starts with this prefix. */
+export const ATTEMPT_STORAGE_PREFIX = "pensuma:poging:";
+
 export function storageKey(attemptId: string, suffix = "answers") {
-  return `pensuma:poging:${attemptId}:${suffix}`;
+  return `${ATTEMPT_STORAGE_PREFIX}${attemptId}:${suffix}`;
+}
+
+/**
+ * Remove the local copies of every attempt (answers backup, flags,
+ * position) from this browser: shared school PCs keep nothing behind.
+ */
+export function clearAllAttemptBackups() {
+  try {
+    const storage = window.localStorage;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key?.startsWith(ATTEMPT_STORAGE_PREFIX)) keys.push(key);
+    }
+    for (const key of keys) storage.removeItem(key);
+  } catch {
+    // Storage blocked: nothing was stored either.
+  }
 }
 
 export function readStorage<T>(key: string): T | null {

@@ -1,39 +1,64 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.2/schema.json",
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true
-  },
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!node_modules", "!.next", "!dist", "!build"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/.next-*",
+      "!**/drizzle",
+      "!**/public/pyodide",
+      "!**/playwright-report",
+      "!**/blob-report",
+      "!**/test-results",
+      "!**/coverage",
+      "!**/e2e/.auth",
+      "!tsconfig.json"
+    ]
   },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
-    "indentWidth": 2
+    "indentWidth": 2,
+    "lineWidth": 80
   },
-  "css": {
-    "parser": {
-      "tailwindDirectives": true
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
     }
   },
+  "css": { "parser": { "tailwindDirectives": true } },
   "linter": {
     "enabled": true,
-    "rules": {
-      "recommended": true
-    },
-    "domains": {
-      "next": "recommended",
-      "react": "recommended"
-    }
+    "rules": { "recommended": true },
+    "domains": { "next": "recommended", "react": "recommended" }
   },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "on"
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "overrides": [
+    {
+      "includes": ["src/components/ui/**"],
+      "formatter": { "lineWidth": 120 },
+      "javascript": {
+        "formatter": {
+          "quoteStyle": "single",
+          "semicolons": "asNeeded",
+          "jsxQuoteStyle": "double"
+        }
+      },
+      "linter": {
+        "rules": {
+          "suspicious": { "noExplicitAny": "off", "noArrayIndexKey": "off" },
+          "style": { "noNonNullAssertion": "off" }
+        }
       }
+    },
+    {
+      "includes": ["**/*.css"],
+      "linter": { "rules": { "complexity": { "noImportantStyles": "off" } } }
     }
-  }
+  ]
 }

@@ -1,2 +1,1 @@
-export { ToggleGroup, ToggleGroupItem, type ToggleGroupProps, type ToggleGroupItemProps } from './toggle-group'
-
+export { ToggleGroup, ToggleGroupItem, type ToggleGroupItemProps, type ToggleGroupProps } from './toggle-group'

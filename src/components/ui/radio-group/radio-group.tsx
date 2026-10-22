@@ -1,8 +1,8 @@
 'use client'
 
-import * as React from 'react'
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group'
 import { Circle } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export type RadioOption = string | { label: string; value: string; disabled?: boolean }
@@ -27,10 +27,8 @@ function normalizeOption(option: RadioOption): { label: string; value: string; d
   return option
 }
 
-export interface RadioGroupProps extends Omit<
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>,
-  'defaultValue' | 'dir'
-> {
+export interface RadioGroupProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>, 'defaultValue' | 'dir'> {
   /** The controlled value of the radio items to check. */
   value?: string
   /** The value of the radio items that should be checked when initially rendered. */
@@ -103,6 +101,14 @@ const RadioGroup = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive.
     const hasError =
       Boolean(error) ||
       Boolean(errorMessages && (typeof errorMessages === 'string' ? errorMessages : errorMessages.length > 0))
+    // Generated ids: option values repeat across groups (and hidden routes stay mounted).
+    const groupId = React.useId()
+    const labelId = `${groupId}-label`
+    const hintId = `${groupId}-hint`
+    const errorId = `${groupId}-error`
+    const describedBy =
+      [hint && !hasError ? hintId : null, hasError && errorMessages ? errorId : null].filter(Boolean).join(' ') ||
+      undefined
 
     return (
       <RadioGroupContext.Provider value={{ disabled, size, optionType, buttonVariant, orientation }}>
@@ -114,13 +120,24 @@ const RadioGroup = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive.
           layout intent unambiguous.
         */}
         <div className="flex flex-col gap-2">
-          {label && <label className="text-sm font-medium">{label}</label>}
+          {label && (
+            <span id={labelId} className="text-sm font-medium">
+              {label}
+            </span>
+          )}
 
-          {hint && !hasError && <p className="text-muted-foreground text-xs">{hint}</p>}
+          {hint && !hasError && (
+            <p id={hintId} className="text-muted-foreground text-xs">
+              {hint}
+            </p>
+          )}
 
           <RadioGroupPrimitive.Root
             ref={ref}
             data-slot="radio-group"
+            aria-labelledby={label ? labelId : undefined}
+            aria-describedby={describedBy}
+            aria-invalid={hasError || undefined}
             value={value}
             defaultValue={defaultValue}
             disabled={disabled}
@@ -148,9 +165,9 @@ const RadioGroup = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive.
                     const opt = normalizeOption(option)
                     return (
                       <div key={opt.value} className="flex items-center gap-2">
-                        <RadioGroupItem id={opt.value} value={opt.value} disabled={opt.disabled} />
+                        <RadioGroupItem id={`${groupId}-${opt.value}`} value={opt.value} disabled={opt.disabled} />
                         <label
-                          htmlFor={opt.value}
+                          htmlFor={`${groupId}-${opt.value}`}
                           className={cn(
                             'cursor-pointer text-sm font-medium select-none',
                             opt.disabled && 'cursor-not-allowed opacity-50',
@@ -165,7 +182,7 @@ const RadioGroup = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive.
           </RadioGroupPrimitive.Root>
 
           {hasError && (
-            <div className="flex flex-col gap-0.5">
+            <div id={errorId} className="flex flex-col gap-0.5">
               {typeof errorMessages === 'string' ? (
                 <p className="text-destructive text-xs">{errorMessages}</p>
               ) : (
@@ -184,10 +201,8 @@ const RadioGroup = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive.
 )
 RadioGroup.displayName = 'RadioGroup'
 
-export interface RadioGroupItemProps extends Omit<
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>,
-  'children'
-> {
+export interface RadioGroupItemProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>, 'children'> {
   /** Size of the radio item */
   size?: 'sm' | 'md' | 'lg'
   /** Custom color for the checked state */
@@ -228,10 +243,10 @@ const indicatorSizes = {
 const colorClasses: Record<string, string> = {
   primary: 'data-[state=checked]:border-primary',
   secondary: 'data-[state=checked]:border-secondary',
-  success: 'data-[state=checked]:border-success data-[state=checked]:text-success',
-  warning: 'data-[state=checked]:border-warning data-[state=checked]:text-warning',
+  success: 'data-[state=checked]:border-success data-[state=checked]:text-success-ink',
+  warning: 'data-[state=checked]:border-warning data-[state=checked]:text-warning-ink',
   error: 'data-[state=checked]:border-destructive data-[state=checked]:text-destructive',
-  info: 'data-[state=checked]:border-info data-[state=checked]:text-info',
+  info: 'data-[state=checked]:border-info data-[state=checked]:text-info-ink',
 }
 
 // Density classes
@@ -295,7 +310,7 @@ const RadioGroupItem = React.forwardRef<React.ElementRef<typeof RadioGroupPrimit
             aria-busy={loading || undefined}
             aria-invalid={hasError || undefined}
             className={cn(
-              'border-input text-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 aspect-square shrink-0 rounded-full border shadow-sm transition-colors duration-200 outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
+              'border-input text-primary focus-visible:border-ring focus-visible:ring-ring aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 aspect-square shrink-0 rounded-full border shadow-sm transition-colors duration-200 outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
               sizeClasses[size],
               colorClasses[color] || colorClasses.primary,
               hasError && 'border-destructive',
@@ -349,10 +364,8 @@ const RadioGroupItem = React.forwardRef<React.ElementRef<typeof RadioGroupPrimit
 )
 RadioGroupItem.displayName = 'RadioGroupItem'
 
-export interface RadioButtonProps extends Omit<
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>,
-  'children'
-> {
+export interface RadioButtonProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>, 'children'> {
   /** Size of the button radio */
   size?: 'small' | 'middle' | 'large'
   /** Visual variant */
@@ -402,7 +415,7 @@ const RadioButton = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive
         disabled={effectiveDisabled}
         className={cn(
           'inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-colors duration-200',
-          'focus-visible:border-ring focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]',
+          'focus-visible:border-ring focus-visible:ring-ring outline-none focus-visible:ring-[3px]',
           'disabled:cursor-not-allowed disabled:opacity-50',
           buttonSizeClasses[effectiveSize],
           buttonVariantClasses[effectiveVariant],
@@ -419,4 +432,3 @@ const RadioButton = React.forwardRef<React.ElementRef<typeof RadioGroupPrimitive
 RadioButton.displayName = 'RadioButton'
 
 export { RadioGroup, RadioGroupItem, RadioButton }
-

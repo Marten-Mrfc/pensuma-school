@@ -9,7 +9,7 @@ import { cva } from 'class-variance-authority'
  * motivated the split.
  */
 export const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform,scale] duration-150 active:scale-[0.97] active:duration-100 touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform,scale] duration-150 active:scale-[0.97] active:duration-100 touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
@@ -37,7 +37,7 @@ export const buttonVariants = cva(
         // Row-action tier: the hover-revealed copy control inside a two-line
         // table cell. Anything taller than the 20px text line it sits on makes
         // the row grow when the control appears.
-        'icon-2xs': 'size-5',
+        'icon-2xs': "relative size-5 after:absolute after:-inset-1 after:content-['']",
       },
     },
     defaultVariants: {

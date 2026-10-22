@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, inArray, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -11,7 +12,13 @@ import {
   MAX_STUDENT_NAME_LENGTH,
   normalizeCell,
 } from "@/lib/import/parse-students";
-import { getClassOrThrow } from "@/server/api/routers/class";
+import { accommodationsFor } from "@/server/api/routers/accommodation";
+import {
+  getClassOrThrow,
+  type LoginLock,
+  lastLoginAtSql,
+  loginLocksFor,
+} from "@/server/api/routers/class";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import { studentEmail } from "@/server/auth";
 import type { DB } from "@/server/db";
@@ -26,11 +33,14 @@ import {
   tests,
   user,
 } from "@/server/db/schema";
+import { eraseStudentById } from "@/server/privacy/erasure";
+import { clearStudentLoginThrottle } from "@/server/security/login-throttle";
 import {
   createStudentAccount,
   getStudentPin,
   resetStudentPin,
 } from "@/server/services/accounts";
+import { auditFromCtx, auditRead } from "@/server/services/audit";
 
 /** Leerlingen (student accounts), PIN codes and import. Teachers only. */
 
@@ -62,22 +72,29 @@ const pinSchema = z
   .trim()
   .regex(STUDENT_PIN_REGEX, "Een pincode bestaat uit precies 6 cijfers.");
 
-const userIdSchema = z.string().min(1, "Ongeldige leerling.");
+const userIdSchema = z.string().min(1, "Ongeldige leerling.").max(64);
 
 /* -------------------------------- Helpers --------------------------------- */
 
 /** Students who are not deactivated. */
 const isActive = sql`coalesce(${user.banned}, false) = false`;
 
-/** Most recent sign-in (session start), if any session is still stored. */
-const lastLoginAt =
-  sql<Date | null>`(select max(ls.created_at) from ${session} ls where ls.user_id = ${user}.id)`.mapWith(
-    session.createdAt,
-  );
+const lastLoginAt = lastLoginAtSql;
 const hasPin = sql<boolean>`exists(select 1 from ${studentPins} sp where sp.user_id = ${user}.id)`;
 
 /** Escape LIKE wildcards in user input. */
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+const NO_LOCK: LoginLock = { loginLockedUntil: null, recentFailures: 0 };
+
+/** Short, stable id for a selection of students (audit de-duplication). */
+function selectionId(ids: string[]): string {
+  const digest = createHash("sha256")
+    .update([...ids].sort().join(","))
+    .digest("hex")
+    .slice(0, 16);
+  return `selectie-${digest}`;
+}
 
 async function getStudentOrThrow(db: DB, id: string) {
   const [row] = await db
@@ -305,10 +322,16 @@ export const studentRouter = createTRPCRouter({
           .where(condition),
       ]);
 
-      const classMap = await classesFor(
-        ctx.db,
-        rows.map((r) => r.id),
-      );
+      const [classMap, locks] = await Promise.all([
+        classesFor(
+          ctx.db,
+          rows.map((r) => r.id),
+        ),
+        loginLocksFor(
+          ctx.db,
+          rows.map((r) => r.username ?? ""),
+        ),
+      ]);
 
       return {
         total,
@@ -320,6 +343,7 @@ export const studentRouter = createTRPCRouter({
           studentNumber: username ?? "",
           banned: banned ?? false,
           classes: classMap.get(r.id) ?? [],
+          ...(locks.get(username ?? "") ?? NO_LOCK),
         })),
       };
     }),
@@ -388,13 +412,29 @@ export const studentRouter = createTRPCRouter({
           .orderBy(desc(attempts.startedAt)),
       ]);
 
-      const { username, banned, ...student } = row;
+      const studentNumber = row.username ?? "";
+      const [locks, accommodations] = await Promise.all([
+        loginLocksFor(ctx.db, [studentNumber]),
+        accommodationsFor(ctx.db, [row.id]),
+      ]);
+
+      auditRead(ctx, {
+        action: "student.viewed",
+        subjectType: "student",
+        subjectId: row.id,
+        subjectUserId: row.id,
+        subjectLabel: studentNumber || null,
+      });
+
+      const { username: _username, banned, ...student } = row;
       return {
         ...student,
-        studentNumber: username ?? "",
+        studentNumber,
         banned: banned ?? false,
         classes: classRows,
         attempts: attemptRows,
+        ...(locks.get(studentNumber) ?? NO_LOCK),
+        accommodation: accommodations.get(row.id) ?? null,
       };
     }),
 
@@ -405,7 +445,9 @@ export const studentRouter = createTRPCRouter({
   checkExisting: adminProcedure
     .input(
       z.object({
-        studentNumbers: z.array(z.string().trim()).max(MAX_IMPORT_ROWS * 2),
+        studentNumbers: z
+          .array(z.string().trim().max(64))
+          .max(MAX_IMPORT_ROWS * 2),
         classId: z.uuid().optional(),
       }),
     )
@@ -678,12 +720,27 @@ export const studentRouter = createTRPCRouter({
           studentNumber: current.username ?? "",
         };
       }
+      const fields: ("name" | "studentNumber")[] = [];
+      if (patch.name !== undefined) fields.push("name");
+      if (patch.username !== undefined) fields.push("studentNumber");
       try {
         const [updated] = await ctx.db
           .update(user)
           .set(patch)
           .where(eq(user.id, input.id))
           .returning();
+        if (patch.username !== undefined && current.username) {
+          // Lockouts are keyed by the old number; don't let them linger.
+          await clearStudentLoginThrottle(ctx.db, current.username);
+        }
+        await auditFromCtx(ctx, {
+          action: "student.updated",
+          subjectType: "student",
+          subjectId: updated.id,
+          subjectUserId: updated.id,
+          subjectLabel: updated.username ?? null,
+          details: { fields },
+        });
         return {
           id: updated.id,
           name: updated.name,
@@ -709,6 +766,17 @@ export const studentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const student = await getStudentOrThrow(ctx.db, input.id);
       const pin = await resetStudentPin(student.id);
+      if (student.username) {
+        await clearStudentLoginThrottle(ctx.db, student.username);
+      }
+      await auditFromCtx(ctx, {
+        action: "student.pin_reset",
+        subjectType: "student",
+        subjectId: student.id,
+        subjectUserId: student.id,
+        subjectLabel: student.username ?? null,
+        details: { count: 1 },
+      });
       return {
         id: student.id,
         studentNumber: student.username ?? "",
@@ -723,12 +791,27 @@ export const studentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await getClassOrThrow(ctx.db, input.classId);
       const students = await classStudents(ctx.db, input.classId);
-      return mapLimit(students, ACCOUNT_CONCURRENCY, async (s) => ({
-        id: s.id,
-        studentNumber: s.username ?? "",
-        name: s.name,
-        pin: await resetStudentPin(s.id),
-      }));
+      const result = await mapLimit(
+        students,
+        ACCOUNT_CONCURRENCY,
+        async (s) => {
+          const pin = await resetStudentPin(s.id);
+          if (s.username) await clearStudentLoginThrottle(ctx.db, s.username);
+          return {
+            id: s.id,
+            studentNumber: s.username ?? "",
+            name: s.name,
+            pin,
+          };
+        },
+      );
+      await auditFromCtx(ctx, {
+        action: "student.pin_reset",
+        subjectType: "class",
+        subjectId: input.classId,
+        details: { classId: input.classId, count: result.length },
+      });
+      return result;
     }),
 
   /**
@@ -740,7 +823,7 @@ export const studentRouter = createTRPCRouter({
       z
         .object({
           classId: z.uuid().optional(),
-          userIds: z.array(z.string().min(1)).max(1000).optional(),
+          userIds: z.array(z.string().min(1).max(64)).max(1000).optional(),
         })
         .refine(
           (v) => v.classId || v.userIds?.length,
@@ -768,7 +851,7 @@ export const studentRouter = createTRPCRouter({
           )
           .orderBy(asc(user.name));
       }
-      return Promise.all(
+      const result = await Promise.all(
         students.map(async (s) => ({
           id: s.id,
           studentNumber: s.username ?? "",
@@ -776,13 +859,39 @@ export const studentRouter = createTRPCRouter({
           pin: await getStudentPin(s.id),
         })),
       );
+      if (input.classId) {
+        auditRead(ctx, {
+          action: "student.pins_viewed",
+          subjectType: "class",
+          subjectId: input.classId,
+          details: { classId: input.classId, count: result.length },
+        });
+      } else if (result.length === 1) {
+        const [only] = result;
+        auditRead(ctx, {
+          action: "student.pins_viewed",
+          subjectType: "student",
+          subjectId: only.id,
+          subjectUserId: only.id,
+          subjectLabel: only.studentNumber || null,
+          details: { count: 1 },
+        });
+      } else if (result.length > 1) {
+        auditRead(ctx, {
+          action: "student.pins_viewed",
+          subjectType: "student",
+          subjectId: selectionId(result.map((r) => r.id)),
+          details: { count: result.length },
+        });
+      }
+      return result;
     }),
 
   /** Deactivate (blocks sign-in, signs out) or reactivate a student. */
   setActive: adminProcedure
     .input(z.object({ id: userIdSchema, active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      await getStudentOrThrow(ctx.db, input.id);
+      const student = await getStudentOrThrow(ctx.db, input.id);
       await ctx.db
         .update(user)
         .set(
@@ -797,15 +906,45 @@ export const studentRouter = createTRPCRouter({
         .where(eq(user.id, input.id));
       if (!input.active)
         await ctx.db.delete(session).where(eq(session.userId, input.id));
+      await auditFromCtx(ctx, {
+        action: input.active ? "student.reactivated" : "student.deactivated",
+        subjectType: "student",
+        subjectId: student.id,
+        subjectUserId: student.id,
+        subjectLabel: student.username ?? null,
+      });
       return { id: input.id, active: input.active };
     }),
 
-  /** Permanently delete a student, including all their attempts. */
+  /**
+   * Permanently delete a student, including all their attempts (AVG art.
+   * 17). Goes through the shared erasure service: refused while a
+   * retention hold applies, audited, and the login lockouts are cleared.
+   */
   delete: adminProcedure
     .input(z.object({ id: userIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await getStudentOrThrow(ctx.db, input.id);
-      await ctx.db.delete(user).where(eq(user.id, input.id));
+      await eraseStudentById(ctx.db, input.id, ctx);
       return { id: input.id };
+    }),
+
+  /** Lift a login lockout (too many wrong PINs) right away. */
+  unlockLogin: adminProcedure
+    .input(z.object({ id: userIdSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const student = await getStudentOrThrow(ctx.db, input.id);
+      const cleared = student.username
+        ? await clearStudentLoginThrottle(ctx.db, student.username)
+        : 0;
+      await auditFromCtx(ctx, {
+        action: "auth.login_unlocked",
+        subjectType: "student",
+        subjectId: student.id,
+        subjectUserId: student.id,
+        subjectLabel: student.username ?? null,
+        details: { count: cleared },
+      });
+      return { id: student.id };
     }),
 });

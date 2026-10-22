@@ -19,6 +19,7 @@ import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { ACCESS_CODE_REGEX, normalizeAccessCode } from "./defaults";
 import { fromDateTimeLocal, toDateTimeLocal } from "./format";
 import { AssignmentSettingsFields } from "./settings-fields";
+import { useDialogReturnFocus } from "./use-dialog-return-focus";
 
 type Assignment = RouterOutputs["assignment"]["get"];
 
@@ -32,9 +33,14 @@ export function SettingsSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const returnFocus = useDialogReturnFocus();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 sm:max-w-xl">
+      <SheetContent
+        side="right"
+        className="w-full gap-0 sm:max-w-xl"
+        {...returnFocus}
+      >
         <SheetHeader className="border-b px-6 py-5">
           <SheetTitle>Instellingen van de afname</SheetTitle>
           <SheetDescription>
@@ -79,9 +85,19 @@ function SettingsForm({
   const update = useMutation(
     trpc.assignment.update.mutationOptions({
       onSuccess: async (res) => {
-        await queryClient.invalidateQueries({
-          queryKey: trpc.assignment.pathKey(),
-        });
+        // Grades are computed from the scale on the fly: refresh every view.
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: trpc.assignment.pathKey(),
+          }),
+          queryClient.invalidateQueries({ queryKey: trpc.review.pathKey() }),
+          queryClient.invalidateQueries({
+            queryKey: trpc.analysis.pathKey(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: trpc.dashboard.pathKey(),
+          }),
+        ]);
         toast.success("Instellingen opgeslagen", {
           description: res.recomputedDeadlines
             ? `De eindtijd van ${res.recomputedDeadlines} lopende poging(en) is bijgewerkt.`
@@ -219,6 +235,7 @@ function SettingsForm({
           <AssignmentSettingsFields
             value={settings}
             onChange={setSettings}
+            mode={assignment.mode}
             compact
           />
         </div>

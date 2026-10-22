@@ -393,7 +393,12 @@ export function parseStudentList(text: string): ParseStudentsResult {
       continue;
     }
     firstLineFor.set(candidate.studentNumber, line);
-    result.rows.push({ line, ...candidate });
+    // Data minimisation: only these three fields ever leave the parser.
+    result.rows.push({
+      line,
+      studentNumber: candidate.studentNumber,
+      name: candidate.name,
+    });
   }
 
   return result;

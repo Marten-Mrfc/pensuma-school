@@ -1,11 +1,11 @@
-import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { ChevronRight, MoreHorizontal } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const Breadcrumb = React.forwardRef<HTMLElement, React.ComponentPropsWithoutRef<'nav'>>(
   ({ className, ...props }, ref) => (
-    <nav ref={ref} aria-label="breadcrumb" data-uipkge="" data-slot="breadcrumb" className={className} {...props} />
+    <nav ref={ref} aria-label="Kruimelpad" data-uipkge="" data-slot="breadcrumb" className={className} {...props} />
   ),
 )
 Breadcrumb.displayName = 'Breadcrumb'
@@ -100,7 +100,7 @@ const BreadcrumbEllipsis = ({ children, className, ...props }: React.ComponentPr
     {...props}
   >
     {children ?? <MoreHorizontal className="size-4" aria-hidden="true" />}
-    <span className="sr-only">More</span>
+    <span className="sr-only">Meer</span>
   </span>
 )
 BreadcrumbEllipsis.displayName = 'BreadcrumbEllipsis'
@@ -114,4 +114,3 @@ export {
   BreadcrumbSeparator,
   BreadcrumbEllipsis,
 }
-

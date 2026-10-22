@@ -1,11 +1,11 @@
 'use client'
 
+import { ChevronDown, type LucideIcon, Monitor, Moon, Palette, Sparkles, Sun } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import * as React from 'react'
 import { flushSync } from 'react-dom'
-import { useTheme } from 'next-themes'
-import { ChevronDown, Monitor, Moon, Palette, Sparkles, Sun, type LucideIcon } from 'lucide-react'
-import { SectionCard } from '@/components/ui/section-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { SectionCard } from '@/components/ui/section-card'
 
 type Theme = 'light' | 'dark' | 'system' | 'black'
 type Variant = 'cards' | 'icons' | 'icon-only' | 'dropdown' | 'pill' | 'pill-4' | 'switch'
@@ -18,9 +18,9 @@ const ICONS: Record<Theme, LucideIcon> = {
 }
 
 const LABELS: Record<Theme, string> = {
-  light: 'Light',
-  dark: 'Dark',
-  system: 'System',
+  light: 'Licht',
+  dark: 'Donker',
+  system: 'Systeem',
   black: 'Black',
 }
 
@@ -124,20 +124,20 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
       return (
         <SectionCard
           ref={ref}
-          title={title ?? 'Appearance'}
-          description={description ?? 'Choose your interface theme.'}
+          title={title ?? 'Weergave'}
+          description={description ?? 'Kies het thema van de interface.'}
           className={className}
-          headerAction={<Palette className="text-muted-foreground size-5" />}
+          headerAction={<Palette className="text-muted-foreground size-5" aria-hidden="true" />}
         >
-          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={title ?? 'Theme'}>
+          {/* biome-ignore lint/a11y/useSemanticElements: ARIA group of toggle buttons; <fieldset> would add form semantics */}
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label={title ?? 'Thema'}>
             {options.map((t) => {
               const Icon = ICONS[t]
               return (
                 <button
                   type="button"
                   key={t}
-                  role="radio"
-                  aria-checked={modelValue === t}
+                  aria-pressed={modelValue === t}
                   className={[
                     'focus-visible:ring-ring rounded-md border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:outline-none',
                     modelValue === t
@@ -159,10 +159,11 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
     // Icons: compact 3-icon segmented row, no labels
     if (variant === 'icons') {
       return (
+        // biome-ignore lint/a11y/useSemanticElements: ARIA group of toggle buttons; <fieldset> would add form semantics
         <div
           ref={ref}
-          role="radiogroup"
-          aria-label={title ?? 'Theme'}
+          role="group"
+          aria-label={title ?? 'Thema'}
           className={['border-border bg-card inline-flex items-center gap-0.5 rounded-md border p-0.5', className]
             .filter(Boolean)
             .join(' ')}
@@ -173,8 +174,7 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
               <button
                 type="button"
                 key={t}
-                role="radio"
-                aria-checked={modelValue === t}
+                aria-pressed={modelValue === t}
                 aria-label={LABELS[t]}
                 className={[
                   'focus-visible:ring-ring grid size-7 place-items-center rounded transition-colors focus-visible:ring-2 focus-visible:outline-none',
@@ -199,7 +199,7 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
         <button
           type="button"
           ref={ref as React.Ref<HTMLButtonElement>}
-          aria-label={LABELS[modelValue]}
+          aria-label={`Thema wisselen (nu: ${LABELS[modelValue].toLowerCase()})`}
           className={[
             'text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring inline-flex size-8 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:outline-none',
             className,
@@ -251,10 +251,11 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
     // Pill / Pill-4: equal segments with sliding indicator
     if (variant === 'pill' || variant === 'pill-4') {
       return (
+        // biome-ignore lint/a11y/useSemanticElements: ARIA group of toggle buttons; <fieldset> would add form semantics
         <div
           ref={ref}
-          role="radiogroup"
-          aria-label={title ?? 'Theme'}
+          role="group"
+          aria-label={title ?? 'Thema'}
           className={['border-border bg-card relative inline-flex w-full max-w-md rounded-full border p-0.5', className]
             .filter(Boolean)
             .join(' ')}
@@ -270,8 +271,7 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
               <button
                 type="button"
                 key={t}
-                role="radio"
-                aria-checked={modelValue === t}
+                aria-pressed={modelValue === t}
                 aria-label={LABELS[t]}
                 className={[
                   'focus-visible:ring-ring relative z-[1] inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
@@ -295,7 +295,7 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
         ref={ref as React.Ref<HTMLButtonElement>}
         role="switch"
         aria-checked={modelValue === 'dark'}
-        aria-label={LABELS[modelValue]}
+        aria-label="Donker thema"
         className={[
           'border-border focus-visible:ring-ring relative inline-flex h-8 w-16 items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:outline-none',
           modelValue === 'dark' ? 'bg-primary' : 'bg-muted',
@@ -331,4 +331,3 @@ const ThemeSwitch = React.forwardRef<HTMLDivElement, ThemeSwitchProps>(
 ThemeSwitch.displayName = 'ThemeSwitch'
 
 export { ThemeSwitch }
-

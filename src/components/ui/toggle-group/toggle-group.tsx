@@ -1,9 +1,9 @@
 'use client'
 
-import * as React from 'react'
 import * as ToggleGroupPrimitive from '@radix-ui/react-toggle-group'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { toggleVariants, type ToggleVariants } from '../toggle/toggle.variants'
+import { type ToggleVariants, toggleVariants } from '../toggle/toggle.variants'
 
 // Make variant/size/spacing reachable from items without each consumer having
 // to pass it manually — the React equivalent of the Vue provide('toggleGroup').
@@ -77,6 +77,7 @@ const ToggleGroup = React.forwardRef<React.ElementRef<typeof ToggleGroupPrimitiv
 
     // Bind observers once per animated mode / layout props — NOT on every children
     // identity change (controlled groups re-render parents constantly).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: layout props are listed on purpose so the indicator re-measures when they change
     React.useLayoutEffect(() => {
       firstPosition.current = true
       if (!indicatorActive) {
@@ -89,12 +90,12 @@ const ToggleGroup = React.forwardRef<React.ElementRef<typeof ToggleGroupPrimitiv
 
       const ro = new ResizeObserver(() => updateIndicator())
       ro.observe(root)
-      root.querySelectorAll('[data-slot="toggle-group-item"]').forEach((el) => ro.observe(el))
+      for (const el of root.querySelectorAll('[data-slot="toggle-group-item"]')) ro.observe(el)
 
       const mo = new MutationObserver((mutations) => {
         for (const m of mutations) {
           if (m.type === 'childList') {
-            root.querySelectorAll('[data-slot="toggle-group-item"]').forEach((el) => ro.observe(el))
+            for (const el of root.querySelectorAll('[data-slot="toggle-group-item"]')) ro.observe(el)
           }
         }
         updateIndicator()
@@ -183,4 +184,3 @@ const ToggleGroupItem = React.forwardRef<React.ElementRef<typeof ToggleGroupPrim
 ToggleGroupItem.displayName = 'ToggleGroupItem'
 
 export { ToggleGroup, ToggleGroupItem }
-

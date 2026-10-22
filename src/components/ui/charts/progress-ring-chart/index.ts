@@ -1,1 +1,1 @@
-export { ProgressRingChart, type ProgressRingChartProps, type ProgressRing } from './ProgressRingChart'
+export { type ProgressRing, ProgressRingChart, type ProgressRingChartProps } from './ProgressRingChart'

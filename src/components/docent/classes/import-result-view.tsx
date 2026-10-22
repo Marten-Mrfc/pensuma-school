@@ -2,6 +2,7 @@
 
 import { CircleAlert, CircleCheck, Printer, UsersRound } from "lucide-react";
 import Link from "next/link";
+import { useId } from "react";
 import { CopyButton } from "@/components/app/copy-button";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
@@ -24,6 +25,7 @@ export function ImportResultView({
   onImportMore,
   onDone,
 }: ImportResultViewProps) {
+  const uid = useId();
   const { created, existing, errors } = result;
   const addedExisting = existing.filter((e) => e.addedToClass);
   const total = created.length + addedExisting.length;
@@ -78,10 +80,13 @@ export function ImportResultView({
         {created.length > 0 ? (
           <section
             className="flex flex-col gap-2"
-            aria-labelledby="created-heading"
+            aria-labelledby={`${uid}-created-heading`}
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 id="created-heading" className="text-sm font-semibold">
+              <h3
+                id={`${uid}-created-heading`}
+                className="text-sm font-semibold"
+              >
                 Nieuwe accounts
               </h3>
               <CopyButton
@@ -135,10 +140,10 @@ export function ImportResultView({
         {existing.length > 0 ? (
           <section
             className="flex flex-col gap-2"
-            aria-labelledby="existing-heading"
+            aria-labelledby={`${uid}-existing-heading`}
           >
             <h3
-              id="existing-heading"
+              id={`${uid}-existing-heading`}
               className="flex items-center gap-1.5 text-sm font-semibold"
             >
               <UsersRound
@@ -174,10 +179,10 @@ export function ImportResultView({
         {errors.length > 0 ? (
           <section
             className="flex flex-col gap-2"
-            aria-labelledby="errors-heading"
+            aria-labelledby={`${uid}-errors-heading`}
           >
             <h3
-              id="errors-heading"
+              id={`${uid}-errors-heading`}
               className="flex items-center gap-1.5 text-sm font-semibold text-destructive-ink"
             >
               <CircleAlert className="size-4" aria-hidden="true" />

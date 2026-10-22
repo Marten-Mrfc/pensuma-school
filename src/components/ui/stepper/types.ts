@@ -8,4 +8,3 @@ export interface StepperStep {
   disabled?: boolean
   error?: boolean
 }
-

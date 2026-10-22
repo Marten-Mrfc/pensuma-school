@@ -34,45 +34,47 @@ export default function GlobalError({
 
   return (
     <html lang="nl">
-      <body className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background px-5 text-center font-sans text-foreground">
+      <body className="bg-background font-sans text-foreground">
         <title>Er ging iets mis · Pensuma</title>
-        <svg viewBox="0 0 32 32" className="size-12" aria-hidden="true">
-          <rect width="32" height="32" rx="9" className="fill-primary" />
-          <path
-            d="M10.5 24V8.5L20 13.25L10.5 18"
-            className="stroke-primary-foreground"
-            strokeWidth="2.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </svg>
-        <div className="flex max-w-md flex-col gap-2">
-          <h1 className="text-2xl font-bold">
-            Pensuma kon niet worden geladen
-          </h1>
-          <p className="text-muted-foreground">
-            Er is een onverwachte fout opgetreden. Probeer het opnieuw of laad
-            de pagina later nog eens.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          {tryAgain ? (
-            <button
-              type="button"
-              onClick={() => tryAgain()}
-              className="h-10 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-5 text-center">
+          <svg viewBox="0 0 32 32" className="size-12" aria-hidden="true">
+            <rect width="32" height="32" rx="9" className="fill-primary" />
+            <path
+              d="M10.5 24V8.5L20 13.25L10.5 18"
+              className="stroke-primary-foreground"
+              strokeWidth="2.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+          <div className="flex max-w-md flex-col gap-2">
+            <h1 className="text-2xl font-bold">
+              Pensuma kon niet worden geladen
+            </h1>
+            <p className="text-muted-foreground">
+              Er is een onverwachte fout opgetreden. Probeer het opnieuw of laad
+              de pagina later nog eens.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {tryAgain ? (
+              <button
+                type="button"
+                onClick={() => tryAgain()}
+                className="h-10 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                Opnieuw proberen
+              </button>
+            ) : null}
+            <a
+              href="/"
+              className="inline-flex h-10 items-center rounded-md border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              Opnieuw proberen
-            </button>
-          ) : null}
-          <a
-            href="/"
-            className="inline-flex h-10 items-center rounded-md border px-5 text-sm font-medium hover:bg-accent"
-          >
-            Naar de startpagina
-          </a>
-        </div>
+              Naar de startpagina
+            </a>
+          </div>
+        </main>
       </body>
     </html>
   );

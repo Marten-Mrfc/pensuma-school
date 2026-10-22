@@ -1,10 +1,26 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronsUpDown, LogOut, Palette, UserRound } from "lucide-react";
+import {
+  Accessibility,
+  ChevronsUpDown,
+  FileUser,
+  Keyboard,
+  LogOut,
+  Palette,
+  ShieldCheck,
+  Type,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ShortcutsDialog } from "@/components/a11y/shortcuts-dialog";
+import { DisplayPreferencesDialog } from "@/components/preferences/display-preferences-dialog";
+import {
+  flushPendingPreferences,
+  resetPreferences,
+} from "@/components/preferences/preferences-store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +37,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth-client";
 import { ROUTES } from "@/lib/auth-shared";
+import { clearLocalUserData } from "@/lib/local-data";
+import { routes } from "@/lib/routes";
 import { useTheme } from "@/lib/use-theme";
 import { cn } from "@/lib/utils";
 import type { ShellUser } from "./current-user";
@@ -57,7 +75,13 @@ function UserAvatar({ name, className }: { name: string; className?: string }) {
   );
 }
 
-/** Account dropdown: who is signed in, account link, theme, sign out. */
+type MenuDialog = "preferences" | "shortcuts";
+
+/**
+ * Account dropdown: who is signed in, account link, display preferences,
+ * theme, shortcuts, help links (same order in every shell, WCAG 3.2.6) and
+ * sign out.
+ */
 export function UserMenu({
   user,
   variant = "sidebar",
@@ -67,6 +91,16 @@ export function UserMenu({
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
+  const [dialog, setDialog] = useState<MenuDialog | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // A dialog opened from the menu takes focus itself; the menu must not
+  // pull focus back to its trigger while it closes.
+  const dialogPending = useRef(false);
+
+  function openDialog(which: MenuDialog) {
+    dialogPending.current = true;
+    setDialog(which);
+  }
   const isStudent = user.role === "student";
   const subtitle = isStudent
     ? user.username
@@ -76,12 +110,18 @@ export function UserMenu({
 
   async function handleSignOut() {
     setSigningOut(true);
+    // A display-preference change still waiting to be saved goes out now,
+    // while the session exists.
+    await flushPendingPreferences();
     const { error } = await signOut();
     if (error) {
       setSigningOut(false);
       toast.error("Uitloggen lukte niet. Probeer het opnieuw.");
       return;
     }
+    // Shared school computers: remove preferences, drafts and backups first.
+    resetPreferences();
+    clearLocalUserData();
     queryClient.clear();
     // Full navigation so every server component re-renders without the session.
     window.location.assign(ROUTES.login);
@@ -90,6 +130,7 @@ export function UserMenu({
   const trigger =
     variant === "sidebar" ? (
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
           "flex w-full items-center gap-2.5 rounded-lg p-2 text-left text-sm outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0",
@@ -111,9 +152,10 @@ export function UserMenu({
       </button>
     ) : (
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
-          "flex items-center gap-2 rounded-full p-0.5 pr-0.5 text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=open]:bg-accent sm:pr-3",
+          "flex items-center gap-2 rounded-full p-0.5 pr-0.5 text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent sm:pr-3",
           className,
         )}
       >
@@ -126,76 +168,132 @@ export function UserMenu({
     );
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={variant === "sidebar" ? "start" : "end"}
-        side={variant === "sidebar" ? "top" : "bottom"}
-        sideOffset={8}
-        className="w-64"
-      >
-        <DropdownMenuLabel className="flex items-center gap-3 px-2 py-2 font-normal">
-          <UserAvatar name={user.name} className="size-9" />
-          <span className="grid min-w-0 leading-tight">
-            <span className="truncate text-sm font-semibold">{user.name}</span>
-            <span className="truncate text-xs text-muted-foreground">
-              {subtitle}
-            </span>
-          </span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          {accountHref ? (
-            <DropdownMenuItem asChild>
-              <Link href={accountHref}>
-                <UserRound aria-hidden="true" />
-                Account
-              </Link>
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="gap-2">
-              <Palette
-                className="size-4 text-muted-foreground"
-                aria-hidden="true"
-              />
-              Thema
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-40">
-              <DropdownMenuRadioGroup
-                value={theme ?? "system"}
-                onValueChange={setTheme}
-              >
-                {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
-                  <DropdownMenuRadioItem
-                    key={value}
-                    value={value}
-                    className="gap-2"
-                  >
-                    <Icon
-                      className="size-4 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    {label}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={signingOut}
-          onSelect={(e) => {
-            e.preventDefault();
-            void handleSignOut();
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={variant === "sidebar" ? "start" : "end"}
+          side={variant === "sidebar" ? "top" : "bottom"}
+          sideOffset={8}
+          className="w-64"
+          onCloseAutoFocus={(e) => {
+            if (dialogPending.current) {
+              dialogPending.current = false;
+              e.preventDefault();
+            }
           }}
         >
-          <LogOut aria-hidden="true" />
-          {signingOut ? "Bezig met uitloggen…" : "Uitloggen"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuLabel className="flex items-center gap-3 px-2 py-2 font-normal">
+            <UserAvatar name={user.name} className="size-9" />
+            <span className="grid min-w-0 leading-tight">
+              <span className="truncate text-sm font-semibold">
+                {user.name}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {subtitle}
+              </span>
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {accountHref ? (
+            <>
+              <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                  <Link href={accountHref}>
+                    <UserRound aria-hidden="true" />
+                    Account
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <DropdownMenuGroup>
+            <DropdownMenuItem onSelect={() => openDialog("preferences")}>
+              <Type aria-hidden="true" />
+              Weergave en leesbaarheid
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2">
+                <Palette
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                Thema
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-40">
+                <DropdownMenuRadioGroup
+                  value={theme ?? "system"}
+                  onValueChange={setTheme}
+                >
+                  {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                    <DropdownMenuRadioItem
+                      key={value}
+                      value={value}
+                      className="gap-2"
+                    >
+                      <Icon
+                        className="size-4 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      {label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuItem onSelect={() => openDialog("shortcuts")}>
+              <Keyboard aria-hidden="true" />
+              Sneltoetsen
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link href={routes.accessibility}>
+                <Accessibility aria-hidden="true" />
+                Toegankelijkheid
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={routes.privacy}>
+                <ShieldCheck aria-hidden="true" />
+                Privacyverklaring
+              </Link>
+            </DropdownMenuItem>
+            {isStudent ? (
+              <DropdownMenuItem asChild>
+                <Link href={routes.leerling.myData}>
+                  <FileUser aria-hidden="true" />
+                  Mijn gegevens
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={signingOut}
+            onSelect={(e) => {
+              e.preventDefault();
+              void handleSignOut();
+            }}
+          >
+            <LogOut aria-hidden="true" />
+            {signingOut ? "Bezig met uitloggen…" : "Uitloggen"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DisplayPreferencesDialog
+        open={dialog === "preferences"}
+        onOpenChange={(open) => setDialog(open ? "preferences" : null)}
+        returnFocusRef={triggerRef}
+      />
+      <ShortcutsDialog
+        open={dialog === "shortcuts"}
+        onOpenChange={(open) => setDialog(open ? "shortcuts" : null)}
+        returnFocusRef={triggerRef}
+      />
+    </>
   );
 }

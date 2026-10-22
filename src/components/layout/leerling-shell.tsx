@@ -20,7 +20,7 @@ function TopNavLinks({ pathname }: { pathname: string | null }) {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/70 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 active &&
                   "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
               )}
@@ -47,7 +47,7 @@ function BottomNavLinks({ pathname }: { pathname: string | null }) {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-xl py-2 text-[0.7rem] font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "flex flex-col items-center gap-1 rounded-xl py-2 text-[0.7rem] font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active && "text-primary",
               )}
             >
@@ -103,6 +103,7 @@ export function LeerlingShell({ userMenu, children }: LeerlingShellProps) {
 
       <main
         id="inhoud"
+        tabIndex={-1}
         className="flex-1 px-4 pt-6 pb-28 sm:px-6 md:pt-10 md:pb-16"
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">

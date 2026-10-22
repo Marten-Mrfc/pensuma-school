@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // HeikinAshiChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ export interface HeikinAshiChartProps {
   zoom?: boolean
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -114,7 +114,7 @@ export const HeikinAshiChart = React.forwardRef<HTMLDivElement, HeikinAshiChartP
     }, [data, zoom, option, theme])
 
     return (
-      <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel || 'Heikin-Ashi chart'}>
+      <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel || 'Heikin-Ashi-grafiek'}>
         <EChart option={mergedOption} />
       </ChartFrame>
     )

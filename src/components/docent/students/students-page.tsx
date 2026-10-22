@@ -27,7 +27,7 @@ import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
 import { StudentActionsMenu } from "./student-actions-menu";
 import { StudentFormDialog } from "./student-form-dialog";
-import { StudentStatus } from "./student-status";
+import { LoginLockBadge, StudentStatus } from "./student-status";
 
 type Row = RouterOutputs["student"]["list"]["rows"][number];
 type Status = "all" | "active" | "inactive";
@@ -104,6 +104,10 @@ export function StudentsPage() {
               ? s.classes.map((c) => c.name).join(", ")
               : "Geen klas"}
           </span>
+          <LoginLockBadge
+            lockedUntil={s.loginLockedUntil}
+            className="mt-1 lg:hidden"
+          />
         </div>
       ),
     },
@@ -133,7 +137,12 @@ export function StudentsPage() {
       key: "status",
       header: "Status",
       hideBelow: "lg",
-      cell: (s) => <StudentStatus banned={s.banned} />,
+      cell: (s) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <StudentStatus banned={s.banned} />
+          <LoginLockBadge lockedUntil={s.loginLockedUntil} />
+        </span>
+      ),
     },
     {
       key: "pin",
@@ -165,6 +174,7 @@ export function StudentsPage() {
             name: s.name,
             studentNumber: s.studentNumber,
             banned: s.banned,
+            loginLockedUntil: s.loginLockedUntil,
           }}
         />
       ),

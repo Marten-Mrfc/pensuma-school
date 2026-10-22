@@ -110,12 +110,26 @@ export function formatGrade(n: number | null | undefined): string {
 
 export function formatMinutes(minutes: number | null | undefined): string {
   if (minutes == null) return "Geen tijdslimiet";
-  if (minutes < 60) return `${minutes} minuten`;
+  const min = (n: number) => `${n} ${n === 1 ? "minuut" : "minuten"}`;
+  if (minutes < 60) return min(minutes);
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m ? `${h} uur en ${m} minuten` : `${h} uur`;
+  return m ? `${h} uur en ${min(m)}` : `${h} uur`;
 }
 
 export function pluralize(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
+}
+
+/** "1 hint gebruikt (−0,5 pt)", or without a penalty "2 hints gebruikt". */
+export function formatHintsUsed(used: number, penaltyPoints: number): string {
+  const base = `${pluralize(used, "hint", "hints")} gebruikt`;
+  return penaltyPoints > 0
+    ? `${base} (−${formatNumber(penaltyPoints)} pt)`
+    : base;
+}
+
+/** 0.25 → "25%". */
+export function formatPercent(fraction: number): string {
+  return `${formatNumber(Math.round(fraction * 1000) / 10, 1)}%`;
 }

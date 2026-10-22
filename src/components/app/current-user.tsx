@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, type ReactNode, use } from "react";
+import { PreferencesSync } from "@/components/preferences/preferences-sync";
 
 /** The signed-in user as exposed to client components (no secrets). */
 export type ShellUser = {
@@ -16,8 +17,10 @@ export type ShellUser = {
 const CurrentUserContext = createContext<ShellUser | null>(null);
 
 /**
- * Provided by the /docent and /leerling layouts once the session has been
- * verified on the server, so pages can greet the user without a fetch.
+ * Provided by the /docent, /leerling and exam layouts once the session has
+ * been verified on the server, so pages can greet the user without a fetch.
+ * It also mounts PreferencesSync, which applies the user's display
+ * preferences (text size, readable font, …) to the page.
  */
 export function CurrentUserProvider({
   user,
@@ -26,7 +29,17 @@ export function CurrentUserProvider({
   user: ShellUser;
   children: ReactNode;
 }) {
-  return <CurrentUserContext value={user}>{children}</CurrentUserContext>;
+  return (
+    <CurrentUserContext value={user}>
+      <PreferencesSync userId={user.id} />
+      {children}
+    </CurrentUserContext>
+  );
+}
+
+/** The signed-in user, or null outside the /docent, /leerling and exam layouts. */
+export function useOptionalCurrentUser(): ShellUser | null {
+  return use(CurrentUserContext);
 }
 
 /**

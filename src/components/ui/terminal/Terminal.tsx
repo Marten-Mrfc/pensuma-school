@@ -33,6 +33,15 @@ export interface TerminalProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   maxHeight?: string
 }
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
+function subscribeReducedMotion(onChange: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {}
+  const mql = window.matchMedia(REDUCED_MOTION_QUERY)
+  mql.addEventListener('change', onChange)
+  return () => mql.removeEventListener('change', onChange)
+}
+
 const Terminal = React.forwardRef<HTMLDivElement, TerminalProps>(
   (
     {
@@ -41,7 +50,7 @@ const Terminal = React.forwardRef<HTMLDivElement, TerminalProps>(
       promptChar = '$',
       theme = 'dark',
       autoScroll = true,
-      typing = false,
+      typing: typingProp = false,
       typingSpeed = 120,
       maxHeight = '400px',
       className,
@@ -49,6 +58,13 @@ const Terminal = React.forwardRef<HTMLDivElement, TerminalProps>(
     },
     ref,
   ) => {
+    // The typing animation is JS-driven, so the CSS reduced-motion floor does not cover it.
+    const reducedMotion = React.useSyncExternalStore(
+      subscribeReducedMotion,
+      () => !!window.matchMedia?.(REDUCED_MOTION_QUERY).matches,
+      () => false,
+    )
+    const typing = typingProp && !reducedMotion
     const bodyRef = React.useRef<HTMLDivElement | null>(null)
     const [visibleCount, setVisibleCount] = React.useState(typing ? 0 : lines.length)
     const typingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -81,8 +97,7 @@ const Terminal = React.forwardRef<HTMLDivElement, TerminalProps>(
       // Scroll on the next paint once the new lines are rendered.
       const raf = requestAnimationFrame(scrollToBottom)
       return () => cancelAnimationFrame(raf)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [lines.length, typing])
+    }, [lines.length, typing, scrollToBottom])
 
     // Drive the typing animation whenever visibleCount is below the total.
     React.useEffect(() => {
@@ -103,9 +118,9 @@ const Terminal = React.forwardRef<HTMLDivElement, TerminalProps>(
     }, [typing, visibleCount, lines.length, typingSpeed, scrollToBottom])
 
     // Initial scroll-to-bottom for the non-typing case.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount; later changes are handled by the effects above
     React.useEffect(() => {
       if (!typing) scrollToBottom()
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     return (
@@ -137,7 +152,7 @@ const Terminal = React.forwardRef<HTMLDivElement, TerminalProps>(
             <div key={i} data-slot="terminal-line" className="break-words whitespace-pre-wrap">
               {line.type === 'command' && (
                 <div data-slot="terminal-command" className="flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="text-success shrink-0 font-semibold">{line.prompt}</span>
+                  <span className="text-success-ink shrink-0 font-semibold">{line.prompt}</span>
                   <span>{line.command}</span>
                 </div>
               )}

@@ -35,7 +35,10 @@ const FloatLabel = React.forwardRef<HTMLDivElement, FloatLabelProps>(
         setHasValue(!!el.value)
       } else {
         const input = el.querySelector?.('input, textarea, select') as
-          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | HTMLSelectElement
+          | null
         if (input) setHasValue(!!input.value)
       }
     }
@@ -45,7 +48,10 @@ const FloatLabel = React.forwardRef<HTMLDivElement, FloatLabelProps>(
       const wrapper = wrapperRef.current
       if (!wrapper) return
       const input = wrapper.querySelector('input, textarea, select') as
-        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | HTMLSelectElement
+        | null
       if (!input) return
       setHasValue(!!input.value)
       if (input.id) {
@@ -81,6 +87,7 @@ const FloatLabel = React.forwardRef<HTMLDivElement, FloatLabelProps>(
     )
 
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: delegated focus/input listeners only observe the wrapped control
       <div
         ref={setRefs}
         className={wrapperClasses}
@@ -104,4 +111,3 @@ const FloatLabel = React.forwardRef<HTMLDivElement, FloatLabelProps>(
 FloatLabel.displayName = 'FloatLabel'
 
 export { FloatLabel }
-

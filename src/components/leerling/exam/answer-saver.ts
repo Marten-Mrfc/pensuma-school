@@ -1,5 +1,5 @@
 import type { AnswerResponse } from "@/lib/questions/schema";
-import { readStorage, storageKey, writeStorage } from "./types";
+import { readStorage, removeStorage, storageKey, writeStorage } from "./types";
 
 /**
  * Autosave engine for one attempt (plain class, outside React):
@@ -8,7 +8,8 @@ import { readStorage, storageKey, writeStorage } from "./types";
  *  - a localStorage backup of every change (restored when newer than the
  *    server copy),
  *  - retries with exponential backoff while offline,
- *  - stops for good when the server says the attempt is closed.
+ *  - stops for good when the server says the attempt is closed, and then
+ *    removes the local backup (shared school PCs keep nothing behind).
  *
  * React reads `getSnapshot()` through `useSyncExternalStore`.
  */
@@ -118,6 +119,11 @@ export class AnswerSaver {
     return readStorage<Backup>(this.backupKey) ?? {};
   }
 
+  /** Remove the local backup (after handing in, or once the server locked it). */
+  clearBackup() {
+    removeStorage(this.backupKey);
+  }
+
   private writeBackup(questionId: string, response: AnswerResponse) {
     const backup = this.readBackup();
     backup[questionId] = {
@@ -223,6 +229,8 @@ export class AnswerSaver {
         if (isLockedError(err)) {
           this.locked = true;
           this.pending.clear();
+          // Nothing can be saved any more: don't leave answers behind.
+          this.clearBackup();
           this.hooks.onLocked?.(err);
         } else {
           failed = true;

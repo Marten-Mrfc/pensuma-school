@@ -1,3 +1,11 @@
+"use client";
+
+import { Lock } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /** Pill: Actief / Gedeactiveerd. */
@@ -27,5 +35,60 @@ export function StudentStatus({
       />
       {banned ? "Gedeactiveerd" : "Actief"}
     </span>
+  );
+}
+
+const timeFormat = new Intl.DateTimeFormat("nl-NL", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const LOCK_HELP =
+  "Te veel verkeerde PIN-codes. Hef de blokkade op of wacht tot de tijd voorbij is.";
+
+/** Is the login lock still active? */
+export function isLoginLocked(
+  lockedUntil: Date | string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!lockedUntil) return false;
+  const until =
+    lockedUntil instanceof Date ? lockedUntil : new Date(lockedUntil);
+  return !Number.isNaN(until.getTime()) && until > now;
+}
+
+/**
+ * Warning pill “Geblokkeerd tot {HH:mm}” while a student's login is locked
+ * after too many wrong PINs. Focusable, so the explanation (tooltip) also
+ * works with the keyboard; screen readers get it as part of the name.
+ */
+export function LoginLockBadge({
+  lockedUntil,
+  className,
+}: {
+  lockedUntil: Date | string | null | undefined;
+  className?: string;
+}) {
+  if (!lockedUntil || !isLoginLocked(lockedUntil)) return null;
+  const until =
+    lockedUntil instanceof Date ? lockedUntil : new Date(lockedUntil);
+  const time = timeFormat.format(until);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex h-6 w-fit shrink-0 cursor-help items-center gap-1.5 rounded-full bg-warning/12 px-2.5 text-xs font-medium whitespace-nowrap text-warning-ink ring-1 ring-warning/30 ring-inset outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            className,
+          )}
+        >
+          <Lock className="size-3" aria-hidden="true" />
+          Geblokkeerd tot {time}
+          <span className="sr-only">. {LOCK_HELP}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{LOCK_HELP}</TooltipContent>
+    </Tooltip>
   );
 }

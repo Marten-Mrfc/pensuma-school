@@ -7,11 +7,10 @@ import {
   ClipboardPaste,
   Clock3,
   Code2,
-  Eye,
   FileQuestion,
   KeyRound,
+  Lightbulb,
   Loader2,
-  Maximize,
   PlayCircle,
   RotateCcw,
   Save,
@@ -20,13 +19,21 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, use, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  use,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Markdown } from "@/components/app/markdown";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
@@ -38,6 +45,7 @@ import {
   pluralize,
 } from "./format";
 import { ModeBadge } from "./mode-badge";
+import { MonitoringNotice } from "./monitoring/monitoring-notice";
 
 type AssignmentInfo = RouterOutputs["portal"]["getAssignment"];
 
@@ -111,15 +119,37 @@ async function enterFullscreen(): Promise<boolean> {
     return false;
   try {
     await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+    // Keep Escape inside the page while in fullscreen (where supported).
+    (
+      navigator as Navigator & {
+        keyboard?: { lock?: (keys: string[]) => Promise<void> };
+      }
+    ).keyboard
+      ?.lock?.(["Escape"])
+      .catch(() => {});
     return true;
   } catch {
     return false;
   }
 }
 
+/** "Zodra je start, loopt de tijd: …" including verlengde tijd. */
+function timeLimitText(info: AssignmentInfo): string | null {
+  if (!info.timeLimitMinutes) return null;
+  const personal = info.personalTimeMinutes ?? info.timeLimitMinutes;
+  if (info.extraTimePercent > 0 && personal > info.timeLimitMinutes) {
+    return `Zodra je start, loopt de tijd: je hebt ${personal} minuten (${info.timeLimitMinutes} minuten + ${info.extraTimePercent}% verlengde tijd).`;
+  }
+  return `Zodra je start, loopt de tijd: je hebt ${formatMinutes(info.timeLimitMinutes)}.`;
+}
+
 function StartPanel({ info }: { info: AssignmentInfo }) {
   const trpc = useTRPC();
   const router = useRouter();
+  const codeId = useId();
+  const hintId = `${codeId}-hint`;
+  const errorId = `${codeId}-error`;
+  const codeRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const start = useMutation(trpc.portal.startAttempt.mutationOptions());
@@ -134,6 +164,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
     setError(null);
     if (needsCode && !code.trim()) {
       setError("Vul de toegangscode in die je docent laat zien.");
+      codeRef.current?.focus();
       return;
     }
     // Must run inside the click/submit gesture, before any await.
@@ -154,6 +185,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
       setError(
         getErrorMessage(err, "Starten lukte niet. Probeer het opnieuw."),
       );
+      if (needsCode) codeRef.current?.focus();
     }
   };
 
@@ -217,7 +249,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
               ? `Je bent al begonnen. Je hebt ${formatTimeLeft(info.inProgressDeadlineAt)} (tot ${formatMoment(info.inProgressDeadlineAt)}).`
               : "Je bent al begonnen. Je antwoorden zijn bewaard."
             : info.timeLimitMinutes
-              ? `Zodra je start, loopt de tijd: je hebt ${formatMinutes(info.timeLimitMinutes)}.`
+              ? timeLimitText(info)
               : exam
                 ? "Neem rustig de tijd. Je antwoorden worden automatisch opgeslagen."
                 : "Je kunt je code zo vaak uitvoeren en testen als je wilt."}
@@ -227,7 +259,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
       {needsCode ? (
         <div className="flex flex-col gap-2">
           <label
-            htmlFor="toegangscode"
+            htmlFor={codeId}
             className="flex items-center gap-2 text-sm font-medium"
           >
             <KeyRound
@@ -237,7 +269,8 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
             Toegangscode
           </label>
           <input
-            id="toegangscode"
+            ref={codeRef}
+            id={codeId}
             name="toegangscode"
             value={code}
             onChange={(e) => {
@@ -251,14 +284,14 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
             maxLength={12}
             placeholder="ABC123"
             aria-invalid={error ? true : undefined}
-            aria-describedby="toegangscode-hint"
+            aria-describedby={error ? `${hintId} ${errorId}` : hintId}
             className={cn(
               "h-16 w-full rounded-xl border-2 border-input bg-background px-4 text-center font-mono text-3xl font-semibold tracking-[0.35em] uppercase shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
               error &&
                 "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
             )}
           />
-          <p id="toegangscode-hint" className="text-xs text-muted-foreground">
+          <p id={hintId} className="text-xs text-muted-foreground">
             Je docent laat de code op het bord zien.
           </p>
         </div>
@@ -266,6 +299,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
 
       {error ? (
         <p
+          id={errorId}
           role="alert"
           className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-ink"
         >
@@ -320,21 +354,10 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
         {exam ? "Goed om te weten" : "Zo werkt het"}
       </h2>
       <ul className="flex flex-col gap-3">
-        {s.logFocusEvents ? (
-          <Rule icon={Eye} tone="warning">
-            Deze toets registreert wanneer je het venster of tabblad verlaat. Je
-            docent kan dat zien.
-          </Rule>
-        ) : null}
-        {s.requireFullscreen ? (
-          <Rule icon={Maximize} tone="warning">
-            De toets draait in <strong>volledig scherm</strong>. Ga je eruit,
-            dan wordt dat ook geregistreerd.
-          </Rule>
-        ) : null}
         {s.blockPaste ? (
           <Rule icon={ClipboardPaste} tone="warning">
             Plakken in de code-editor is uitgeschakeld. Typ je code zelf.
+            Pogingen om te plakken worden geregistreerd, maar niet wát je plakt.
           </Rule>
         ) : null}
         {info.timeLimitMinutes ? (
@@ -358,6 +381,12 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
                   : "Uitvoeren en testen zijn bij deze toets uitgeschakeld."}
           </Rule>
         ) : null}
+        {info.hasHints ? (
+          <Rule icon={Lightbulb}>
+            Bij sommige vragen kun je een hint bekijken. Een hint kan punten
+            kosten.
+          </Rule>
+        ) : null}
         {!exam ? (
           <Rule icon={Sparkles}>
             Dit is een oefening: fouten maken mag! Na het inleveren zie je
@@ -366,6 +395,13 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
           </Rule>
         ) : null}
       </ul>
+      <MonitoringNotice
+        settings={{
+          logFocusEvents: s.logFocusEvents,
+          requireFullscreen: s.requireFullscreen,
+          blockPaste: s.blockPaste,
+        }}
+      />
     </section>
   );
 }
@@ -373,6 +409,7 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
 function StartScreenContent({ id }: { id: string }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.portal.getAssignment.queryOptions({ id }));
+  useDocumentTitle([query.data?.title, "Toets starten"]);
 
   if (query.isPending) return <LoadingState />;
   if (query.isError) {
@@ -425,7 +462,12 @@ function StartScreenContent({ id }: { id: string }) {
             icon={Clock3}
             label="Tijdslimiet"
             value={
-              info.timeLimitMinutes ? `${info.timeLimitMinutes} min` : "Geen"
+              info.timeLimitMinutes
+                ? info.extraTimePercent > 0 &&
+                  (info.personalTimeMinutes ?? 0) > info.timeLimitMinutes
+                  ? `${info.personalTimeMinutes} min (incl. verlengde tijd)`
+                  : `${info.timeLimitMinutes} min`
+                : "Geen"
             }
           />
           <FactTile

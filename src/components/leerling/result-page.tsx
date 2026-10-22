@@ -3,16 +3,25 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Ban,
+  BookOpenCheck,
+  Check,
   CheckCircle2,
+  ChevronDown,
   CircleDashed,
+  CircleDot,
   CircleMinus,
   Clock,
+  EyeOff,
   Hourglass,
+  Lightbulb,
+  ListChecks,
   Loader2,
   MessageSquareText,
   PartyPopper,
   PlayCircle,
   RotateCcw,
+  X,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,20 +39,41 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { QUESTION_TYPE_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
-import { formatGrade, formatMoment, formatNumber } from "./format";
+import {
+  formatGrade,
+  formatHintsUsed,
+  formatMoment,
+  formatNumber,
+} from "./format";
 import { ModeBadge } from "./mode-badge";
+import { ProvisionalScoreNote } from "./monitoring/provisional-score-note";
 
 type Result = RouterOutputs["portal"]["getResult"];
 type VisibleResult = Extract<Result, { visible: true }>;
 type ResultQuestion = VisibleResult["questions"][number];
+type Solutions = RouterOutputs["help"]["solutions"]["solutions"];
 
-type Verdict = "correct" | "partial" | "wrong" | "review" | "empty" | "pending";
+type Verdict =
+  | "correct"
+  | "partial"
+  | "wrong"
+  | "review"
+  | "empty"
+  | "pending"
+  | "neutralized";
 
 function verdictOf(q: ResultQuestion): Verdict {
+  if (q.neutralized) return "neutralized";
   if (!q.answered && !q.reviewed && !q.earned) return "empty";
   if (q.status === "needs_review" && !q.reviewed) return "review";
   if (q.earned == null) return "pending";
@@ -86,6 +116,11 @@ const VERDICT: Record<
     label: "Wordt nagekeken",
     className: "bg-info/10 text-info-ink",
   },
+  neutralized: {
+    icon: Ban,
+    label: "Vervalt",
+    className: "bg-muted text-muted-foreground",
+  },
 };
 
 function Centered({ children }: { children: ReactNode }) {
@@ -123,6 +158,7 @@ function ScoreHero({ result }: { result: VisibleResult }) {
       review: 0,
       empty: 0,
       pending: 0,
+      neutralized: 0,
     } as Record<Verdict, number>,
   );
   const radius = 52;
@@ -183,7 +219,16 @@ function ScoreHero({ result }: { result: VisibleResult }) {
             ({pct}%).
           </p>
           <ul className="flex flex-wrap justify-center gap-2 sm:justify-start">
-            {(["correct", "partial", "wrong", "empty", "review"] as const)
+            {(
+              [
+                "correct",
+                "partial",
+                "wrong",
+                "empty",
+                "review",
+                "neutralized",
+              ] as const
+            )
               .filter((v) => counts[v])
               .map((v) => {
                 const meta = VERDICT[v];
@@ -200,7 +245,11 @@ function ScoreHero({ result }: { result: VisibleResult }) {
                     {counts[v]}{" "}
                     {v === "review"
                       ? "nog na te kijken"
-                      : meta.label.toLowerCase()}
+                      : v === "neutralized"
+                        ? counts[v] === 1
+                          ? "vervallen vraag"
+                          : "vervallen vragen"
+                        : meta.label.toLowerCase()}
                   </li>
                 );
               })}
@@ -212,6 +261,7 @@ function ScoreHero({ result }: { result: VisibleResult }) {
               nakijken. Je cijfer kan dus nog veranderen.
             </p>
           ) : null}
+          {result.provisional ? <ProvisionalScoreNote /> : null}
         </div>
       </div>
     </section>
@@ -226,6 +276,38 @@ function ChoiceReview({
   return (
     <ul className="flex flex-col gap-2">
       {choice.options.map((o) => {
+        if (o.correct === null) {
+          // The right answers are hidden: only show what was chosen.
+          return (
+            <li
+              key={o.id}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3",
+                o.selected ? "border-foreground/30 bg-muted/60" : "bg-card",
+              )}
+            >
+              <span className="mt-0.5 shrink-0">
+                {o.selected ? (
+                  <CircleDot
+                    className="size-5 text-foreground"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span
+                    className="block size-5 rounded-full border-2 border-border"
+                    aria-hidden="true"
+                  />
+                )}
+              </span>
+              <div className="min-w-0 flex-1 text-sm [&_p]:my-0">
+                <Markdown>{o.text}</Markdown>
+              </div>
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                {o.selected ? "Jouw keuze" : ""}
+              </span>
+            </li>
+          );
+        }
         const tone = o.correct
           ? "border-success/40 bg-success/8"
           : o.selected
@@ -273,11 +355,117 @@ function ChoiceReview({
   );
 }
 
-function QuestionReview({ q }: { q: ResultQuestion }) {
+function RubricReview({
+  rubric,
+}: {
+  rubric: NonNullable<ResultQuestion["rubric"]>;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h4 className="flex items-center gap-2 text-sm font-semibold">
+        <ListChecks
+          className="size-4 text-muted-foreground"
+          aria-hidden="true"
+        />
+        Beoordelingscriteria
+      </h4>
+      <ul className="flex flex-col gap-1.5">
+        {rubric.map((item) => (
+          <li
+            key={item.id}
+            className="flex items-start gap-2.5 rounded-lg border bg-card px-3 py-2 text-sm"
+          >
+            <span
+              className={cn(
+                "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full",
+                item.achieved
+                  ? "bg-success/12 text-success-ink"
+                  : "bg-destructive/10 text-destructive-ink",
+              )}
+            >
+              {item.achieved ? (
+                <Check
+                  className="size-3.5"
+                  strokeWidth={3}
+                  aria-hidden="true"
+                />
+              ) : (
+                <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 leading-6">{item.label}</span>
+            <span
+              className={cn(
+                "shrink-0 text-xs font-medium leading-6",
+                item.achieved ? "text-success-ink" : "text-muted-foreground",
+              )}
+            >
+              {item.achieved ? "behaald" : "niet behaald"} ·{" "}
+              {formatNumber(item.points)} pt
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SolutionReview({
+  solution,
+}: {
+  solution: NonNullable<Solutions[string]>;
+}) {
+  return (
+    <Collapsible className="group/solution rounded-lg border">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-sm font-medium outline-none hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring">
+        <BookOpenCheck className="size-4 text-primary" aria-hidden="true" />
+        Modeloplossing bekijken
+        <ChevronDown
+          className="ml-auto size-4 text-muted-foreground transition-transform group-data-[state=open]/solution:rotate-180 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-3 px-4 pb-4">
+        <p className="text-sm text-muted-foreground">
+          Er zijn vaak meerdere goede oplossingen. Vergelijk het idee, niet elke
+          letter.
+        </p>
+        {solution.solution ? (
+          <HighlightedCode
+            code={solution.solution}
+            language="python"
+            showLineNumbers
+          />
+        ) : null}
+        {solution.modelAnswer ? (
+          <p className="rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+            {solution.modelAnswer}
+          </p>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function QuestionReview({
+  q,
+  solution,
+}: {
+  q: ResultQuestion;
+  solution: Solutions[string] | undefined;
+}) {
   const verdict = verdictOf(q);
   const response = q.response;
   return (
     <div className="flex flex-col gap-5 pt-1">
+      {q.neutralized ? (
+        <p className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <Ban className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {q.neutralized === "drop"
+            ? "Deze vraag telt niet mee."
+            : "Deze vraag telt niet mee: iedereen krijgt er alle punten voor."}
+        </p>
+      ) : null}
       {q.prompt.trim() ? (
         <details className="group rounded-lg border bg-muted/30 px-4 py-3">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground select-none">
@@ -342,6 +530,7 @@ function QuestionReview({ q }: { q: ResultQuestion }) {
               Je docent kijkt deze vraag nog na.
             </p>
           ) : null}
+          {q.rubric ? <RubricReview rubric={q.rubric} /> : null}
         </div>
       ) : null}
 
@@ -356,11 +545,19 @@ function QuestionReview({ q }: { q: ResultQuestion }) {
           </div>
         </div>
       ) : null}
+
+      {solution ? <SolutionReview solution={solution} /> : null}
     </div>
   );
 }
 
-function QuestionAccordion({ questions }: { questions: ResultQuestion[] }) {
+function QuestionAccordion({
+  questions,
+  solutions,
+}: {
+  questions: ResultQuestion[];
+  solutions: Solutions;
+}) {
   return (
     <Accordion
       type="multiple"
@@ -389,10 +586,23 @@ function QuestionAccordion({ questions }: { questions: ResultQuestion[] }) {
                   <span className="sr-only">{meta.label}</span>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-muted-foreground">
                     Vraag {q.position} · {QUESTION_TYPE_LABELS[q.type]}
+                    {q.neutralized ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">
+                        Vervalt
+                      </span>
+                    ) : null}
+                    {q.hints ? (
+                      <span className="inline-flex items-center gap-1 text-warning-ink">
+                        <Lightbulb className="size-3" aria-hidden="true" />
+                        {formatHintsUsed(q.hints.used, q.hints.penaltyPoints)}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="truncate font-semibold">{q.title}</span>
+                  <span className="max-w-full truncate font-semibold">
+                    {q.title}
+                  </span>
                 </span>
                 <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-sm font-semibold tabular-nums">
                   {q.earned == null ? "–" : formatNumber(q.earned)}
@@ -403,7 +613,7 @@ function QuestionAccordion({ questions }: { questions: ResultQuestion[] }) {
               </AccordionTrigger>
             </AccordionHeader>
             <AccordionContent className="px-4 pb-5">
-              <QuestionReview q={q} />
+              <QuestionReview q={q} solution={solutions[q.id]} />
             </AccordionContent>
           </AccordionItem>
         );
@@ -425,6 +635,19 @@ function ResultContent({ attemptId }: { attemptId: string }) {
       },
     ),
   );
+
+  const solutionsQuery = useQuery(
+    trpc.help.solutions.queryOptions(
+      { attemptId },
+      {
+        enabled:
+          !!query.data?.visible &&
+          query.data.gradingStatus !== "pending" &&
+          query.data.mode === "practice",
+      },
+    ),
+  );
+  useDocumentTitle([query.data?.title, "Resultaat"]);
 
   const header = (title: string, extra?: ReactNode) => (
     <PageHeader
@@ -572,11 +795,29 @@ function ResultContent({ attemptId }: { attemptId: string }) {
         actions={retry}
       />
       <ScoreHero result={r} />
+      {r.answersHiddenMessage ? (
+        <p className="flex items-start gap-2 rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <EyeOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {r.answersHiddenMessage}
+        </p>
+      ) : null}
+      {solutionsQuery.data?.message ? (
+        <p className="flex items-start gap-2 rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <BookOpenCheck
+            className="mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
+          {solutionsQuery.data.message}
+        </p>
+      ) : null}
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-lg font-semibold tracking-tight">
           Per vraag
         </h2>
-        <QuestionAccordion questions={r.questions} />
+        <QuestionAccordion
+          questions={r.questions}
+          solutions={solutionsQuery.data?.solutions ?? {}}
+        />
       </section>
     </>
   );

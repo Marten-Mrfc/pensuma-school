@@ -128,4 +128,27 @@ describe("question templates", () => {
     );
     expect(fresh.options[0].id).not.toBe(data.options[0].id);
   });
+
+  test("refreshDataIds also renews hint and rubric item ids", () => {
+    const code = parseQuestionData("code", {
+      tests: [{ id: "t1", kind: "io", expectedOutput: "x" }],
+      checks: [{ id: "c1", kind: "requires", construct: "for_loop" }],
+      hints: [{ id: "h1", text: "Gebruik een lus.", penalty: 0.1 }],
+    });
+    const freshCode = refreshDataIds("code", code);
+    expect(freshCode.tests[0].id).not.toBe("t1");
+    expect(freshCode.checks[0].id).not.toBe("c1");
+    expect(freshCode.hints[0]).toMatchObject({
+      text: "Gebruik een lus.",
+      penalty: 0.1,
+    });
+    expect(freshCode.hints[0].id).not.toBe("h1");
+
+    const open = parseQuestionData("open", {
+      rubricItems: [{ id: "r1", label: "Juiste uitleg", points: 1 }],
+    });
+    const freshOpen = refreshDataIds("open", open);
+    expect(freshOpen.rubricItems[0].label).toBe("Juiste uitleg");
+    expect(freshOpen.rubricItems[0].id).not.toBe("r1");
+  });
 });

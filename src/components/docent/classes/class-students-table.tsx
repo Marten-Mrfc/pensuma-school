@@ -1,19 +1,23 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, TimerReset, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import {
   SimpleTable,
   type SimpleTableColumn,
 } from "@/components/app/simple-table";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/lib/routes";
-import type { RouterOutputs } from "@/trpc/react";
+import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { ExtraTimeDialog } from "../students/extra-time-dialog";
 import { formatDateTime } from "../students/format";
 import { PinReveal } from "../students/pin-reveal";
 import { StudentActionsMenu } from "../students/student-actions-menu";
-import { StudentStatus } from "../students/student-status";
+import { LoginLockBadge, StudentStatus } from "../students/student-status";
 
 type Member = RouterOutputs["class"]["get"]["members"][number];
 
@@ -27,7 +31,17 @@ export function ClassStudentsTable({
   classId,
   members,
 }: ClassStudentsTableProps) {
+  const trpc = useTRPC();
   const [filter, setFilter] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const accommodations = useQuery(
+    trpc.accommodation.listForClass.queryOptions({ classId }),
+  );
+  const extraTime = (userId: string) =>
+    accommodations.data?.[userId]?.extraTimePercent ?? 0;
+  const memberIds = new Set(members.map((m) => m.id));
+  const selection = selected.filter((x) => memberIds.has(x));
   const term = filter.trim().toLowerCase();
   const rows = term
     ? members.filter(
@@ -37,7 +51,46 @@ export function ClassStudentsTable({
       )
     : members;
 
+  const allShownSelected =
+    rows.length > 0 && rows.every((m) => selection.includes(m.id));
+  const toggle = (id: string, on: boolean) =>
+    setSelected((list) =>
+      on ? [...new Set([...list, id])] : list.filter((x) => x !== id),
+    );
+
   const columns: SimpleTableColumn<Member>[] = [
+    {
+      key: "select",
+      header: (
+        <Checkbox
+          checked={
+            allShownSelected
+              ? true
+              : rows.some((m) => selection.includes(m.id))
+                ? "indeterminate"
+                : false
+          }
+          onCheckedChange={(v) =>
+            setSelected((list) =>
+              v === true
+                ? [...new Set([...list, ...rows.map((m) => m.id)])]
+                : list.filter((x) => !rows.some((m) => m.id === x)),
+            )
+          }
+          aria-label="Alle leerlingen selecteren"
+        />
+      ),
+      label: "Selecteren",
+      className: "w-10",
+      hideBelow: "sm",
+      cell: (m) => (
+        <Checkbox
+          checked={selection.includes(m.id)}
+          onCheckedChange={(v) => toggle(m.id, v === true)}
+          aria-label={`${m.name} selecteren`}
+        />
+      ),
+    },
     {
       key: "studentNumber",
       header: "Nummer",
@@ -65,7 +118,12 @@ export function ClassStudentsTable({
           <span className="font-mono text-xs text-muted-foreground sm:hidden">
             {m.studentNumber}
             {m.banned ? " · gedeactiveerd" : ""}
+            {extraTime(m.id) > 0 ? ` · +${extraTime(m.id)}% tijd` : ""}
           </span>
+          <LoginLockBadge
+            lockedUntil={m.loginLockedUntil}
+            className="mt-1 sm:hidden"
+          />
         </div>
       ),
     },
@@ -74,7 +132,29 @@ export function ClassStudentsTable({
       header: "Status",
       hideBelow: "sm",
       sortValue: (m) => (m.banned ? 1 : 0),
-      cell: (m) => <StudentStatus banned={m.banned} />,
+      cell: (m) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <StudentStatus banned={m.banned} />
+          <LoginLockBadge lockedUntil={m.loginLockedUntil} />
+        </span>
+      ),
+    },
+    {
+      key: "extraTime",
+      header: "Extra tijd",
+      hideBelow: "sm",
+      sortValue: (m) => extraTime(m.id),
+      cell: (m) =>
+        extraTime(m.id) > 0 ? (
+          <span className="inline-flex h-6 items-center rounded-full bg-info/10 px-2 text-xs font-medium text-info-ink tabular-nums ring-1 ring-info/25 ring-inset">
+            +{extraTime(m.id)}%
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            <span aria-hidden="true">–</span>
+            <span className="sr-only">Geen</span>
+          </span>
+        ),
     },
     {
       key: "pin",
@@ -101,11 +181,14 @@ export function ClassStudentsTable({
       cell: (m) => (
         <StudentActionsMenu
           classId={classId}
+          showExtraTime
           student={{
             id: m.id,
             name: m.name,
             studentNumber: m.studentNumber,
             banned: m.banned,
+            loginLockedUntil: m.loginLockedUntil,
+            extraTimePercent: extraTime(m.id),
           }}
         />
       ),
@@ -125,6 +208,38 @@ export function ClassStudentsTable({
           className="sm:max-w-xs"
         />
       ) : null}
+      {selection.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium" aria-live="polite">
+            {selection.length}{" "}
+            {selection.length === 1 ? "leerling" : "leerlingen"} geselecteerd
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
+            <TimerReset aria-hidden="true" />
+            Verlengde tijd instellen…
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => setSelected([])}
+          >
+            <X aria-hidden="true" />
+            Selectie wissen
+          </Button>
+        </div>
+      ) : null}
+      <ExtraTimeDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        students={members
+          .filter((m) => selection.includes(m.id))
+          .map((m) => ({ id: m.id, name: m.name }))}
+        initialPercent={
+          selection.length === 1 ? extraTime(selection[0] ?? "") : 0
+        }
+        onSaved={() => setSelected([])}
+      />
       <SimpleTable
         caption="Leerlingen in deze klas"
         columns={columns}

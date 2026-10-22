@@ -19,4 +19,3 @@ export function dateToIso(date: Date | undefined): string {
   if (!date) return ''
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
-

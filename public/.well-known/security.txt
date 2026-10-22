@@ -1,0 +1,6 @@
+# Pensuma security contact (RFC 9116).
+# Replace the placeholder address with the school's ICT or security
+# contact before going live, and renew Expires every year (see README).
+Contact: mailto:ict@school.example
+Expires: 2027-10-22T00:00:00Z
+Preferred-Languages: nl, en

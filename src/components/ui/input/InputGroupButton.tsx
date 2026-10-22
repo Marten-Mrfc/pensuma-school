@@ -40,4 +40,3 @@ export const InputGroupButton = React.forwardRef<HTMLButtonElement, InputGroupBu
 )
 
 InputGroupButton.displayName = 'InputGroupButton'
-

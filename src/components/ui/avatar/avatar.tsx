@@ -1,9 +1,9 @@
 'use client'
 
-import * as React from 'react'
 import * as AvatarPrimitive from '@radix-ui/react-avatar'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { avatarVariants, avatarFallbackVariants } from './avatar.variants'
+import { avatarFallbackVariants, avatarVariants } from './avatar.variants'
 
 /* ------------------------------------------------------------------ */
 /* Avatar (Root)                                                       */
@@ -60,10 +60,8 @@ AvatarImage.displayName = 'AvatarImage'
 /* AvatarFallback                                                      */
 /* ------------------------------------------------------------------ */
 
-export interface AvatarFallbackProps extends Omit<
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>,
-  'color'
-> {
+export interface AvatarFallbackProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>, 'color'> {
   size?: 'xs' | 'sm' | 'default' | 'lg' | 'xl' | '2xl'
   color?: 'default' | 'primary' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'error' | 'muted'
   text?: string

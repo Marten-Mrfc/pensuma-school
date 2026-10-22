@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import { Clock, X } from 'lucide-react'
+import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -76,7 +76,8 @@ export interface TimeColumnsProps {
 function TimeColumns({
   value = '',
   onValueChange,
-  use24Hour = false,
+  // 24h is the default; kept for API compatibility (12h needs use12Hours or format="hh:mm A").
+  use24Hour: _use24Hour = false,
   use12Hours = false,
   minuteStep = 5,
   hourStep = 1,
@@ -103,7 +104,7 @@ function TimeColumns({
 
   // Default to 24h columns. Opt into 12h via format="hh:mm A" or use12Hours.
   // use24Hour:false no longer inverts to 12h (that mismatched HH:mm demos).
-  const effective12Hour = format === 'hh:mm A' ? true : use12Hours ? true : use24Hour ? false : false
+  const effective12Hour = format === 'hh:mm A' || !!use12Hours
 
   const hour12 = parts ? (parts.hour24 % 12 === 0 ? 12 : parts.hour24 % 12) : null
   const period = parts && parts.hour24 >= 12 ? 'PM' : 'AM'
@@ -199,6 +200,7 @@ function TimeColumns({
   const minCol = React.useRef<HTMLDivElement | null>(null)
   const secCol = React.useRef<HTMLDivElement | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-centre the active rows whenever the value changes
   React.useEffect(() => {
     if (!visible) return
     const raf = requestAnimationFrame(() => {
@@ -365,7 +367,7 @@ const TimePicker = React.forwardRef<HTMLButtonElement, TimePickerProps>(
       value,
       defaultValue = '',
       onValueChange,
-      placeholder = 'Pick a time',
+      placeholder = 'Kies een tijd',
       disabled = false,
       readOnly = false,
       clearable = true,
@@ -478,12 +480,19 @@ const TimePicker = React.forwardRef<HTMLButtonElement, TimePickerProps>(
             <span className="flex-1 truncate">{display || placeholder}</span>
             {/* span (not button): nested interactive elements inside Button are invalid HTML */}
             {effectiveAllowClear && parsed && !disabled && !readOnly && (
+              // biome-ignore lint/a11y/useSemanticElements: sits inside the trigger <button>; a real <button> cannot be nested there
               <span
                 role="button"
-                tabIndex={-1}
-                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mr-1 inline-flex size-5 items-center justify-center rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
-                aria-label="Clear time"
+                tabIndex={0}
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mr-1 inline-flex size-6 items-center justify-center rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                aria-label="Tijd wissen"
                 onClick={clear}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    clear(e)
+                  }
+                }}
                 onMouseDown={(e) => e.preventDefault()}
               >
                 <X className="size-3.5" aria-hidden="true" />
@@ -507,13 +516,13 @@ const TimePicker = React.forwardRef<HTMLButtonElement, TimePickerProps>(
             </div>
           )}
           <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-muted-foreground text-xs tracking-widest uppercase">Time</span>
+            <span className="text-muted-foreground text-xs tracking-widest uppercase">Tijd</span>
             <button
               type="button"
               className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-xs focus-visible:ring-2 focus-visible:outline-none"
               onClick={pickNow}
             >
-              Now
+              Nu
             </button>
           </div>
           <TimeColumns
@@ -579,7 +588,7 @@ const TimeRangePicker = React.forwardRef<HTMLButtonElement, TimeRangePickerProps
     {
       value: valueProp,
       onValueChange,
-      placeholder = 'Pick a time range',
+      placeholder = 'Kies een tijdsperiode',
       disabled = false,
       readOnly = false,
       clearable = true,
@@ -715,12 +724,19 @@ const TimeRangePicker = React.forwardRef<HTMLButtonElement, TimeRangePickerProps
             <span className="flex-1 truncate">{display || placeholder}</span>
             {/* span (not button): nested interactive elements inside Button are invalid HTML */}
             {effectiveAllowClear && display && !disabled && !readOnly && (
+              // biome-ignore lint/a11y/useSemanticElements: sits inside the trigger <button>; a real <button> cannot be nested there
               <span
                 role="button"
-                tabIndex={-1}
-                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mr-1 inline-flex size-5 items-center justify-center rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
-                aria-label="Clear time range"
+                tabIndex={0}
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mr-1 inline-flex size-6 items-center justify-center rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                aria-label="Tijdsperiode wissen"
                 onClick={clear}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    clear(e)
+                  }
+                }}
                 onMouseDown={(e) => e.preventDefault()}
               >
                 <X className="size-3.5" aria-hidden="true" />
@@ -744,7 +760,7 @@ const TimeRangePicker = React.forwardRef<HTMLButtonElement, TimeRangePickerProps
             </div>
           )}
           <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-muted-foreground text-xs tracking-widest uppercase">Time Range</span>
+            <span className="text-muted-foreground text-xs tracking-widest uppercase">Tijdsperiode</span>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -764,7 +780,7 @@ const TimeRangePicker = React.forwardRef<HTMLButtonElement, TimeRangePickerProps
           </div>
           <div className="flex">
             <div className="flex flex-col">
-              <div className="text-muted-foreground border-b px-3 py-1.5 text-center text-xs font-medium">Start</div>
+              <div className="text-muted-foreground border-b px-3 py-1.5 text-center text-xs font-medium">Begin</div>
               <TimeColumns
                 value={startValue}
                 use24Hour={use24Hour}
@@ -785,7 +801,7 @@ const TimeRangePicker = React.forwardRef<HTMLButtonElement, TimeRangePickerProps
             </div>
             <div className="bg-border w-px" />
             <div className="flex flex-col">
-              <div className="text-muted-foreground border-b px-3 py-1.5 text-center text-xs font-medium">End</div>
+              <div className="text-muted-foreground border-b px-3 py-1.5 text-center text-xs font-medium">Einde</div>
               <TimeColumns
                 value={endValue}
                 use24Hour={use24Hour}
@@ -813,4 +829,3 @@ const TimeRangePicker = React.forwardRef<HTMLButtonElement, TimeRangePickerProps
 TimeRangePicker.displayName = 'TimeRangePicker'
 
 export { TimePicker, TimeColumns, TimeRangePicker }
-

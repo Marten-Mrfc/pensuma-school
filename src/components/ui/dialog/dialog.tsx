@@ -1,10 +1,10 @@
 'use client'
 
-import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const Dialog = DialogPrimitive.Root
 
@@ -62,10 +62,10 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
           <DialogPrimitive.Close
             data-uipkge=""
             data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring absolute top-3 right-3 grid size-8 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <X aria-hidden="true" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">Sluiten</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -107,10 +107,10 @@ const DialogScrollContent = React.forwardRef<
         <DialogPrimitive.Close
           data-uipkge=""
           data-slot="dialog-close"
-          className="hover:bg-secondary absolute top-4 right-4 rounded-md p-0.5 transition-colors duration-200"
+          className="text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring absolute top-3 right-3 grid size-8 place-items-center rounded-md transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-hidden"
         >
           <X className="h-4 w-4" aria-hidden="true" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">Sluiten</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Overlay>

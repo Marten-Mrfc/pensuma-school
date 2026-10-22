@@ -144,7 +144,9 @@ export type IssueTarget =
     }
   | { field: "test"; id: string; index: number }
   | { field: "option"; id: string; index: number }
-  | { field: "options" | "modelAnswer" };
+  | { field: "hint"; id: string; index: number }
+  | { field: "rubricItem"; id: string; index: number }
+  | { field: "options" | "modelAnswer" | "hints" | "rubricItems" };
 
 export type QuestionIssue = {
   severity: IssueSeverity;
@@ -358,6 +360,25 @@ function validateCode(
     });
   }
 
+  data.hints.forEach((h, index) => {
+    if (!h.text.trim()) {
+      issues.push({
+        severity: "warning",
+        code: "code.hint_empty",
+        message: `hint ${index + 1} is leeg`,
+        target: { field: "hint", id: h.id, index },
+      });
+    }
+  });
+  if (hintPenaltyTotal(data.hints) > 1 + 1e-9) {
+    issues.push({
+      severity: "warning",
+      code: "code.hints_cost_too_much",
+      message: "samen kosten de hints meer dan alle punten van deze vraag",
+      target: { field: "hints" },
+    });
+  }
+
   switch (solutionCheckState(data, check)) {
     case "unchecked":
       issues.push({
@@ -459,19 +480,97 @@ function validateMultipleChoice(data: MultipleChoiceData): QuestionIssue[] {
   return issues;
 }
 
-function validateOpen(data: OpenQuestionData): QuestionIssue[] {
-  if (!data.modelAnswer.trim() && !data.rubric.trim()) {
-    return [
-      {
-        severity: "warning",
-        code: "open.no_model_answer",
-        message:
-          "voeg een modelantwoord of beoordelingsrubric toe; dat helpt bij het nakijken",
-        target: { field: "modelAnswer" },
-      },
-    ];
+function validateOpen(data: OpenQuestionData, points: number): QuestionIssue[] {
+  const issues: QuestionIssue[] = [];
+  if (
+    !data.modelAnswer.trim() &&
+    !data.rubric.trim() &&
+    data.rubricItems.length === 0
+  ) {
+    issues.push({
+      severity: "warning",
+      code: "open.no_model_answer",
+      message:
+        "voeg een modelantwoord of beoordelingscriteria toe; dat helpt bij het nakijken",
+      target: { field: "modelAnswer" },
+    });
   }
-  return [];
+  data.rubricItems.forEach((item, index) => {
+    if (!item.label.trim()) {
+      issues.push({
+        severity: "warning",
+        code: "open.rubric_item_empty",
+        message: `criterium ${index + 1} heeft nog geen omschrijving`,
+        target: { field: "rubricItem", id: item.id, index },
+      });
+    }
+  });
+  const mismatch = rubricSumMismatch(data.rubricItems, points);
+  if (mismatch) {
+    issues.push({
+      severity: "warning",
+      code: "open.rubric_sum_mismatch",
+      message: lowerFirst(mismatch),
+      target: { field: "rubricItems" },
+    });
+  }
+  return issues;
+}
+
+/* ------------------------- Hints, criteria, images ------------------------ */
+
+/** Sum of the hint penalties (fractions of the question's points). */
+export function hintPenaltyTotal(
+  hints: readonly { penalty: number }[],
+): number {
+  return hints.reduce((sum, h) => sum + (h.penalty > 0 ? h.penalty : 0), 0);
+}
+
+/** Dutch number with at most two decimals: 2.5 → "2,5". */
+export function formatDutchNumber(value: number): string {
+  return value.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
+}
+
+/**
+ * “De criteria tellen op tot {x} punten; de vraag is {y} punten waard.” when
+ * the rubric items do not add up to the question's points (null when they
+ * do, or when there are no items).
+ */
+export function rubricSumMismatch(
+  items: readonly { points: number }[],
+  points: number,
+): string | null {
+  if (items.length === 0) return null;
+  const sum = items.reduce((s, i) => s + i.points, 0);
+  if (Math.abs(sum - points) < 1e-9) return null;
+  return `De criteria tellen op tot ${formatDutchNumber(sum)} punten; de vraag is ${formatDutchNumber(points)} punten waard.`;
+}
+
+const IMAGE_WITHOUT_ALT_RE = /!\[\s*\]\(/;
+/** Markdown images that point to another site (http(s)://… or //…). */
+const EXTERNAL_IMAGE_RE = /!\[[^\]]*\]\(\s*<?(?:[a-z][a-z0-9+.-]*:)?\/\//i;
+
+/** Markdown contains an image without alt text: `![](…)`. */
+export function hasImageWithoutAlt(markdown: string): boolean {
+  return IMAGE_WITHOUT_ALT_RE.test(markdown);
+}
+
+/**
+ * Markdown contains an image on another server. Students never load those
+ * (privacy); only data: URLs and local images are shown.
+ */
+export function hasExternalImage(markdown: string): boolean {
+  return EXTERNAL_IMAGE_RE.test(markdown);
+}
+
+export const IMAGE_ALT_WARNING =
+  "Een afbeelding heeft nog geen beschrijving. Schrijf tussen de [ ] wat erop staat, zodat leerlingen met een schermlezer het ook weten.";
+
+export const EXTERNAL_IMAGE_WARNING =
+  "Externe afbeeldingen worden niet aan leerlingen getoond (privacy). Gebruik een afbeelding als data-URL of laat hem weg.";
+
+function lowerFirst(message: string): string {
+  return message ? message[0].toLowerCase() + message.slice(1) : message;
 }
 
 /** All problems of one question, errors first. */
@@ -505,6 +604,15 @@ export function validateQuestion(
     });
   }
 
+  if (hasImageWithoutAlt(question.prompt)) {
+    issues.push({
+      severity: "warning",
+      code: "question.image_without_alt",
+      message: lowerFirst(IMAGE_ALT_WARNING),
+      target: { field: "prompt" },
+    });
+  }
+
   const parsed = questionDataSchemas[question.type].safeParse(
     question.data ?? {},
   );
@@ -525,7 +633,7 @@ export function validateQuestion(
     } else if (question.type === "multiple_choice") {
       issues.push(...validateMultipleChoice(data as MultipleChoiceData));
     } else {
-      issues.push(...validateOpen(data as OpenQuestionData));
+      issues.push(...validateOpen(data as OpenQuestionData, question.points));
     }
     const added = issues.slice(before);
     if (!parsed.success && !added.some((i) => i.severity === "error")) {
@@ -658,7 +766,12 @@ const FIELD_LABELS: Record<string, string> = {
   shuffle: "husselen",
   scoring: "puntentelling",
   modelAnswer: "modelantwoord",
-  rubric: "rubric",
+  rubric: "toelichting voor het nakijken",
+  rubricItems: "beoordelingscriteria",
+  hints: "hints",
+  penalty: "puntaftrek",
+  label: "omschrijving",
+  tags: "onderwerpen",
   maxLength: "max. aantal tekens",
   description: "beschrijving",
   topic: "onderwerp",
@@ -678,6 +791,8 @@ function describePath(path: PropertyKey[]): string {
       if (seg === "tests") parts.push(`test ${next + 1}`);
       else if (seg === "checks") parts.push(`controle ${next + 1}`);
       else if (seg === "options") parts.push(`optie ${optionLetter(next)}`);
+      else if (seg === "hints") parts.push(`hint ${next + 1}`);
+      else if (seg === "rubricItems") parts.push(`criterium ${next + 1}`);
       else if (seg === "questions") parts.push(`vraag ${next + 1}`);
       else
         parts.push(`${FIELD_LABELS[String(seg)] ?? String(seg)} ${next + 1}`);
@@ -751,6 +866,127 @@ export function safeParseQuestionData<T extends QuestionType>(
 }
 
 /* -------------------------------------------------------------------------- */
+/*                              Input size limits                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Hard limits for what a teacher can store in one question (characters or
+ * items). Checked on every write (question.create / update / copyToTest,
+ * test.importJson); the parse schemas stay lenient so stored legacy data
+ * still loads.
+ */
+export const QUESTION_INPUT_LIMITS = {
+  title: 300,
+  prompt: 20_000,
+  starterCode: 100_000,
+  solution: 100_000,
+  tests: 100,
+  stdin: 100_000,
+  expectedOutput: 100_000,
+  call: 2_000,
+  expected: 10_000,
+  testName: 200,
+  checks: 30,
+  checkMessage: 500,
+  options: 30,
+  optionText: 2_000,
+  modelAnswer: 20_000,
+  rubric: 20_000,
+  hints: 5,
+  rubricItems: 20,
+} as const;
+
+/** 20000 → "20.000" (Dutch thousands separator, locale-independent). */
+function groupThousands(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+const asArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+const textLength = (value: unknown): number =>
+  typeof value === "string" ? value.length : 0;
+
+/**
+ * Check a question against QUESTION_INPUT_LIMITS. Returns Dutch messages
+ * (empty when everything fits), e.g. “De opdrachttekst is te lang
+ * (maximaal 20.000 tekens).” Works on raw input, before parsing.
+ */
+export function assertQuestionInputLimits(
+  type: QuestionType,
+  data: unknown,
+  fields: { title?: string; prompt?: string } = {},
+): string[] {
+  const L = QUESTION_INPUT_LIMITS;
+  const issues: string[] = [];
+  const tooLong = (label: string, max: number) =>
+    `${label} is te lang (maximaal ${groupThousands(max)} tekens).`;
+  const checkText = (value: unknown, max: number, label: string) => {
+    if (textLength(value) > max) issues.push(tooLong(label, max));
+  };
+
+  checkText(fields.title, L.title, "De titel");
+  checkText(fields.prompt, L.prompt, "De opdrachttekst");
+
+  const d = asRecord(data);
+  if (type === "code") {
+    checkText(d.starterCode, L.starterCode, "De startcode");
+    checkText(d.solution, L.solution, "De modeloplossing");
+    const tests = asArray(d.tests);
+    if (tests.length > L.tests) {
+      issues.push(`Een vraag kan maximaal ${L.tests} tests hebben.`);
+    }
+    tests.slice(0, L.tests).forEach((raw, i) => {
+      const t = asRecord(raw);
+      const n = `Test ${i + 1}: `;
+      checkText(t.name, L.testName, `${n}de naam`);
+      checkText(t.stdin, L.stdin, `${n}de invoer`);
+      checkText(t.expectedOutput, L.expectedOutput, `${n}de verwachte uitvoer`);
+      checkText(t.call, L.call, `${n}de aanroep`);
+      checkText(t.expected, L.expected, `${n}de verwachte waarde`);
+    });
+    const checks = asArray(d.checks);
+    if (checks.length > L.checks) {
+      issues.push(`Een vraag kan maximaal ${L.checks} controles hebben.`);
+    }
+    checks.slice(0, L.checks).forEach((raw, i) => {
+      checkText(
+        asRecord(raw).message,
+        L.checkMessage,
+        `Controle ${i + 1}: de melding`,
+      );
+    });
+    if (asArray(d.hints).length > L.hints) {
+      issues.push(`Een vraag kan maximaal ${L.hints} hints hebben.`);
+    }
+  } else if (type === "multiple_choice") {
+    const options = asArray(d.options);
+    if (options.length > L.options) {
+      issues.push(`Een vraag kan maximaal ${L.options} antwoordopties hebben.`);
+    }
+    options.slice(0, L.options).forEach((raw, i) => {
+      checkText(
+        asRecord(raw).text,
+        L.optionText,
+        `Optie ${optionLetter(i)}: de tekst`,
+      );
+    });
+  } else {
+    checkText(d.modelAnswer, L.modelAnswer, "Het modelantwoord");
+    checkText(d.rubric, L.rubric, "De toelichting voor het nakijken");
+    if (asArray(d.rubricItems).length > L.rubricItems) {
+      issues.push(
+        `Een vraag kan maximaal ${L.rubricItems} beoordelingscriteria hebben.`,
+      );
+    }
+  }
+  return issues;
+}
+
+/* -------------------------------------------------------------------------- */
 /*                            Portable JSON format                            */
 /* -------------------------------------------------------------------------- */
 
@@ -761,6 +997,8 @@ const portableCommon = {
   title: z.string().trim().min(1).max(300),
   prompt: z.string().max(50_000).default(""),
   points: z.number().min(0).max(MAX_POINTS_PER_QUESTION).default(1),
+  /** Question bank topics (optional; normalised on import). */
+  tags: z.array(z.string().max(100)).max(50).optional(),
 };
 
 export const portableQuestionSchema = z.discriminatedUnion("type", [

@@ -10,11 +10,19 @@ import {
   QUESTION_TEMPLATES,
 } from "@/lib/questions/templates";
 import {
+  assertQuestionInputLimits,
   calledFunctionName,
   describeDataIssues,
+  EXTERNAL_IMAGE_WARNING,
+  hasExternalImage,
+  hasImageWithoutAlt,
+  hintPenaltyTotal,
+  IMAGE_ALT_WARNING,
+  QUESTION_INPUT_LIMITS as L,
   looksBalanced,
   parsePortableTest,
   portableFileName,
+  rubricSumMismatch,
   type SolutionCheck,
   safeParseQuestionData,
   solutionCheckState,
@@ -441,5 +449,268 @@ describe("helpers", () => {
       "python-basis-oefentoets.pensuma.json",
     );
     expect(portableFileName("???")).toBe("toets.pensuma.json");
+  });
+});
+
+describe("hints, criteria and images", () => {
+  test("empty hint and hints that cost more than the question", () => {
+    const data = codeQuestionDataSchema.parse({
+      solution: 'print("Hallo")',
+      tests: [newIoTest({ expectedOutput: "Hallo" })],
+      hints: [
+        { id: "h1", text: "Denk aan print().", penalty: 0.5 },
+        { id: "h2", text: "  ", penalty: 0.5 },
+        { id: "h3", text: "Gebruik aanhalingstekens.", penalty: 0.25 },
+      ],
+    });
+    const data2 = { ...data };
+    const issues = validateQuestion(
+      codeQuestion(data2, { solutionCheck: passedCheck(data2) }),
+    );
+    expect(codes(issues)).toEqual([
+      "code.hint_empty",
+      "code.hints_cost_too_much",
+    ]);
+    expect(issues[0].message).toBe("hint 2 is leeg");
+    expect(issues[0].target).toEqual({ field: "hint", id: "h2", index: 1 });
+    expect(issues[1].message).toBe(
+      "samen kosten de hints meer dan alle punten van deze vraag",
+    );
+    expect(hintPenaltyTotal(data.hints)).toBeCloseTo(1.25);
+  });
+
+  test("hints that cost exactly all points are fine", () => {
+    const data = codeQuestionDataSchema.parse({
+      solution: 'print("Hallo")',
+      tests: [newIoTest({ expectedOutput: "Hallo" })],
+      hints: [
+        { id: "h1", text: "a", penalty: 0.5 },
+        { id: "h2", text: "b", penalty: 0.25 },
+        { id: "h3", text: "c", penalty: 0.25 },
+      ],
+    });
+    expect(
+      validateQuestion(
+        codeQuestion(data, { solutionCheck: passedCheck(data) }),
+      ),
+    ).toEqual([]);
+  });
+
+  test("rubric criteria that do not add up to the points", () => {
+    const issues = validateQuestion({
+      type: "open",
+      title: "Uitleg",
+      prompt: "Leg uit.",
+      points: 2,
+      data: {
+        rubricItems: [
+          { id: "r1", label: "Juiste uitleg", points: 1 },
+          { id: "r2", label: "Voorbeeld", points: 1.5 },
+        ],
+      },
+    });
+    expect(codes(issues)).toEqual(["open.rubric_sum_mismatch"]);
+    expect(issues[0].message).toBe(
+      "de criteria tellen op tot 2,5 punten; de vraag is 2 punten waard.",
+    );
+    expect(rubricSumMismatch([{ points: 1 }, { points: 1 }], 2)).toBeNull();
+    expect(rubricSumMismatch([], 2)).toBeNull();
+    expect(rubricSumMismatch([{ points: 3 }], 2)).toBe(
+      "De criteria tellen op tot 3 punten; de vraag is 2 punten waard.",
+    );
+  });
+
+  test("criteria replace the model answer warning", () => {
+    const issues = validateQuestion({
+      type: "open",
+      title: "Uitleg",
+      prompt: "Leg uit.",
+      points: 1,
+      data: { rubricItems: [{ id: "r1", label: "Juist", points: 1 }] },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  test("image without alt text is a warning", () => {
+    const issues = validateQuestion({
+      type: "open",
+      title: "Plaatje",
+      prompt: "Bekijk ![ ](data:image/png;base64,AAAA) en leg uit.",
+      points: 1,
+      data: { modelAnswer: "x" },
+    });
+    expect(codes(issues)).toEqual(["question.image_without_alt"]);
+    expect(issues[0].severity).toBe("warning");
+    expect(issues[0].message.toLowerCase()).toBe(
+      IMAGE_ALT_WARNING.toLowerCase(),
+    );
+    expect(hasImageWithoutAlt("![Een stroomdiagram](a.png)")).toBe(false);
+  });
+
+  test("external images are detected", () => {
+    expect(hasExternalImage("![logo](https://example.com/a.png)")).toBe(true);
+    expect(hasExternalImage("![logo](//cdn.example.com/a.png)")).toBe(true);
+    expect(hasExternalImage("![logo]( http://x.nl/a.png )")).toBe(true);
+    expect(hasExternalImage("![logo](data:image/png;base64,AAAA)")).toBe(false);
+    expect(hasExternalImage("[link](https://example.com)")).toBe(false);
+    expect(EXTERNAL_IMAGE_WARNING).toContain("privacy");
+  });
+});
+
+describe("assertQuestionInputLimits", () => {
+  const s = (n: number) => "x".repeat(n);
+
+  test("title and prompt at the boundary are ok, +1 is rejected", () => {
+    expect(
+      assertQuestionInputLimits(
+        "open",
+        {},
+        { title: s(L.title), prompt: s(L.prompt) },
+      ),
+    ).toEqual([]);
+    expect(
+      assertQuestionInputLimits("open", {}, { title: s(L.title + 1) }),
+    ).toEqual(["De titel is te lang (maximaal 300 tekens)."]);
+    expect(
+      assertQuestionInputLimits("open", {}, { prompt: s(L.prompt + 1) }),
+    ).toEqual(["De opdrachttekst is te lang (maximaal 20.000 tekens)."]);
+  });
+
+  test("code text fields", () => {
+    const ok = {
+      starterCode: s(L.starterCode),
+      solution: s(L.solution),
+      tests: [
+        {
+          kind: "io",
+          name: s(L.testName),
+          stdin: s(L.stdin),
+          expectedOutput: s(L.expectedOutput),
+        },
+        { kind: "function", call: s(L.call), expected: s(L.expected) },
+      ],
+      checks: [{ message: s(L.checkMessage) }],
+    };
+    expect(assertQuestionInputLimits("code", ok)).toEqual([]);
+    expect(
+      assertQuestionInputLimits("code", {
+        starterCode: s(L.starterCode + 1),
+        solution: s(L.solution + 1),
+        tests: [
+          {
+            kind: "io",
+            name: s(L.testName + 1),
+            stdin: s(L.stdin + 1),
+            expectedOutput: s(L.expectedOutput + 1),
+          },
+          {
+            kind: "function",
+            call: s(L.call + 1),
+            expected: s(L.expected + 1),
+          },
+        ],
+        checks: [{ message: s(L.checkMessage + 1) }],
+      }),
+    ).toEqual([
+      "De startcode is te lang (maximaal 100.000 tekens).",
+      "De modeloplossing is te lang (maximaal 100.000 tekens).",
+      "Test 1: de naam is te lang (maximaal 200 tekens).",
+      "Test 1: de invoer is te lang (maximaal 100.000 tekens).",
+      "Test 1: de verwachte uitvoer is te lang (maximaal 100.000 tekens).",
+      "Test 2: de aanroep is te lang (maximaal 2.000 tekens).",
+      "Test 2: de verwachte waarde is te lang (maximaal 10.000 tekens).",
+      "Controle 1: de melding is te lang (maximaal 500 tekens).",
+    ]);
+  });
+
+  test("code item counts", () => {
+    const items = (n: number) => Array.from({ length: n }, () => ({}));
+    expect(
+      assertQuestionInputLimits("code", {
+        tests: items(L.tests),
+        checks: items(L.checks),
+        hints: items(L.hints),
+      }),
+    ).toEqual([]);
+    expect(
+      assertQuestionInputLimits("code", {
+        tests: items(L.tests + 1),
+        checks: items(L.checks + 1),
+        hints: items(L.hints + 1),
+      }),
+    ).toEqual([
+      "Een vraag kan maximaal 100 tests hebben.",
+      "Een vraag kan maximaal 30 controles hebben.",
+      "Een vraag kan maximaal 5 hints hebben.",
+    ]);
+  });
+
+  test("multiple choice options", () => {
+    const options = (n: number, len = 1) =>
+      Array.from({ length: n }, () => ({ text: s(len) }));
+    expect(
+      assertQuestionInputLimits("multiple_choice", {
+        options: options(L.options, L.optionText),
+      }),
+    ).toEqual([]);
+    expect(
+      assertQuestionInputLimits("multiple_choice", {
+        options: options(L.options + 1),
+      }),
+    ).toEqual(["Een vraag kan maximaal 30 antwoordopties hebben."]);
+    expect(
+      assertQuestionInputLimits("multiple_choice", {
+        options: [{ text: "a" }, { text: s(L.optionText + 1) }],
+      }),
+    ).toEqual(["Optie B: de tekst is te lang (maximaal 2.000 tekens)."]);
+  });
+
+  test("open question fields", () => {
+    const items = (n: number) => Array.from({ length: n }, () => ({}));
+    expect(
+      assertQuestionInputLimits("open", {
+        modelAnswer: s(L.modelAnswer),
+        rubric: s(L.rubric),
+        rubricItems: items(L.rubricItems),
+      }),
+    ).toEqual([]);
+    expect(
+      assertQuestionInputLimits("open", {
+        modelAnswer: s(L.modelAnswer + 1),
+        rubric: s(L.rubric + 1),
+        rubricItems: items(L.rubricItems + 1),
+      }),
+    ).toEqual([
+      "Het modelantwoord is te lang (maximaal 20.000 tekens).",
+      "De toelichting voor het nakijken is te lang (maximaal 20.000 tekens).",
+      "Een vraag kan maximaal 20 beoordelingscriteria hebben.",
+    ]);
+  });
+
+  test("ignores junk input instead of throwing", () => {
+    expect(assertQuestionInputLimits("code", null)).toEqual([]);
+    expect(assertQuestionInputLimits("code", { tests: "nope" })).toEqual([]);
+    expect(assertQuestionInputLimits("multiple_choice", [1, 2])).toEqual([]);
+  });
+});
+
+describe("portable tags", () => {
+  test("tags are optional and carried through", () => {
+    const parsed = parsePortableTest({
+      test: { title: "T" },
+      questions: [
+        {
+          type: "open",
+          title: "Vraag",
+          tags: ["Lussen", "lijsten"],
+          data: {},
+        },
+        { type: "open", title: "Zonder tags", data: {} },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.questions[0].tags).toEqual(["Lussen", "lijsten"]);
+    expect(parsed.data.questions[1].tags).toBeUndefined();
   });
 });

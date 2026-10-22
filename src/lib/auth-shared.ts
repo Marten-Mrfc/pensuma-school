@@ -9,8 +9,9 @@ export const STUDENT_EMAIL_DOMAIN = "leerling.pensuma.local";
 export const STUDENT_NUMBER_REGEX = /^\d{3,12}$/;
 /** Student PIN: exactly 6 digits. */
 export const STUDENT_PIN_REGEX = /^\d{6}$/;
-/** Minimum password length for teacher (admin) accounts. */
-export const ADMIN_MIN_PASSWORD_LENGTH = 10;
+/** Password length limits for teacher (admin) accounts. */
+export const ADMIN_MIN_PASSWORD_LENGTH = 12;
+export const ADMIN_MAX_PASSWORD_LENGTH = 128;
 
 export const ROUTES = {
   login: "/inloggen",
@@ -21,4 +22,10 @@ export const ROUTES = {
 
 export function homeForRole(role: string | null | undefined): string {
   return role === ROLES.admin ? ROUTES.adminHome : ROUTES.studentHome;
+}
+
+/** True for the placeholder e-mail address of a student account. */
+export function isStudentEmail(email: string | null | undefined): boolean {
+  if (typeof email !== "string") return false;
+  return email.trim().toLowerCase().endsWith(`@${STUDENT_EMAIL_DOMAIN}`);
 }

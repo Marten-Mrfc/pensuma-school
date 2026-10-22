@@ -1,9 +1,8 @@
 export {
   PinInput,
   PinInputGroup,
-  PinInputSlot,
-  PinInputSeparator,
   type PinInputProps,
+  PinInputSeparator,
+  PinInputSlot,
   type PinInputSlotProps,
 } from './pin-input'
-

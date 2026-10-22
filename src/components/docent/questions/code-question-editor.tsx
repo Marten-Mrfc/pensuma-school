@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
 import { ChecksEditor } from "./checks-editor";
 import { EditorSection, FieldLabel, NumberInput } from "./fields";
+import { HintsEditor } from "./hints-editor";
 import { IssueList } from "./issue-list";
 import { CodeRunPanel, TestResultsList, usePythonRunner } from "./python";
 import { TestCaseEditor } from "./test-case-editor";
@@ -183,9 +184,9 @@ export function CodeQuestionEditor({
         icon={<Code2 />}
       >
         <div className="flex flex-col gap-2">
-          <FieldLabel htmlFor={`${id}-starter`}>Startcode</FieldLabel>
+          <FieldLabel id={`${id}-starter-label`}>Startcode</FieldLabel>
           <CodeEditor
-            aria-label="Startcode"
+            aria-labelledby={`${id}-starter-label`}
             value={data.starterCode}
             onChange={(starterCode) => set({ starterCode })}
             minHeight={96}
@@ -194,9 +195,9 @@ export function CodeQuestionEditor({
           />
         </div>
         <div className="flex flex-col gap-2">
-          <FieldLabel htmlFor={`${id}-solution`}>Modeloplossing</FieldLabel>
+          <FieldLabel id={`${id}-solution-label`}>Modeloplossing</FieldLabel>
           <CodeEditor
-            aria-label="Modeloplossing"
+            aria-labelledby={`${id}-solution-label`}
             value={data.solution}
             onChange={(solution) => set({ solution })}
             minHeight={160}
@@ -331,6 +332,12 @@ export function CodeQuestionEditor({
           onChange={(checks) => set({ checks })}
         />
       </EditorSection>
+
+      <HintsEditor
+        hints={data.hints}
+        onChange={(hints) => set({ hints })}
+        issues={issues}
+      />
     </div>
   );
 }

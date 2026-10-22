@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { after } from "next/server";
+import { accommodationMinutes } from "@/lib/accommodations";
 import { db } from "@/server/db";
 import {
   answers,
@@ -10,6 +11,7 @@ import {
   attempts,
   classMembers,
   questions,
+  studentAccommodations,
 } from "@/server/db/schema";
 import {
   computeAttemptDeadline,
@@ -250,7 +252,7 @@ export async function findResumableAttempt(
 
 export class AttemptStartError extends Error {
   constructor(
-    public reason: "no_questions" | "no_attempts_left",
+    public reason: "no_questions" | "no_attempts_left" | "cooldown",
     message: string,
   ) {
     super(message);
@@ -258,9 +260,32 @@ export class AttemptStartError extends Error {
 }
 
 /**
+ * A new attempt may start this long after the previous one at the
+ * earliest (stops scripted start/submit loops that harvest answers).
+ */
+export const NEW_ATTEMPT_COOLDOWN_MS = 30_000;
+
+/** Whether a new attempt is still blocked by the cooldown. */
+export function isInCooldown(
+  previousStarts: readonly Date[],
+  now: Date,
+  cooldownMs = NEW_ATTEMPT_COOLDOWN_MS,
+): boolean {
+  const last = previousStarts.reduce(
+    (max, d) => Math.max(max, d.getTime()),
+    Number.NEGATIVE_INFINITY,
+  );
+  return now.getTime() - last < cooldownMs;
+}
+
+/**
  * Create a new attempt (with empty answer rows) for a student, or return the
  * in-progress one when it already exists (double-click / two tabs).
  * Assumes the caller checked membership, status and access code.
+ *
+ * Verlengde tijd: the student's extra-time percentage is turned into
+ * minutes once, at the start (`accommodationMinutes`); later changes to the
+ * accommodation never alter a running attempt.
  */
 export async function createOrResumeAttempt(
   assignment: Pick<
@@ -297,7 +322,11 @@ export async function createOrResumeAttempt(
   const pointsById = new Map(points.map((p) => [p.id, p.points]));
 
   const previous = await db
-    .select({ attemptNumber: attempts.attemptNumber })
+    .select({
+      attemptNumber: attempts.attemptNumber,
+      startedAt: attempts.startedAt,
+      status: attempts.status,
+    })
     .from(attempts)
     .where(
       and(
@@ -305,6 +334,13 @@ export async function createOrResumeAttempt(
         eq(attempts.userId, userId),
       ),
     );
+  // A concurrent request (double click, second tab) may have created the
+  // attempt after our resume check: resume it instead of failing on the
+  // attempt limit or the cooldown.
+  if (previous.some((p) => p.status === "in_progress")) {
+    const running = await findResumableAttempt(assignment, userId);
+    if (running) return { attemptId: running.id, resumed: true };
+  }
   if (previous.length >= settings.maxAttempts) {
     throw new AttemptStartError(
       "no_attempts_left",
@@ -313,10 +349,32 @@ export async function createOrResumeAttempt(
         : `Je hebt al je ${settings.maxAttempts} pogingen gebruikt.`,
     );
   }
+  const startedAt = new Date();
+  if (
+    previous.length &&
+    isInCooldown(
+      previous.map((p) => p.startedAt),
+      startedAt,
+    )
+  ) {
+    throw new AttemptStartError(
+      "cooldown",
+      "Je bent net nog begonnen. Wacht een halve minuut voordat je opnieuw begint.",
+    );
+  }
   const attemptNumber =
     previous.reduce((max, p) => Math.max(max, p.attemptNumber), 0) + 1;
 
-  const startedAt = new Date();
+  const [accommodation] = await db
+    .select({ extraTimePercent: studentAccommodations.extraTimePercent })
+    .from(studentAccommodations)
+    .where(eq(studentAccommodations.userId, userId))
+    .limit(1);
+  const accMinutes = accommodationMinutes(
+    assignment,
+    startedAt,
+    accommodation?.extraTimePercent ?? 0,
+  );
   const order = settings.shuffleQuestions ? shuffled(questionIds) : questionIds;
 
   try {
@@ -329,7 +387,8 @@ export async function createOrResumeAttempt(
           attemptNumber,
           status: "in_progress",
           startedAt,
-          deadlineAt: computeAttemptDeadline(assignment, startedAt),
+          accommodationMinutes: accMinutes,
+          deadlineAt: computeAttemptDeadline(assignment, startedAt, accMinutes),
           questionOrder: order,
           lastSeenAt: startedAt,
         })
@@ -345,7 +404,7 @@ export async function createOrResumeAttempt(
       await tx.insert(attemptEvents).values({
         attemptId: created.id,
         type: "started",
-        details: { attemptNumber },
+        details: { attemptNumber, accommodationMinutes: accMinutes },
         createdAt: startedAt,
       });
       return created.id;

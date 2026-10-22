@@ -23,7 +23,7 @@ export interface UptimeTrackerChartProps {
   /** Show the legend row with the computed uptime %. Default true. */
   showLegend?: boolean
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -39,7 +39,7 @@ export const UptimeTrackerChart = React.forwardRef<HTMLDivElement, UptimeTracker
     const uptime = days.length
       ? `${((days.filter((d) => d.status === 'up').length / days.length) * 100).toFixed(1)}%`
       : '—'
-    const summary = `${days.filter((d) => d.status === 'up').length} up, ${days.filter((d) => d.status === 'degraded').length} degraded, ${days.filter((d) => d.status === 'down').length} down days`
+    const summary = `${days.filter((d) => d.status === 'up').length} dagen beschikbaar, ${days.filter((d) => d.status === 'degraded').length} dagen verstoord, ${days.filter((d) => d.status === 'down').length} dagen onbeschikbaar`
 
     return (
       <ChartFrame
@@ -47,7 +47,7 @@ export const UptimeTrackerChart = React.forwardRef<HTMLDivElement, UptimeTracker
         height="auto"
         focusable
         className={className}
-        ariaLabel={ariaLabel || `Uptime tracker: ${summary}`}
+        ariaLabel={ariaLabel || `Beschikbaarheid: ${summary}`}
       >
         <div
           className="flex min-h-6 w-full items-stretch"

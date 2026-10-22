@@ -1,7 +1,8 @@
+// biome-ignore-all lint/correctness/useHookAtTopLevel: forwardRef inner component; hooks are at top level
 'use client'
 
-import * as React from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export interface VirtualListHandle {

@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // ErrorBarChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ export interface ErrorBarChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -125,7 +125,7 @@ export const ErrorBarChart = React.forwardRef<HTMLDivElement, ErrorBarChartProps
     }, [data, option, theme])
 
     return (
-      <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel || 'Error bar chart'}>
+      <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel || 'Foutbalkendiagram'}>
         <EChart option={mergedOption} />
       </ChartFrame>
     )

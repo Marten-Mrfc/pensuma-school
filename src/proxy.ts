@@ -2,10 +2,10 @@ import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 
 /**
- * Optimistic auth check: without a session cookie, /docent/* and /leerling/*
- * redirect to /inloggen?next=<path>. This only looks at cookie presence; the
- * real checks happen in the layouts (requireAdmin/requireStudent) and in
- * every tRPC procedure.
+ * Optimistic auth check: without a session cookie, /docent/*, /leerling/*
+ * and /print/* redirect to /inloggen?next=<path>. This only looks at
+ * cookie presence; the real checks happen in the layouts
+ * (requireAdmin/requireStudent) and in every tRPC procedure.
  */
 export function proxy(request: NextRequest) {
   if (getSessionCookie(request)) return NextResponse.next();
@@ -18,5 +18,12 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Only the protected areas: api, _next, static files and /pyodide/* never match.
-  matcher: ["/docent", "/docent/:path*", "/leerling", "/leerling/:path*"],
+  matcher: [
+    "/docent",
+    "/docent/:path*",
+    "/leerling",
+    "/leerling/:path*",
+    "/print",
+    "/print/:path*",
+  ],
 };

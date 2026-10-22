@@ -20,7 +20,6 @@ import {
   type QuestionType,
   questionDataSchemas,
 } from "@/lib/questions/schema";
-import { refreshDataIds } from "@/lib/questions/templates";
 import {
   capitalize,
   PORTABLE_TEST_FORMAT,
@@ -40,6 +39,7 @@ import {
   tests,
   user,
 } from "@/server/db/schema";
+import { insertPortableTest } from "@/server/services/portable-tests";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 type Executor = DB | Tx;
@@ -128,6 +128,7 @@ function toPortable(
           title: q.title,
           prompt: q.prompt,
           points: q.points,
+          ...(q.tags.length > 0 ? { tags: q.tags } : {}),
           data: q.data,
         }) as PortableTest["questions"][number],
     ),
@@ -404,6 +405,8 @@ export const testRouter = createTRPCRouter({
               prompt: q.prompt,
               points: q.points,
               data: q.data,
+              tags: q.tags,
+              sourceQuestionId: q.sourceQuestionId ?? q.id,
               solutionCheck: q.solutionCheck,
             })),
           );
@@ -460,31 +463,8 @@ export const testRouter = createTRPCRouter({
         });
       }
       const portable = parsed.data;
-      return ctx.db.transaction(async (tx) => {
-        const [created] = await tx
-          .insert(tests)
-          .values({
-            title: portable.test.title,
-            description: portable.test.description,
-            topic: portable.test.topic || null,
-            status: "draft",
-            createdById: ctx.user.id,
-          })
-          .returning({ id: tests.id });
-        if (portable.questions.length > 0) {
-          await tx.insert(questions).values(
-            portable.questions.map((q, position) => ({
-              testId: created.id,
-              position,
-              type: q.type,
-              title: q.title,
-              prompt: q.prompt,
-              points: q.points,
-              data: refreshDataIds(q.type, q.data) as Record<string, unknown>,
-            })),
-          );
-        }
-        return { id: created.id, questionCount: portable.questions.length };
-      });
+      return ctx.db.transaction((tx) =>
+        insertPortableTest(tx, portable, ctx.user.id),
+      );
     }),
 });

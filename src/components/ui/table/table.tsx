@@ -163,4 +163,3 @@ const TableEmpty = React.forwardRef<HTMLTableCellElement, TableEmptyProps>(
 TableEmpty.displayName = 'TableEmpty'
 
 export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption, TableEmpty }
-

@@ -1,8 +1,6 @@
 'use client'
 
-import * as React from 'react'
 import type { Table } from '@tanstack/react-table'
-import type { DateRange } from 'react-day-picker'
 import {
   CalendarIcon,
   Check,
@@ -15,19 +13,10 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import type * as React from 'react'
+import type { DateRange } from 'react-day-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Command,
   CommandEmpty,
@@ -37,8 +26,19 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
+import { Separator } from '@/components/ui/separator'
 import { DataTableFilterPopover } from './DataTableFilterPopover'
 import { type FilterDefinition, resolveOption } from './types'
 
@@ -80,6 +80,8 @@ export interface DataTableToolbarProps {
   toolbarExtra?: React.ReactNode
   customFilters?: React.ReactNode
 }
+
+const DENSITY_LABELS = { compact: 'Compact', cozy: 'Normaal', comfortable: 'Ruim' } as const
 
 export function DataTableToolbar({
   table,
@@ -133,7 +135,7 @@ export function DataTableToolbar({
             <Input
               className="h-8 pl-8"
               placeholder={filterPlaceholder}
-              aria-label={filterPlaceholder || 'Search table'}
+              aria-label={filterPlaceholder || 'Tabel doorzoeken'}
               value={(table.getColumn(filterColumn)?.getFilterValue() as string) ?? ''}
               onChange={(e) => onSearch(e.target.value)}
             />
@@ -164,7 +166,7 @@ export function DataTableToolbar({
                           <div className="flex gap-1">
                             {multi.length > 2 ? (
                               <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                                {multi.length} selected
+                                {multi.length} geselecteerd
                               </Badge>
                             ) : (
                               getFilterSelectedLabels(filter).map((label) => (
@@ -180,9 +182,9 @@ export function DataTableToolbar({
                   </PopoverTrigger>
                   <PopoverContent className="w-52 p-0" align="start">
                     <Command>
-                      <CommandInput placeholder={`Search ${filter.label.toLowerCase()}...`} />
+                      <CommandInput placeholder={`Zoek ${filter.label.toLowerCase()}…`} />
                       <CommandList>
-                        <CommandEmpty>No results.</CommandEmpty>
+                        <CommandEmpty>Geen resultaten.</CommandEmpty>
                         <CommandGroup>
                           {filter.options?.map((rawOpt) => {
                             const opt = resolveOption(rawOpt)
@@ -201,9 +203,9 @@ export function DataTableToolbar({
                                       : 'opacity-50 [&_svg]:invisible',
                                   ].join(' ')}
                                 >
-                                  <Check className="size-3" />
+                                  <Check className="size-3" aria-hidden="true" />
                                 </div>
-                                {OptIcon && <OptIcon className="text-muted-foreground size-4" />}
+                                {OptIcon && <OptIcon className="text-muted-foreground size-4" aria-hidden="true" />}
                                 <span>{opt.label}</span>
                               </CommandItem>
                             )
@@ -218,7 +220,7 @@ export function DataTableToolbar({
                                 className="justify-center text-center"
                                 onSelect={() => onClearFilter(filter)}
                               >
-                                Clear filter
+                                Filter wissen
                               </CommandItem>
                             </CommandGroup>
                           </>
@@ -270,7 +272,7 @@ export function DataTableToolbar({
                           className="h-7 w-full text-xs"
                           onClick={() => onClearDateFilter(filter)}
                         >
-                          Clear dates
+                          Datums wissen
                         </Button>
                       </div>
                     )}
@@ -308,7 +310,7 @@ export function DataTableToolbar({
                     <div className="space-y-2">
                       <p className="text-sm font-medium">{filter.label}</p>
                       <Input
-                        placeholder={`Filter by ${filter.label.toLowerCase()}...`}
+                        placeholder={`Filter op ${filter.label.toLowerCase()}…`}
                         value={(table.getColumn(filter.column)?.getFilterValue() as string) ?? ''}
                         className="h-8 text-sm"
                         onChange={(e) => onTextFilterUpdate(filter.column, e.target.value || undefined)}
@@ -370,7 +372,7 @@ export function DataTableToolbar({
         {/* Reset button */}
         {isAnyFilterActive && (
           <Button variant="ghost" size="sm" className="h-8 px-2" onClick={onClearAllFilters}>
-            Reset
+            Filters wissen
             <X className="size-4" aria-hidden="true" />
           </Button>
         )}
@@ -382,16 +384,16 @@ export function DataTableToolbar({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8">
-                    <Download className="size-4" />
-                    Export
-                    <ChevronDown className="size-4 opacity-60" />
+                    <Download className="size-4" aria-hidden="true" />
+                    Exporteren
+                    <ChevronDown className="size-4 opacity-60" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={onExportCsv}>Export as CSV</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={onExportJson}>Export as JSON</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={onCopyTsv}>Copy as TSV (Excel / Sheets)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={onCopyMarkdown}>Copy as Markdown</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onExportCsv}>Exporteren als CSV</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onExportJson}>Exporteren als JSON</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onCopyTsv}>Kopiëren als TSV (Excel / Sheets)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onCopyMarkdown}>Kopiëren als Markdown</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -399,9 +401,14 @@ export function DataTableToolbar({
             {enableDensityToggle && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8" aria-label={`Row density: ${density}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    aria-label={`Rijhoogte: ${DENSITY_LABELS[density].toLowerCase()}`}
+                  >
                     <Rows3 className="size-4" aria-hidden="true" />
-                    <span className="capitalize">{density}</span>
+                    <span>{DENSITY_LABELS[density]}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -409,9 +416,9 @@ export function DataTableToolbar({
                     value={density}
                     onValueChange={(v) => onDensityChange(v as 'compact' | 'cozy' | 'comfortable')}
                   >
-                    <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="cozy">Cozy</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="compact">{DENSITY_LABELS.compact}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="cozy">{DENSITY_LABELS.cozy}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="comfortable">{DENSITY_LABELS.comfortable}</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -422,7 +429,7 @@ export function DataTableToolbar({
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8">
                     <Columns3 className="size-4" aria-hidden="true" />
-                    View
+                    Kolommen
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
@@ -448,4 +455,3 @@ export function DataTableToolbar({
     </div>
   )
 }
-

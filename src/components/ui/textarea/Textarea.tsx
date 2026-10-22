@@ -1,9 +1,9 @@
 'use client'
 
+import { AlertCircle, Check, Loader, X } from 'lucide-react'
 import * as React from 'react'
-import { Loader, Check, AlertCircle, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 export interface TextareaProps {
   // Core
@@ -249,6 +249,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
   // Auto grow functionality (legacy)
   const rowsNum = Number(rows) || 3
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reads the DOM scrollHeight, so the typed value is the trigger
   const computedRows = React.useMemo(() => {
     if (autoSizeEnabled || autoResize) return rowsNum
     if (!autoGrow) return rowsNum
@@ -436,7 +437,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
         return 'text-sm min-h-[32px]'
       case 'comfortable':
         return 'text-base min-h-[40px]'
-      case 'default':
       default:
         return 'text-base min-h-[48px]'
     }
@@ -450,12 +450,14 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
   }, [noResize, anyAutoResize])
 
   // Watch for programmatic value changes to trigger auto-resize
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the value is the trigger; the resize reads the DOM
   React.useEffect(() => {
     if (anyAutoResize) {
       requestAnimationFrame(() => autoResizeFn())
     }
   }, [internalValue, anyAutoResize, autoResizeFn])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measure once after mount
   React.useEffect(() => {
     requestAnimationFrame(() => {
       measureHeights()
@@ -463,7 +465,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
         autoResizeFn()
       }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -519,6 +520,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
           required={required}
           name={name}
           autoComplete={autoComplete}
+          // biome-ignore lint/a11y/noAutofocus: only when the consumer explicitly passes autoFocus
           autoFocus={autoFocus}
           spellCheck={spellCheck}
           maxLength={maxLength}
@@ -559,7 +561,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
           <button
             type="button"
             tabIndex={-1}
-            aria-label="Clear"
+            aria-label="Wissen"
             className={cn(
               'text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute top-3 flex items-center justify-center rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none',
               suffix ? 'right-10' : 'right-3',
@@ -579,7 +581,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
 
         {/* Success/Error indicators */}
         {hasSuccess && !loading && (
-          <div className="text-success absolute top-3 right-3 flex items-center justify-center">
+          <div className="text-success-ink absolute top-3 right-3 flex items-center justify-center">
             <Check className="size-4" aria-hidden="true" />
           </div>
         )}
@@ -619,7 +621,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
 
         {/* Success messages */}
         {computedSuccessMessages.map((msg, i) => (
-          <p key={`success-${i}`} className="text-success flex items-center gap-1 text-sm">
+          <p key={`success-${i}`} className="text-success-ink flex items-center gap-1 text-sm">
             <Check className="size-3 shrink-0" aria-hidden="true" />
             {msg}
           </p>
@@ -645,4 +647,3 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
 Textarea.displayName = 'Textarea'
 
 export { Textarea }
-

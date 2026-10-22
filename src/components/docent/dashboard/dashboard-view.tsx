@@ -19,6 +19,8 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { useId } from "react";
+import { AccessibleChart } from "@/components/a11y/accessible-chart";
 import { useCurrentUser } from "@/components/app/current-user";
 import { PageHeader } from "@/components/app/page-header";
 import { StatCard } from "@/components/app/stat-card";
@@ -54,6 +56,7 @@ export function DashboardView() {
     }),
   );
   const firstName = user.name.trim().split(/\s+/)[0] ?? "";
+  const uid = useId();
 
   if (query.isPending) return <LoadingState />;
   if (query.isError)
@@ -123,10 +126,10 @@ export function DashboardView() {
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section
           className="flex min-w-0 flex-col gap-3"
-          aria-labelledby="now-title"
+          aria-labelledby={`${uid}-now`}
         >
           <SectionTitle
-            id="now-title"
+            id={`${uid}-now`}
             icon={Radio}
             title="Nu bezig"
             href={routes.docent.assignments}
@@ -200,9 +203,9 @@ export function DashboardView() {
         <div className="flex flex-col gap-6">
           <section
             className="flex flex-col gap-3"
-            aria-labelledby="quick-title"
+            aria-labelledby={`${uid}-quick`}
           >
-            <SectionTitle id="quick-title" title="Snel aan de slag" />
+            <SectionTitle id={`${uid}-quick`} title="Snel aan de slag" />
             <div className="grid gap-2">
               <QuickAction
                 href={routes.docent.tests}
@@ -227,10 +230,10 @@ export function DashboardView() {
 
           <section
             className="flex flex-col gap-3"
-            aria-labelledby="review-title"
+            aria-labelledby={`${uid}-review`}
           >
             <SectionTitle
-              id="review-title"
+              id={`${uid}-review`}
               icon={NotebookPen}
               title="Te beoordelen"
             />
@@ -274,10 +277,10 @@ export function DashboardView() {
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <section
           className="flex min-w-0 flex-col gap-3"
-          aria-labelledby="recent-title"
+          aria-labelledby={`${uid}-recent`}
         >
           <SectionTitle
-            id="recent-title"
+            id={`${uid}-recent`}
             icon={Send}
             title="Recent ingeleverd"
           />
@@ -321,6 +324,9 @@ export function DashboardView() {
                           )}
                         >
                           {formatGrade(s.grade)}
+                          {s.grade < 5.5 ? (
+                            <span className="sr-only"> (onvoldoende)</span>
+                          ) : null}
                         </span>
                       ) : (
                         <StatusBadge
@@ -347,10 +353,10 @@ export function DashboardView() {
 
         <section
           className="flex min-w-0 flex-col gap-3"
-          aria-labelledby="last-title"
+          aria-labelledby={`${uid}-last`}
         >
           <SectionTitle
-            id="last-title"
+            id={`${uid}-last`}
             icon={Award}
             title="Laatst gesloten afname"
           />
@@ -390,10 +396,24 @@ export function DashboardView() {
                   </div>
                 </div>
               </div>
-              <GradeDistributionChart
-                bins={d.lastClosed.distribution}
-                height={200}
-              />
+              <AccessibleChart
+                title={`Cijferverdeling · ${d.lastClosed.title}`}
+                summary={`${d.lastClosed.passed} van de ${d.lastClosed.submitted} leerlingen hebben een voldoende. Het gemiddelde cijfer is ${formatGrade(d.lastClosed.averageGrade)}.`}
+                columns={[
+                  { key: "cijfer", header: "Cijfer" },
+                  { key: "aantal", header: "Aantal leerlingen" },
+                ]}
+                rows={d.lastClosed.distribution.map((b) => ({
+                  cijfer: b.label,
+                  aantal: b.count,
+                }))}
+              >
+                <GradeDistributionChart
+                  bins={d.lastClosed.distribution}
+                  height={200}
+                  ariaLabel={`${d.lastClosed.passed} van de ${d.lastClosed.submitted} leerlingen hebben een voldoende.`}
+                />
+              </AccessibleChart>
               <p className="text-xs text-muted-foreground">
                 Aantal leerlingen per cijfer. Rood = lager dan 5.
               </p>

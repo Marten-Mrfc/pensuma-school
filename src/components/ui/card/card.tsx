@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { cardVariants, type CardVariants } from './card.variants'
+import { type CardVariants, cardVariants } from './card.variants'
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement>, CardVariants {}
 
@@ -91,4 +91,3 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 CardFooter.displayName = 'CardFooter'
 
 export { Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { Dumbbell, FileCheck2 } from "lucide-react";
+import { Dumbbell, FileCheck2, RotateCcw, UserRoundCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AssignmentMode } from "./defaults";
 
@@ -128,5 +128,45 @@ export function InfoItem({
         {children}
       </span>
     </div>
+  );
+}
+
+/** "Herkansing van {titel}" and "Alleen voor {n} leerlingen" badges. */
+export function TargetingBadges({
+  retakeOf,
+  targetedStudentCount,
+  className,
+}: {
+  retakeOf: { id: string; title: string } | null;
+  targetedStudentCount: number | null;
+  className?: string;
+}) {
+  if (!retakeOf && targetedStudentCount == null) return null;
+  return (
+    <>
+      {retakeOf ? (
+        <span
+          className={cn(
+            "inline-flex h-6 max-w-64 min-w-0 items-center gap-1 rounded-full bg-secondary px-2.5 text-xs font-medium text-secondary-foreground ring-1 ring-border ring-inset",
+            className,
+          )}
+        >
+          <RotateCcw className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">Herkansing van {retakeOf.title}</span>
+        </span>
+      ) : null}
+      {targetedStudentCount != null ? (
+        <span
+          className={cn(
+            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-info/10 px-2.5 text-xs font-medium whitespace-nowrap text-info-ink ring-1 ring-info/25 ring-inset",
+            className,
+          )}
+        >
+          <UserRoundCheck className="size-3.5" aria-hidden="true" />
+          Alleen voor {targetedStudentCount}{" "}
+          {targetedStudentCount === 1 ? "leerling" : "leerlingen"}
+        </span>
+      ) : null}
+    </>
   );
 }

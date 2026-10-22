@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -22,6 +22,7 @@ import { routes } from "@/lib/routes";
 import { useTRPC } from "@/trpc/react";
 
 export function NewTestDialog({ trigger }: { trigger?: ReactNode }) {
+  const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -82,12 +83,12 @@ export function NewTestDialog({ trigger }: { trigger?: ReactNode }) {
           </DialogHeader>
           <FormField
             label="Titel"
-            htmlFor="new-test-title"
+            htmlFor={`${uid}-new-test-title`}
             required
             error={error ?? undefined}
           >
             <Input
-              id="new-test-title"
+              id={`${uid}-new-test-title`}
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
@@ -100,11 +101,11 @@ export function NewTestDialog({ trigger }: { trigger?: ReactNode }) {
           </FormField>
           <FormField
             label="Onderwerp"
-            htmlFor="new-test-topic"
+            htmlFor={`${uid}-new-test-topic`}
             description="Optioneel. Handig om toetsen terug te vinden."
           >
             <Input
-              id="new-test-topic"
+              id={`${uid}-new-test-topic`}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="bijv. Python – lussen"

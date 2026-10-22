@@ -39,12 +39,12 @@ const variantMap: Record<IconStackVariant, { back: string; front: string; text: 
   success: {
     back: 'bg-success/20 border-success/30',
     front: 'bg-background border-success/20 shadow-success/10',
-    text: 'text-success',
+    text: 'text-success-ink',
   },
   warning: {
     back: 'bg-warning/20 border-warning/30',
     front: 'bg-background border-warning/20 shadow-warning/10',
-    text: 'text-warning',
+    text: 'text-warning-ink',
   },
 }
 
@@ -88,4 +88,3 @@ export const IconStack = React.forwardRef<HTMLDivElement, IconStackProps>(
 )
 
 IconStack.displayName = 'IconStack'
-

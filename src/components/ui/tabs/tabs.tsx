@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { tabsListVariants, tabsTriggerVariants } from './tabs.variants'
 
@@ -112,6 +112,7 @@ const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, T
 
     // Bind observers once per animated/variant/orientation — NOT on every children identity
     // change (controlled tabs re-render parents constantly and would kill the slide).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: layout props are listed on purpose so the indicator re-measures when they change
     React.useLayoutEffect(() => {
       firstPosition.current = true
       if (!animated) {
@@ -124,12 +125,12 @@ const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, T
 
       const ro = new ResizeObserver(() => updateIndicator())
       ro.observe(root)
-      root.querySelectorAll('[data-slot="tabs-trigger"]').forEach((el) => ro.observe(el))
+      for (const el of root.querySelectorAll('[data-slot="tabs-trigger"]')) ro.observe(el)
 
       const mo = new MutationObserver((mutations) => {
         for (const m of mutations) {
           if (m.type === 'childList') {
-            root.querySelectorAll('[data-slot="tabs-trigger"]').forEach((el) => ro.observe(el))
+            for (const el of root.querySelectorAll('[data-slot="tabs-trigger"]')) ro.observe(el)
           }
         }
         updateIndicator()
@@ -209,7 +210,7 @@ const TabsContent = React.forwardRef<
     data-uipkge=""
     data-slot="tabs-content"
     className={cn(
-      'ring-offset-background focus-visible:border-ring focus-visible:ring-ring/50 motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:blur-in-2 motion-safe:data-[state=active]:slide-in-from-bottom-1 motion-safe:data-[state=active]:ease-emphasized flex-1 focus-visible:ring-2 focus-visible:ring-[3px] focus-visible:outline-none motion-safe:data-[state=active]:duration-200',
+      'ring-offset-background focus-visible:border-ring focus-visible:ring-ring motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:blur-in-2 motion-safe:data-[state=active]:slide-in-from-bottom-1 motion-safe:data-[state=active]:ease-emphasized flex-1 focus-visible:ring-2 focus-visible:ring-[3px] focus-visible:outline-none motion-safe:data-[state=active]:duration-200',
       className,
     )}
     {...props}
@@ -218,4 +219,3 @@ const TabsContent = React.forwardRef<
 TabsContent.displayName = 'TabsContent'
 
 export { Tabs, TabsList, TabsTrigger, TabsContent }
-

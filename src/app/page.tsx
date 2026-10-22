@@ -78,7 +78,7 @@ export default function HomePage() {
 
       <PublicHeader />
 
-      <main className="flex-1">
+      <main id="inhoud" tabIndex={-1} className="flex-1">
         {/* Hero */}
         <section className="relative overflow-hidden">
           <div

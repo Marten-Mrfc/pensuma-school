@@ -11,6 +11,7 @@ export interface ButtonGroupProps extends React.HTMLAttributes<HTMLDivElement> {
 export const ButtonGroup = React.forwardRef<HTMLDivElement, ButtonGroupProps>(
   ({ className, orientation = 'horizontal', attached = true, children, ...props }, ref) => {
     return (
+      // biome-ignore lint/a11y/useSemanticElements: ARIA group pattern; <fieldset> would add form semantics
       <div
         ref={ref}
         role="group"

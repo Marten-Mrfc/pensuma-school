@@ -1,7 +1,7 @@
 'use client'
 
+import { Eye, EyeOff, X } from 'lucide-react'
 import * as React from 'react'
-import { X, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Size = 'small' | 'middle' | 'large'
@@ -79,8 +79,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const [internal, setInternal] = React.useState<string>(defaultValue != null ? String(defaultValue) : '')
     const currentValue = isControlled ? String(value ?? '') : internal
 
-    const [focused, setFocused] = React.useState(false)
-    const [hovered, setHovered] = React.useState(false)
     const [passwordVisible, setPasswordVisible] = React.useState(false)
 
     const isPassword = type === 'password'
@@ -94,7 +92,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const hasRightConfig = !!allowClear || hasPasswordToggle || hasCount
 
     const currentLength = currentValue.length
-    const showClear = !!allowClear && currentValue.length > 0 && (focused || hovered) && !disabled && !readOnly
+    // Always mounted while there is a value (so Tab from the input can reach it);
+    // only visible on hover or while focus is inside the field (pure CSS, no state).
+    const showClear = !!allowClear && currentValue.length > 0 && !disabled && !readOnly
     const computedType = !isPassword ? type : passwordVisible ? 'text' : 'password'
 
     const wrapperRounded =
@@ -118,11 +118,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     }
 
     const wrapperClasses = cn(
-      'flex w-full items-center gap-1.5 overflow-hidden border transition-[color,box-shadow] outline-none',
+      'group/input flex w-full items-center gap-1.5 overflow-hidden border transition-[color,box-shadow] outline-none',
       sizeClasses[size],
       variantMap[variant],
       status ? statusMap[status] : '',
-      !status ? 'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]' : '',
+      !status ? 'focus-within:border-ring focus-within:ring-ring focus-within:ring-[3px]' : '',
       disabled ? 'pointer-events-none opacity-50 cursor-not-allowed bg-muted/30' : '',
       'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
       wrapperRounded,
@@ -191,13 +191,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <div className="flex w-full">
         {hasAddonBefore && <div className={addonClasses('before')}>{addonBefore}</div>}
 
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: pointer convenience only; keyboard users focus the <input> itself */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: clicking the padding or an icon focuses the input */}
         <div
           className={wrapperClasses}
           data-uipkge=""
           data-slot="input"
           aria-invalid={resolvedAriaInvalid}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
           onClick={() => innerRef.current?.focus()}
         >
           {hasPrefix && (
@@ -216,14 +216,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             maxLength={maxLength}
             aria-invalid={resolvedAriaInvalid}
             onChange={handleChange}
-            onFocus={(e) => {
-              setFocused(true)
-              onFocus?.(e)
-            }}
-            onBlur={(e) => {
-              setFocused(false)
-              onBlur?.(e)
-            }}
+            onFocus={onFocus}
+            onBlur={onBlur}
             className={cn(
               'w-full min-w-0 flex-1 bg-transparent outline-none',
               'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground',
@@ -243,8 +237,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               {showClear && (
                 <button
                   type="button"
-                  aria-label="Clear input"
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 shrink-0 rounded p-0.5 transition-colors focus-visible:ring-1 focus-visible:outline-none"
+                  aria-label="Invoer wissen"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring pointer-events-none shrink-0 rounded p-1 opacity-0 transition-[color,opacity] group-focus-within/input:pointer-events-auto group-focus-within/input:opacity-100 group-hover/input:pointer-events-auto group-hover/input:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={handleClear}
                 >
@@ -255,9 +249,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               {hasPasswordToggle && !disabled && !readOnly && (
                 <button
                   type="button"
-                  aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+                  aria-label="Wachtwoord tonen"
                   aria-pressed={passwordVisible}
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 shrink-0 rounded p-0.5 transition-colors focus-visible:ring-1 focus-visible:outline-none"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring shrink-0 rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={togglePassword}
                 >
@@ -290,4 +284,3 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 Input.displayName = 'Input'
 
 export { Input }
-

@@ -6,6 +6,7 @@ import {
   CalendarPlus,
   CheckCircle2,
   Clock,
+  CopyPlus,
   Eye,
   KeyRound,
   Lock,
@@ -18,13 +19,15 @@ import {
   RotateCcw,
   Settings2,
   Trash2,
+  UserRoundCheck,
   UserRoundX,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { CopyButton } from "@/components/app/copy-button";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -33,6 +36,7 @@ import { StatCard } from "@/components/app/stat-card";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,17 +44,54 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
+import { describeScale } from "@/lib/grading/grade-scale";
 import { SHOW_RESULTS_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { AccessCodePresenter } from "./access-code-presenter";
 import { AssignmentNav, useNow } from "./assignment-nav";
+import { DuplicateAssignmentDialog } from "./duplicate-assignment-dialog";
 import { formatMinutes, formatMoment, formatWindow } from "./format";
 import { MonitorTable } from "./monitor-table";
+import { SelectStudentsDialog } from "./select-students-dialog";
 import { SettingsSheet } from "./settings-sheet";
-import { InfoItem, ModeBadge } from "./shared";
+import { InfoItem, ModeBadge, TargetingBadges } from "./shared";
 
 type Assignment = RouterOutputs["assignment"]["get"];
+type Monitor = RouterOutputs["assignment"]["monitor"];
+
+/**
+ * Announce "{naam} heeft ingeleverd." for every student whose attempt was
+ * submitted since the previous poll (only when the teacher turned it on).
+ */
+function useSubmissionAnnouncements(data: Monitor | undefined, on: boolean) {
+  const announce = useAnnounce();
+  const previous = useRef<Map<string, string> | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const current = new Map(
+      data.students.map((s) => [
+        s.student.id,
+        s.attempt ? `${s.attempt.id}:${s.attempt.status}` : "none",
+      ]),
+    );
+    const before = previous.current;
+    previous.current = current;
+    if (!on || !before) return;
+    for (const s of data.students) {
+      const was = before.get(s.student.id);
+      const now = current.get(s.student.id);
+      if (was !== now && s.attempt?.status === "submitted") {
+        announce(`${s.student.name} heeft ingeleverd.`, {
+          dedupeKey: `submitted:${s.attempt.id}`,
+          dedupeMs: 60_000,
+        });
+      }
+    }
+  }, [data, on, announce]);
+}
 
 export function AssignmentMonitor({
   params,
@@ -59,19 +100,28 @@ export function AssignmentMonitor({
 }) {
   const { afnameId } = use(params);
   const trpc = useTRPC();
+  const id = useId();
+  // WCAG 2.2.2: the teacher can pause the automatic updates.
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [announceSubmissions, setAnnounceSubmissions] = useState(false);
   const assignment = useQuery(
     trpc.assignment.get.queryOptions(
       { id: afnameId },
-      { refetchInterval: 15_000 },
+      { refetchInterval: autoRefresh ? 15_000 : false },
     ),
   );
   const monitor = useQuery(
     trpc.assignment.monitor.queryOptions(
       { id: afnameId },
-      { refetchInterval: 5_000, refetchIntervalInBackground: false },
+      {
+        refetchInterval: autoRefresh ? 5_000 : false,
+        refetchIntervalInBackground: false,
+      },
     ),
   );
   const now = useNow(1000);
+  useSubmissionAnnouncements(monitor.data, announceSubmissions);
+  useDocumentTitle([assignment.data?.title, "Live overzicht"]);
 
   if (assignment.isPending) return <LoadingState />;
   if (assignment.isError) {
@@ -89,7 +139,9 @@ export function AssignmentMonitor({
     : 0;
 
   return (
-    <div className="flex flex-col gap-6">
+    // grid-cols-1 (minmax(0, 1fr)): wide tables scroll inside their region
+    // instead of widening the page on phones.
+    <div className="grid grid-cols-1 gap-6">
       <MonitorHeader
         assignment={a}
         monitorStarted={
@@ -98,6 +150,9 @@ export function AssignmentMonitor({
             : a.counts.started
         }
         inProgress={monitor.data?.summary.inProgress ?? a.counts.inProgress}
+        inProgressWithAccommodation={
+          monitor.data?.summary.inProgressWithAccommodation ?? 0
+        }
       />
       <AssignmentNav assignmentId={a.id} active="monitor" />
 
@@ -105,6 +160,51 @@ export function AssignmentMonitor({
         assignment={a}
         inProgress={monitor.data?.summary.inProgress ?? a.counts.inProgress}
       />
+
+      <div className="flex flex-col gap-2 rounded-xl border bg-card px-4 py-3 shadow-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+        <label
+          htmlFor={`${id}-refresh`}
+          className="flex cursor-pointer items-center gap-2.5 text-sm font-medium"
+        >
+          <Switch
+            id={`${id}-refresh`}
+            checked={autoRefresh}
+            onCheckedChange={setAutoRefresh}
+          />
+          Automatisch bijwerken
+        </label>
+        <label
+          htmlFor={`${id}-announce`}
+          className="flex cursor-pointer items-center gap-2.5 text-sm font-medium"
+        >
+          <Switch
+            id={`${id}-announce`}
+            checked={announceSubmissions}
+            onCheckedChange={setAnnounceSubmissions}
+          />
+          Inleveringen voorlezen
+        </label>
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground sm:ml-auto">
+          <RefreshCw className="size-3.5" aria-hidden="true" />
+          {autoRefresh
+            ? "Ververst automatisch elke 5 seconden."
+            : "Automatisch bijwerken staat uit."}
+          {!autoRefresh ? (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-xs"
+              onClick={() => {
+                void monitor.refetch();
+                void assignment.refetch();
+              }}
+            >
+              Nu verversen
+            </Button>
+          ) : null}
+        </p>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -154,13 +254,10 @@ export function AssignmentMonitor({
           data={monitor.data}
           now={now}
           serverOffsetMs={serverOffsetMs}
+          scale={a.settings.grading}
+          logFocusEvents={a.settings.logFocusEvents}
         />
       )}
-
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <RefreshCw className="size-3.5" aria-hidden="true" />
-        Ververst automatisch elke 5 seconden.
-      </p>
     </div>
   );
 }
@@ -226,18 +323,28 @@ function MonitorHeader({
   assignment: a,
   monitorStarted,
   inProgress,
+  inProgressWithAccommodation,
 }: {
   assignment: Assignment;
   monitorStarted: number;
   inProgress: number;
+  inProgressWithAccommodation: number;
 }) {
+  const id = useId();
   const m = useAssignmentMutations(a);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [choosingStudents, setChoosingStudents] = useState(false);
+  const [submitAccommodated, setSubmitAccommodated] = useState(false);
   const [confirm, setConfirm] = useState<"close" | "reopen" | "delete" | null>(
     null,
   );
   const status = a.effectiveStatus;
+  const othersInProgress = Math.max(
+    0,
+    inProgress - inProgressWithAccommodation,
+  );
 
   return (
     <>
@@ -249,6 +356,10 @@ function MonitorHeader({
           <>
             <StatusBadge kind="assignment" status={status} />
             <ModeBadge mode={a.mode} />
+            <TargetingBadges
+              retakeOf={a.retakeOf}
+              targetedStudentCount={a.targetedStudentCount}
+            />
           </>
         }
         description={
@@ -337,6 +448,14 @@ function MonitorHeader({
                     Toets bekijken
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setChoosingStudents(true)}>
+                  <UserRoundCheck aria-hidden="true" />
+                  Leerlingen kiezen…
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setDuplicating(true)}>
+                  <CopyPlus aria-hidden="true" />
+                  Dupliceren naar andere klas…
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link
                     href={routes.docent.newAssignment({
@@ -364,25 +483,65 @@ function MonitorHeader({
 
       <ConfirmDialog
         open={confirm === "close"}
-        onOpenChange={(o) => !o && setConfirm(null)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirm(null);
+            setSubmitAccommodated(false);
+          }
+        }}
         destructive
         title="Afname sluiten?"
         description={
-          inProgress > 0
-            ? `${inProgress} ${inProgress === 1 ? "leerling is" : "leerlingen zijn"} nog bezig. Hun werk wordt nu automatisch ingeleverd en nagekeken. Daarna kan niemand meer beginnen.`
-            : "Daarna kan niemand meer beginnen of verder werken. Je kunt de afname later heropenen."
+          othersInProgress > 0
+            ? `${othersInProgress} ${othersInProgress === 1 ? "leerling is" : "leerlingen zijn"} nog bezig. Hun werk wordt nu automatisch ingeleverd en nagekeken. Daarna kan niemand meer beginnen.`
+            : "Daarna kan niemand meer beginnen. Je kunt de afname later heropenen."
         }
-        confirmLabel="Sluiten en inleveren"
+        confirmLabel={inProgress > 0 ? "Sluiten en inleveren" : "Sluiten"}
         onConfirm={async () => {
-          const res = await m.close.mutateAsync({ id: a.id });
-          await m.invalidate();
-          toast.success("De afname is gesloten", {
-            description: res.autoSubmitted
-              ? `${res.autoSubmitted} poging(en) automatisch ingeleverd. Het nakijken loopt op de achtergrond.`
-              : undefined,
+          const res = await m.close.mutateAsync({
+            id: a.id,
+            respectAccommodations: !submitAccommodated,
           });
+          await m.invalidate();
+          if (res.stillWorking > 0) {
+            toast.success(
+              `Afname gesloten. ${res.stillWorking} ${res.stillWorking === 1 ? "leerling" : "leerlingen"} met verlengde tijd ${res.stillWorking === 1 ? "is" : "zijn"} nog bezig.`,
+              {
+                description: res.autoSubmitted
+                  ? `${res.autoSubmitted} poging(en) automatisch ingeleverd.`
+                  : undefined,
+              },
+            );
+          } else {
+            toast.success("De afname is gesloten", {
+              description: res.autoSubmitted
+                ? `${res.autoSubmitted} poging(en) automatisch ingeleverd. Het nakijken loopt op de achtergrond.`
+                : undefined,
+            });
+          }
+          setSubmitAccommodated(false);
         }}
-      />
+      >
+        {inProgressWithAccommodation > 0 ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-info/25 bg-info/[0.06] p-3 text-sm">
+            <p className="flex items-start gap-2">
+              <Clock
+                className="mt-0.5 size-4 shrink-0 text-info-ink"
+                aria-hidden="true"
+              />
+              {inProgressWithAccommodation === 1
+                ? "1 leerling met verlengde tijd werkt nog door tot de eigen eindtijd."
+                : `${inProgressWithAccommodation} leerlingen met verlengde tijd werken nog door tot hun eigen eindtijd.`}
+            </p>
+            <Checkbox
+              id={`${id}-submit-accommodated`}
+              checked={submitAccommodated}
+              onCheckedChange={(v) => setSubmitAccommodated(v === true)}
+              label="Ook deze leerlingen nu laten inleveren"
+            />
+          </div>
+        ) : null}
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirm === "reopen"}
         onOpenChange={(o) => !o && setConfirm(null)}
@@ -418,6 +577,16 @@ function MonitorHeader({
         assignment={a}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+      <DuplicateAssignmentDialog
+        open={duplicating}
+        onOpenChange={setDuplicating}
+        assignment={a}
+      />
+      <SelectStudentsDialog
+        open={choosingStudents}
+        onOpenChange={setChoosingStudents}
+        assignment={a}
       />
       {presenting && a.accessCode ? (
         <AccessCodePresenter
@@ -472,8 +641,11 @@ function StatusBanner({
         />
         <p className="flex-1">
           Deze afname is gesloten
-          {a.closesAt ? ` (${formatMoment(a.closesAt)})` : ""}. Bekijk de
-          resultaten of kijk de open vragen na.
+          {a.closesAt ? ` (${formatMoment(a.closesAt)})` : ""}.{" "}
+          {inProgress > 0
+            ? `${inProgress} ${inProgress === 1 ? "leerling werkt" : "leerlingen werken"} nog door tot de eigen eindtijd. `
+            : null}
+          Bekijk de resultaten of kijk de open vragen na.
         </p>
         <div className="flex gap-2">
           <Button asChild size="sm" variant="outline">
@@ -508,7 +680,7 @@ function StatusBanner({
 
 function InfoStrip({ assignment: a }: { assignment: Assignment }) {
   return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border bg-card p-4 shadow-xs sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border bg-card p-4 shadow-xs sm:grid-cols-3 lg:grid-cols-4">
       <InfoItem label="Tijdvak">
         <span className="inline-flex items-center gap-1.5">
           <CalendarClock
@@ -551,6 +723,20 @@ function InfoStrip({ assignment: a }: { assignment: Assignment }) {
             : `max. ${a.settings.maxAttempts}`}
         </span>
       </InfoItem>
+      <InfoItem label="Cijferberekening">
+        <span className="whitespace-normal">
+          {describeScale(a.settings.grading)}
+        </span>
+      </InfoItem>
+      {a.accommodationCount > 0 ? (
+        <InfoItem label="Verlengde tijd">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-4 text-info-ink" aria-hidden="true" />
+            {a.accommodationCount}{" "}
+            {a.accommodationCount === 1 ? "leerling" : "leerlingen"}
+          </span>
+        </InfoItem>
+      ) : null}
     </div>
   );
 }

@@ -16,18 +16,22 @@ import { ROLES } from "@/lib/auth-shared";
 import {
   type AssignmentSettings,
   assignmentSettingsSchema,
+  gradingMethodSchema,
   showResultsSchema,
+  showSolutionsSchema,
 } from "@/lib/questions/schema";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
 import {
   answers,
+  assignmentStudents,
   assignments,
   attemptEvents,
   attempts,
   classes,
   classMembers,
   questions,
+  studentAccommodations,
   tests,
   user,
 } from "@/server/db/schema";
@@ -37,7 +41,9 @@ import {
   generateAccessCode,
   isPastDeadline,
   parseAssignmentSettings,
+  totalExtraMinutes,
 } from "@/server/services/assignment-status";
+import { targetedStudentIds } from "@/server/services/assignment-targets";
 import { gradeAttempt } from "@/server/services/grading";
 
 /* -------------------------------------------------------------------------- */
@@ -213,18 +219,29 @@ export function latestPerUser<
   return map;
 }
 
-/** Students of a class plus anyone (no longer in the class) with an attempt. */
+/**
+ * Students of a class plus anyone (no longer in the class) with an attempt.
+ * A targeted afname (inhaaltoets/herkansing) only lists its selected
+ * students, plus anyone who already has an attempt.
+ */
 export async function rosterForAssignment(
   db: DB,
   classId: string,
   assignmentId: string,
 ) {
+  const targets = (await targetedStudentIds(db, [assignmentId])).get(
+    assignmentId,
+  );
   const members = await db
     .select({ id: user.id, name: user.name, studentNumber: user.username })
     .from(classMembers)
     .innerJoin(user, eq(user.id, classMembers.userId))
     .where(
-      and(eq(classMembers.classId, classId), eq(user.role, ROLES.student)),
+      and(
+        eq(classMembers.classId, classId),
+        eq(user.role, ROLES.student),
+        targets ? inArray(user.id, targets) : undefined,
+      ),
     );
   const others = await db
     .selectDistinct({
@@ -243,6 +260,118 @@ export async function rosterForAssignment(
   for (const o of others)
     if (!map.has(o.id)) map.set(o.id, { ...o, inClass: false });
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "nl"));
+}
+
+/** Display title of an afname: its own title or the test title. */
+function displayTitle(a: { title: string | null }, testTitle: string) {
+  return a.title?.trim() || testTitle;
+}
+
+/**
+ * Targeted students per afname plus the afname each one is a herkansing
+ * of, for list/get/monitor.
+ */
+async function targetingInfo(
+  db: DB,
+  rows: { id: string; retakeOfId: string | null }[],
+) {
+  const retakeIds = [
+    ...new Set(rows.map((r) => r.retakeOfId).filter((x): x is string => !!x)),
+  ];
+  const [targets, retakes] = await Promise.all([
+    targetedStudentIds(
+      db,
+      rows.map((r) => r.id),
+    ),
+    retakeIds.length
+      ? db
+          .select({
+            id: assignments.id,
+            title: assignments.title,
+            testTitle: tests.title,
+          })
+          .from(assignments)
+          .innerJoin(tests, eq(tests.id, assignments.testId))
+          .where(inArray(assignments.id, retakeIds))
+      : Promise.resolve([]),
+  ]);
+  const retakeById = new Map(
+    retakes.map((r) => [
+      r.id,
+      { id: r.id, title: displayTitle(r, r.testTitle) },
+    ]),
+  );
+  return {
+    targets,
+    retakeOf: (retakeOfId: string | null) =>
+      retakeOfId ? (retakeById.get(retakeOfId) ?? null) : null,
+  };
+}
+
+/** Verlengde tijd (percent) per student; students without one are absent. */
+async function extraTimeByUser(db: DB, userIds: string[]) {
+  const map = new Map<string, number>();
+  if (!userIds.length) return map;
+  const rows = await db
+    .select({
+      userId: studentAccommodations.userId,
+      extraTimePercent: studentAccommodations.extraTimePercent,
+    })
+    .from(studentAccommodations)
+    .where(inArray(studentAccommodations.userId, userIds));
+  for (const r of rows)
+    if (r.extraTimePercent > 0) map.set(r.userId, r.extraTimePercent);
+  return map;
+}
+
+/**
+ * Throws unless every id is a student member of the class. Returns the
+ * unique ids.
+ */
+async function assertStudentsOfClass(
+  db: DB,
+  classId: string,
+  userIds: string[],
+): Promise<string[]> {
+  const unique = [...new Set(userIds)];
+  if (!unique.length) return unique;
+  const rows = await db
+    .select({ id: classMembers.userId })
+    .from(classMembers)
+    .innerJoin(user, eq(user.id, classMembers.userId))
+    .where(
+      and(
+        eq(classMembers.classId, classId),
+        eq(user.role, ROLES.student),
+        inArray(classMembers.userId, unique),
+      ),
+    );
+  if (rows.length !== unique.length) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Kies leerlingen uit deze klas.",
+    });
+  }
+  return unique;
+}
+
+/** Classes by id, in the requested order; throws when one is missing. */
+async function classesOrThrow(db: DB, classIds: string[]) {
+  const rows = await db
+    .select({ id: classes.id, name: classes.name })
+    .from(classes)
+    .where(inArray(classes.id, classIds));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return classIds.map((id) => {
+    const klas = byId.get(id);
+    if (!klas) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Deze klas bestaat niet (meer).",
+      });
+    }
+    return klas;
+  });
 }
 
 /** Validate the window: closesAt after opensAt and not in the past. */
@@ -304,6 +433,7 @@ async function recomputeRunningDeadlines(
       id: attempts.id,
       startedAt: attempts.startedAt,
       extraMinutes: attempts.extraMinutes,
+      accommodationMinutes: attempts.accommodationMinutes,
     })
     .from(attempts)
     .where(
@@ -319,7 +449,7 @@ async function recomputeRunningDeadlines(
         deadlineAt: computeAttemptDeadline(
           assignment,
           a.startedAt,
-          a.extraMinutes,
+          totalExtraMinutes(a),
         ),
       })
       .where(eq(attempts.id, a.id));
@@ -399,6 +529,24 @@ const settingsPatchSchema = z.object({
     .min(1, "Minstens 1 poging.")
     .max(100, "Hoogstens 100 pogingen.")
     .optional(),
+  allowHints: z.boolean().optional(),
+  showSolutions: showSolutionsSchema.optional(),
+  codeTips: z.boolean().optional(),
+  grading: z
+    .object({
+      method: gradingMethodSchema.optional(),
+      passPercentage: z
+        .number()
+        .min(10, "Kies een percentage van minstens 10.")
+        .max(90, "Kies een percentage van hoogstens 90.")
+        .optional(),
+      nTerm: z
+        .number()
+        .min(0, "De N-term is minstens 0,0.")
+        .max(3, "De N-term is hoogstens 3,0.")
+        .optional(),
+    })
+    .optional(),
 });
 
 /** Drop keys that are undefined so they don't overwrite existing values. */
@@ -406,6 +554,20 @@ function definedOnly<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined),
   ) as Partial<T>;
+}
+
+/** Merge a settings patch into full settings (the grading scale field by field). */
+export function mergeSettings(
+  base: AssignmentSettings,
+  patch: z.infer<typeof settingsPatchSchema> | undefined,
+): AssignmentSettings {
+  if (!patch) return assignmentSettingsSchema.parse(base);
+  const { grading, ...rest } = patch;
+  return assignmentSettingsSchema.parse({
+    ...base,
+    ...definedOnly(rest),
+    grading: { ...base.grading, ...definedOnly(grading ?? {}) },
+  });
 }
 
 const windowFields = {
@@ -459,7 +621,7 @@ export const assignmentRouter = createTRPCRouter({
         .orderBy(desc(assignments.createdAt));
 
       const now = new Date();
-      const [students, counts, totals] = await Promise.all([
+      const [students, counts, totals, targeting] = await Promise.all([
         studentCountsByClass(ctx.db, [
           ...new Set(rows.map((r) => r.assignment.classId)),
         ]),
@@ -468,6 +630,10 @@ export const assignmentRouter = createTRPCRouter({
           rows.map((r) => r.assignment.id),
         ),
         testTotals(ctx.db, [...new Set(rows.map((r) => r.assignment.testId))]),
+        targetingInfo(
+          ctx.db,
+          rows.map((r) => r.assignment),
+        ),
       ]);
 
       const items = rows.map(({ assignment: a, testTitle, className }) => {
@@ -477,9 +643,10 @@ export const assignmentRouter = createTRPCRouter({
           submitted: 0,
         };
         const t = totals.get(a.testId) ?? { questionCount: 0, totalPoints: 0 };
+        const targeted = targeting.targets.get(a.id);
         return {
           id: a.id,
-          title: a.title?.trim() || testTitle,
+          title: displayTitle(a, testTitle),
           customTitle: a.title,
           testId: a.testId,
           testTitle,
@@ -497,7 +664,14 @@ export const assignmentRouter = createTRPCRouter({
           questionCount: t.questionCount,
           totalPoints: t.totalPoints,
           createdAt: a.createdAt,
-          counts: { students: students.get(a.classId) ?? 0, ...c },
+          targetedStudentCount: targeted ? targeted.length : null,
+          retakeOf: targeting.retakeOf(a.retakeOfId),
+          counts: {
+            students: targeted
+              ? targeted.length
+              : (students.get(a.classId) ?? 0),
+            ...c,
+          },
         };
       });
       const filtered = input?.status
@@ -526,25 +700,33 @@ export const assignmentRouter = createTRPCRouter({
     .input(z.object({ id: idSchema }))
     .query(async ({ ctx, input }) => {
       const a = await getAssignmentOrThrow(ctx.db, input.id);
-      const [[test], [klas], totals, students, counts] = await Promise.all([
-        ctx.db
-          .select({
-            id: tests.id,
-            title: tests.title,
-            status: tests.status,
-            description: tests.description,
-          })
-          .from(tests)
-          .where(eq(tests.id, a.testId)),
-        ctx.db
-          .select({ id: classes.id, name: classes.name })
-          .from(classes)
-          .where(eq(classes.id, a.classId)),
-        testTotals(ctx.db, [a.testId]),
-        studentCountsByClass(ctx.db, [a.classId]),
-        attemptCountsByAssignment(ctx.db, [a.id]),
-      ]);
+      const [[test], [klas], totals, students, counts, targeting, roster] =
+        await Promise.all([
+          ctx.db
+            .select({
+              id: tests.id,
+              title: tests.title,
+              status: tests.status,
+              description: tests.description,
+            })
+            .from(tests)
+            .where(eq(tests.id, a.testId)),
+          ctx.db
+            .select({ id: classes.id, name: classes.name })
+            .from(classes)
+            .where(eq(classes.id, a.classId)),
+          testTotals(ctx.db, [a.testId]),
+          studentCountsByClass(ctx.db, [a.classId]),
+          attemptCountsByAssignment(ctx.db, [a.id]),
+          targetingInfo(ctx.db, [a]),
+          rosterForAssignment(ctx.db, a.classId, a.id),
+        ]);
+      const extraTime = await extraTimeByUser(
+        ctx.db,
+        roster.map((r) => r.id),
+      );
       const t = totals.get(a.testId) ?? { questionCount: 0, totalPoints: 0 };
+      const targeted = targeting.targets.get(a.id) ?? null;
       const now = new Date();
       return {
         id: a.id,
@@ -571,11 +753,44 @@ export const assignmentRouter = createTRPCRouter({
         },
         class: { id: a.classId, name: klas?.name ?? "" },
         counts: {
-          students: students.get(a.classId) ?? 0,
+          students: targeted ? targeted.length : (students.get(a.classId) ?? 0),
           ...(counts.get(a.id) ?? { started: 0, inProgress: 0, submitted: 0 }),
         },
+        /** Selected students (inhaaltoets/herkansing); null = the whole class. */
+        targetedStudentIds: targeted,
+        targetedStudentCount: targeted ? targeted.length : null,
+        retakeOf: targeting.retakeOf(a.retakeOfId),
+        /** Students on the roster with verlengde tijd. */
+        accommodationCount: extraTime.size,
         serverTime: now,
       };
+    }),
+
+  /** Student members of one class, for the student picker. */
+  classStudents: adminProcedure
+    .input(z.object({ classId: idSchema }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db
+        .select({
+          id: user.id,
+          name: user.name,
+          studentNumber: user.username,
+        })
+        .from(classMembers)
+        .innerJoin(user, eq(user.id, classMembers.userId))
+        .where(
+          and(
+            eq(classMembers.classId, input.classId),
+            eq(user.role, ROLES.student),
+          ),
+        );
+      const extraTime = await extraTimeByUser(
+        ctx.db,
+        rows.map((r) => r.id),
+      );
+      return rows
+        .map((r) => ({ ...r, extraTimePercent: extraTime.get(r.id) ?? 0 }))
+        .sort((x, y) => x.name.localeCompare(y.name, "nl"));
     }),
 
   /** Published tests and active classes for the "Afname plannen" form. */
@@ -625,19 +840,58 @@ export const assignmentRouter = createTRPCRouter({
 
   create: adminProcedure
     .input(
-      z.object({
-        testId: idSchema,
-        classId: idSchema,
-        title: titleSchema,
-        mode: modeSchema,
-        ...windowFields,
-        accessCode: z.string().max(40).nullable().optional(),
-        generateAccessCode: z.boolean().optional(),
-        settings: settingsPatchSchema.optional(),
-        openNow: z.boolean().optional(),
-      }),
+      z
+        .object({
+          testId: idSchema,
+          /** Legacy single class; merged into `classIds`. */
+          classId: idSchema.optional(),
+          classIds: z
+            .array(idSchema)
+            .max(20, "Kies hoogstens 20 klassen.")
+            .optional(),
+          /** Only these students (inhaaltoets/herkansing); one class only. */
+          studentIds: z
+            .array(z.string().min(1).max(64))
+            .max(500, "Kies hoogstens 500 leerlingen.")
+            .optional(),
+          retakeOfId: idSchema.nullable().optional(),
+          /** Several classes: every class gets its own generated code. */
+          accessCodePerClass: z.boolean().default(false),
+          title: titleSchema,
+          mode: modeSchema,
+          ...windowFields,
+          accessCode: z.string().max(40).nullable().optional(),
+          generateAccessCode: z.boolean().optional(),
+          settings: settingsPatchSchema.optional(),
+          openNow: z.boolean().optional(),
+        })
+        .superRefine((value, refine) => {
+          const ids = new Set([
+            ...(value.classIds ?? []),
+            ...(value.classId ? [value.classId] : []),
+          ]);
+          if (ids.size === 0) {
+            refine.addIssue({
+              code: "custom",
+              path: ["classIds"],
+              message: "Kies minstens één klas.",
+            });
+          } else if (ids.size > 20) {
+            refine.addIssue({
+              code: "custom",
+              path: ["classIds"],
+              message: "Kies hoogstens 20 klassen.",
+            });
+          }
+        }),
     )
     .mutation(async ({ ctx, input }) => {
+      const classIds = [
+        ...new Set([
+          ...(input.classIds ?? []),
+          ...(input.classId ? [input.classId] : []),
+        ]),
+      ];
       const [test] = await ctx.db
         .select()
         .from(tests)
@@ -661,50 +915,204 @@ export const assignmentRouter = createTRPCRouter({
           message: "Deze toets heeft nog geen vragen.",
         });
       }
-      const [klas] = await ctx.db
-        .select()
-        .from(classes)
-        .where(eq(classes.id, input.classId));
-      if (!klas)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Deze klas bestaat niet.",
-        });
+      const klassen = await classesOrThrow(ctx.db, classIds);
+
+      let studentIds: string[] | null = null;
+      if (input.studentIds?.length) {
+        if (klassen.length !== 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Leerlingen kiezen kan alleen als de afname voor één klas is.",
+          });
+        }
+        studentIds = await assertStudentsOfClass(
+          ctx.db,
+          klassen[0].id,
+          input.studentIds,
+        );
+      }
+      if (input.retakeOfId)
+        await getAssignmentOrThrow(ctx.db, input.retakeOfId);
 
       const now = new Date();
       const opensAt = input.openNow ? now : (input.opensAt ?? null);
       const closesAt = input.closesAt ?? null;
       assertWindow(opensAt, closesAt, now);
 
-      const settings: AssignmentSettings = assignmentSettingsSchema.parse({
-        ...defaultSettingsForMode(input.mode),
-        ...definedOnly(input.settings ?? {}),
-      });
-      const accessCode = resolveAccessCode(
+      const settings = mergeSettings(
+        defaultSettingsForMode(input.mode),
+        input.settings,
+      );
+      const sharedCode = resolveAccessCode(
         input,
         defaultAccessCodeForMode(input.mode),
       );
+      // A custom code is shared; a generated one can differ per class.
+      const isCustom =
+        typeof input.accessCode === "string" && input.accessCode.trim() !== "";
+      const codeFor = (index: number) =>
+        sharedCode &&
+        index > 0 &&
+        input.accessCodePerClass &&
+        !isCustom &&
+        klassen.length > 1
+          ? generateAccessCode()
+          : sharedCode;
 
-      const [created] = await ctx.db
-        .insert(assignments)
-        .values({
-          testId: test.id,
-          classId: klas.id,
-          title: input.title?.trim() || null,
-          mode: input.mode,
-          status: input.openNow ? "open" : "planned",
-          opensAt,
-          closesAt,
-          timeLimitMinutes: input.timeLimitMinutes ?? null,
-          accessCode,
-          settings,
-          createdById: ctx.user.id,
-        })
-        .returning();
+      const created = await ctx.db.transaction(async (tx) => {
+        const rows = await tx
+          .insert(assignments)
+          .values(
+            klassen.map((klas, index) => ({
+              testId: test.id,
+              classId: klas.id,
+              title: input.title?.trim() || null,
+              mode: input.mode,
+              status: input.openNow ? ("open" as const) : ("planned" as const),
+              opensAt,
+              closesAt,
+              timeLimitMinutes: input.timeLimitMinutes ?? null,
+              accessCode: codeFor(index),
+              settings,
+              retakeOfId: input.retakeOfId ?? null,
+              createdById: ctx.user.id,
+            })),
+          )
+          .returning();
+        if (studentIds?.length && rows[0]) {
+          await tx.insert(assignmentStudents).values(
+            studentIds.map((userId) => ({
+              assignmentId: rows[0].id,
+              userId,
+            })),
+          );
+        }
+        return rows;
+      });
+
+      const nameById = new Map(klassen.map((k) => [k.id, k.name]));
+      const first = created[0];
       return {
-        id: created.id,
-        accessCode: created.accessCode,
-        effectiveStatus: effectiveAssignmentStatus(created, now),
+        id: first.id,
+        accessCode: first.accessCode,
+        effectiveStatus: effectiveAssignmentStatus(first, now),
+        items: created.map((row) => ({
+          id: row.id,
+          classId: row.classId,
+          className: nameById.get(row.classId) ?? "",
+          accessCode: row.accessCode,
+        })),
+      };
+    }),
+
+  /** Copy an afname (test, title, mode, time limit, settings) to other classes. */
+  duplicate: adminProcedure
+    .input(
+      z.object({
+        id: idSchema,
+        classIds: z
+          .array(idSchema)
+          .min(1, "Kies minstens één klas.")
+          .max(20, "Kies hoogstens 20 klassen."),
+        /** Keep the start and end time; otherwise the copy is planned without a window. */
+        keepWindow: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const source = await getAssignmentOrThrow(ctx.db, input.id);
+      const classIds = [...new Set(input.classIds)];
+      const klassen = await classesOrThrow(ctx.db, classIds);
+      const now = new Date();
+      const opensAt = input.keepWindow ? source.opensAt : null;
+      const closesAt = input.keepWindow ? source.closesAt : null;
+      assertWindow(opensAt, closesAt, now);
+      const settings = parseAssignmentSettings(source.settings);
+      const created = await ctx.db
+        .insert(assignments)
+        .values(
+          klassen.map((klas) => ({
+            testId: source.testId,
+            classId: klas.id,
+            title: source.title,
+            mode: source.mode,
+            status: "planned" as const,
+            opensAt,
+            closesAt,
+            timeLimitMinutes: source.timeLimitMinutes,
+            accessCode: source.accessCode ? generateAccessCode() : null,
+            settings,
+            createdById: ctx.user.id,
+          })),
+        )
+        .returning();
+      const nameById = new Map(klassen.map((k) => [k.id, k.name]));
+      return {
+        items: created.map((row) => ({
+          id: row.id,
+          classId: row.classId,
+          className: nameById.get(row.classId) ?? "",
+          accessCode: row.accessCode,
+          effectiveStatus: effectiveAssignmentStatus(row, now),
+        })),
+      };
+    }),
+
+  /**
+   * Choose the students of an afname: a list (inhaaltoets/herkansing) or
+   * null for the whole class. Attempts are never deleted; the result warns
+   * when a removed student already has one (they stay in the results).
+   */
+  setStudents: adminProcedure
+    .input(
+      z.object({
+        id: idSchema,
+        userIds: z
+          .array(z.string().min(1).max(64))
+          .min(1, "Kies minstens één leerling.")
+          .max(500, "Kies hoogstens 500 leerlingen.")
+          .nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const a = await getAssignmentOrThrow(ctx.db, input.id);
+      const userIds = input.userIds
+        ? await assertStudentsOfClass(ctx.db, a.classId, input.userIds)
+        : null;
+      const before = await rosterForAssignment(ctx.db, a.classId, a.id);
+      await ctx.db.transaction(async (tx) => {
+        await tx
+          .delete(assignmentStudents)
+          .where(eq(assignmentStudents.assignmentId, a.id));
+        if (userIds?.length) {
+          await tx
+            .insert(assignmentStudents)
+            .values(userIds.map((userId) => ({ assignmentId: a.id, userId })));
+        }
+      });
+      const keep = userIds ? new Set(userIds) : null;
+      const removed = keep
+        ? before.filter((s) => s.inClass && !keep.has(s.id)).map((s) => s.id)
+        : [];
+      let removedWithAttempts = 0;
+      if (removed.length) {
+        const [row] = await ctx.db
+          .select({
+            count: sql<number>`count(distinct ${attempts.userId})::int`,
+          })
+          .from(attempts)
+          .where(
+            and(
+              eq(attempts.assignmentId, a.id),
+              inArray(attempts.userId, removed),
+            ),
+          );
+        removedWithAttempts = row?.count ?? 0;
+      }
+      return {
+        id: a.id,
+        targetedStudentCount: userIds ? userIds.length : null,
+        removedWithAttempts,
       };
     }),
 
@@ -735,10 +1143,10 @@ export const assignmentRouter = createTRPCRouter({
         );
       }
       if (input.settings) {
-        patch.settings = assignmentSettingsSchema.parse({
-          ...parseAssignmentSettings(a.settings),
-          ...definedOnly(input.settings),
-        });
+        patch.settings = mergeSettings(
+          parseAssignmentSettings(a.settings),
+          input.settings,
+        );
       }
       const opensAt = patch.opensAt !== undefined ? patch.opensAt : a.opensAt;
       const closesAt =
@@ -794,24 +1202,85 @@ export const assignmentRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * Close an afname. Nobody can start afterwards. Students who are still
+   * busy hand in automatically, except students with verlengde tijd: they
+   * keep working until their own end time (closing moment + their extra
+   * minutes, never later than their time limit allows), unless
+   * `respectAccommodations` is false.
+   */
   close: adminProcedure
-    .input(z.object({ id: idSchema }))
+    .input(
+      z.object({
+        id: idSchema,
+        respectAccommodations: z.boolean().default(true),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const a = await getAssignmentOrThrow(ctx.db, input.id);
       const now = new Date();
+      const closedAt = a.closesAt && a.closesAt <= now ? a.closesAt : now;
       await ctx.db
         .update(assignments)
-        .set({
-          status: "closed",
-          closesAt: a.closesAt && a.closesAt <= now ? a.closesAt : now,
-        })
+        .set({ status: "closed", closesAt: closedAt })
         .where(eq(assignments.id, a.id));
+
+      const stillWorking: string[] = [];
+      const submitNow: string[] = [];
+      if (input.respectAccommodations) {
+        const running = await ctx.db
+          .select({
+            id: attempts.id,
+            startedAt: attempts.startedAt,
+            extraMinutes: attempts.extraMinutes,
+            accommodationMinutes: attempts.accommodationMinutes,
+          })
+          .from(attempts)
+          .where(
+            and(
+              eq(attempts.assignmentId, a.id),
+              eq(attempts.status, "in_progress"),
+              sql`${attempts.accommodationMinutes} > 0`,
+            ),
+          );
+        for (const r of running) {
+          const deadlineAt = computeAttemptDeadline(
+            { timeLimitMinutes: a.timeLimitMinutes, closesAt: closedAt },
+            r.startedAt,
+            totalExtraMinutes(r),
+          );
+          if (!deadlineAt || deadlineAt <= now) {
+            submitNow.push(r.id);
+            continue;
+          }
+          const [updated] = await ctx.db
+            .update(attempts)
+            .set({ deadlineAt })
+            .where(
+              and(eq(attempts.id, r.id), eq(attempts.status, "in_progress")),
+            )
+            .returning({ id: attempts.id });
+          if (updated) stillWorking.push(updated.id);
+        }
+      }
+
       const submitted = await autoSubmitAttempts(
         ctx.db,
-        eq(attempts.assignmentId, a.id),
+        and(
+          eq(attempts.assignmentId, a.id),
+          input.respectAccommodations
+            ? submitNow.length
+              ? sql`(${attempts.accommodationMinutes} = 0 or ${inArray(attempts.id, submitNow)})`
+              : eq(attempts.accommodationMinutes, 0)
+            : undefined,
+        ) as SQL,
         "assignment_closed",
       );
-      return { id: a.id, autoSubmitted: submitted.length };
+      return {
+        id: a.id,
+        autoSubmitted: submitted.length,
+        stillWorking: stillWorking.length,
+      };
     }),
 
   reopen: adminProcedure
@@ -904,7 +1373,7 @@ export const assignmentRouter = createTRPCRouter({
         );
       }
 
-      const [roster, attemptRows, totals] = await Promise.all([
+      const [roster, attemptRows, totals, targeting] = await Promise.all([
         rosterForAssignment(ctx.db, a.classId, a.id),
         ctx.db
           .select({
@@ -917,6 +1386,7 @@ export const assignmentRouter = createTRPCRouter({
             submittedAt: attempts.submittedAt,
             autoSubmitted: attempts.autoSubmitted,
             extraMinutes: attempts.extraMinutes,
+            accommodationMinutes: attempts.accommodationMinutes,
             questionOrder: attempts.questionOrder,
             focusLossCount: attempts.focusLossCount,
             lastSeenAt: attempts.lastSeenAt,
@@ -927,7 +1397,12 @@ export const assignmentRouter = createTRPCRouter({
           .from(attempts)
           .where(eq(attempts.assignmentId, a.id)),
         testTotals(ctx.db, [a.testId]),
+        targetingInfo(ctx.db, [a]),
       ]);
+      const extraTime = await extraTimeByUser(
+        ctx.db,
+        roster.map((r) => r.id),
+      );
       const latest = latestPerUser(attemptRows);
       const attemptCounts = new Map<string, number>();
       for (const r of attemptRows)
@@ -957,6 +1432,8 @@ export const assignmentRouter = createTRPCRouter({
             studentNumber: s.studentNumber,
             inClass: s.inClass,
           },
+          /** Verlengde tijd from the student's facilities (0 = none). */
+          extraTimePercent: extraTime.get(s.id) ?? 0,
           attemptCount: attemptCounts.get(s.id) ?? 0,
           attempt: at
             ? {
@@ -968,6 +1445,7 @@ export const assignmentRouter = createTRPCRouter({
                 submittedAt: at.submittedAt,
                 autoSubmitted: at.autoSubmitted,
                 extraMinutes: at.extraMinutes,
+                accommodationMinutes: at.accommodationMinutes,
                 answeredCount: answered.get(at.id) ?? 0,
                 totalQuestions: at.questionOrder.length || questionCount,
                 focusLossCount: at.focusLossCount,
@@ -990,7 +1468,18 @@ export const assignmentRouter = createTRPCRouter({
         focusWarnings: students.filter(
           (s) => (s.attempt?.focusLossCount ?? 0) > 0,
         ).length,
+        withAccommodation: students.filter(
+          (s) =>
+            s.extraTimePercent > 0 ||
+            (s.attempt?.accommodationMinutes ?? 0) > 0,
+        ).length,
+        inProgressWithAccommodation: students.filter(
+          (s) =>
+            s.attempt?.status === "in_progress" &&
+            s.attempt.accommodationMinutes > 0,
+        ).length,
       };
+      const targeted = targeting.targets.get(a.id) ?? null;
 
       return {
         assignment: {
@@ -1000,6 +1489,8 @@ export const assignmentRouter = createTRPCRouter({
           timeLimitMinutes: a.timeLimitMinutes,
           closesAt: a.closesAt,
           questionCount,
+          targetedStudentCount: targeted ? targeted.length : null,
+          retakeOf: targeting.retakeOf(a.retakeOfId),
         },
         students,
         summary,
@@ -1034,7 +1525,7 @@ export const assignmentRouter = createTRPCRouter({
       const computed = computeAttemptDeadline(
         assignment,
         attempt.startedAt,
-        extraMinutes,
+        extraMinutes + attempt.accommodationMinutes,
       );
       // A reopened attempt can have a custom deadline; extend from that one when it is later.
       const fromCurrent = attempt.deadlineAt
@@ -1118,7 +1609,7 @@ export const assignmentRouter = createTRPCRouter({
             closesAt: futureClose,
           },
           now,
-          0,
+          totalExtraMinutes(attempt),
         );
         // The afname is closed and has no time limit: don't leave it open-ended.
         if (

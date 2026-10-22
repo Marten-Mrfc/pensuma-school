@@ -12,6 +12,7 @@ import {
   slugifyFilename,
   toCsv,
 } from "@/lib/export/csv";
+import { round1 } from "@/lib/grading/grade-scale";
 import {
   type AnswerResponse,
   type GradingResult,
@@ -32,15 +33,18 @@ import {
   attemptEvents,
   attempts,
   classes,
+  questionNeutralizations,
   questions,
   tests,
   user,
 } from "@/server/db/schema";
+import { getPrivacySettings } from "@/server/privacy/settings-store";
 import {
   dutchGrade,
   effectiveAssignmentStatus,
   parseAssignmentSettings,
 } from "@/server/services/assignment-status";
+import { auditFromCtx, auditRead } from "@/server/services/audit";
 import {
   effectiveScore,
   gradeAttempt,
@@ -105,10 +109,15 @@ export type ResultCell = {
   answered: boolean;
 };
 
-/** Everything the results matrix and the CSV export need. */
-async function computeResults(db: DB, assignmentId: string) {
+/**
+ * Everything the results matrix, the CSV export and the toetsanalyse need.
+ * Grades are computed on the fly with the afname's grading scale, so
+ * changing the scale updates every view without regrading.
+ */
+export async function computeResults(db: DB, assignmentId: string) {
   const a = await getAssignmentOrThrow(db, assignmentId);
-  const [[test], [klas]] = await Promise.all([
+  const settings = parseAssignmentSettings(a.settings);
+  const [[test], [klas], neutralizationRows] = await Promise.all([
     db
       .select({ id: tests.id, title: tests.title })
       .from(tests)
@@ -117,7 +126,16 @@ async function computeResults(db: DB, assignmentId: string) {
       .select({ id: classes.id, name: classes.name })
       .from(classes)
       .where(eq(classes.id, a.classId)),
+    db
+      .select({
+        questionId: questionNeutralizations.questionId,
+        mode: questionNeutralizations.mode,
+      })
+      .from(questionNeutralizations)
+      .where(eq(questionNeutralizations.assignmentId, a.id)),
   ]);
+  const neutralized: Record<string, "full_points" | "drop"> =
+    Object.fromEntries(neutralizationRows.map((n) => [n.questionId, n.mode]));
   const questionRows = await db
     .select({
       id: questions.id,
@@ -217,7 +235,7 @@ async function computeResults(db: DB, assignmentId: string) {
         score,
         maxScore,
         percentage: maxScore ? score / maxScore : 0,
-        grade: submitted ? dutchGrade(score, maxScore) : null,
+        grade: submitted ? dutchGrade(score, maxScore, a.settings) : null,
         provisional: !submitted || at.gradingStatus !== "graded",
         reviewCount,
       },
@@ -269,11 +287,16 @@ async function computeResults(db: DB, assignmentId: string) {
       testId: a.testId,
       mode: a.mode,
       effectiveStatus: effectiveAssignmentStatus(a),
-      showResults: parseAssignmentSettings(a.settings).showResults,
+      showResults: settings.showResults,
       resultsReleased: a.resultsReleased,
       totalPoints,
+      grading: settings.grading,
+      logFocusEvents: settings.logFocusEvents,
+      retakeOfId: a.retakeOfId,
     },
     questions: questionRows,
+    /** Questions that "vervallen" for this afname: questionId → mode. */
+    neutralized,
     rows,
     stats: {
       students: rows.length,
@@ -287,8 +310,7 @@ async function computeResults(db: DB, assignmentId: string) {
       ),
       averageScore: avg(scores) == null ? null : round2(avg(scores) ?? 0),
       averagePercentage: avg(percentages),
-      averageGrade:
-        averageGradeRaw == null ? null : Math.round(averageGradeRaw * 10) / 10,
+      averageGrade: averageGradeRaw == null ? null : round1(averageGradeRaw),
       passed: grades.filter((g) => g >= 5.5).length,
       perQuestion: questionStats,
       distribution: gradeDistribution(grades),
@@ -322,11 +344,14 @@ async function getAnswerContext(db: DB, answerId: string) {
       answer: answers,
       attemptStatus: attempts.status,
       attemptId: attempts.id,
+      attemptUserId: attempts.userId,
+      studentNumber: user.username,
       questionType: questions.type,
     })
     .from(answers)
     .innerJoin(attempts, eq(attempts.id, answers.attemptId))
     .innerJoin(questions, eq(questions.id, answers.questionId))
+    .innerJoin(user, eq(user.id, attempts.userId))
     .where(eq(answers.id, answerId));
   if (!row)
     throw new TRPCError({
@@ -343,7 +368,20 @@ async function getAnswerContext(db: DB, answerId: string) {
 export const reviewRouter = createTRPCRouter({
   results: adminProcedure
     .input(z.object({ assignmentId: idSchema }))
-    .query(({ ctx, input }) => computeResults(ctx.db, input.assignmentId)),
+    .query(async ({ ctx, input }) => {
+      const [data, privacy] = await Promise.all([
+        computeResults(ctx.db, input.assignmentId),
+        getPrivacySettings(ctx.db),
+      ]);
+      return {
+        ...data,
+        exportOptions: {
+          /** The afname logged focus events, so the export can include them. */
+          logFocusEvents: data.assignment.logFocusEvents,
+          includeFocusByDefault: privacy.settings.exports.includeFocusByDefault,
+        },
+      };
+    }),
 
   attempt: adminProcedure
     .input(z.object({ attemptId: idSchema }))
@@ -372,6 +410,13 @@ export const reviewRouter = createTRPCRouter({
           message: "Deze poging bestaat niet (meer).",
         });
       const { attempt: at, assignment: a } = row;
+      auditRead(ctx, {
+        action: "attempt.viewed",
+        subjectType: "attempt",
+        subjectId: at.id,
+        subjectUserId: row.student.id,
+        subjectLabel: row.student.studentNumber,
+      });
 
       const [questionRows, answerRows, events, siblings] = await Promise.all([
         ctx.db
@@ -444,6 +489,8 @@ export const reviewRouter = createTRPCRouter({
                   gradedAt: ans.answer.gradedAt,
                   reviewedAt: ans.answer.reviewedAt,
                   reviewerName: ans.reviewerName,
+                  hintsUsed: ans.answer.hintsUsed ?? [],
+                  rubricChecked: ans.answer.rubricChecked,
                 }
               : null,
           },
@@ -488,6 +535,7 @@ export const reviewRouter = createTRPCRouter({
           submittedAt: at.submittedAt,
           autoSubmitted: at.autoSubmitted,
           extraMinutes: at.extraMinutes,
+          accommodationMinutes: at.accommodationMinutes,
           focusLossCount: at.focusLossCount,
           lastSeenAt: at.lastSeenAt,
           gradingStatus: at.gradingStatus,
@@ -495,7 +543,10 @@ export const reviewRouter = createTRPCRouter({
           storedMaxScore: at.maxScore,
           score,
           maxScore,
-          grade: at.status === "submitted" ? dutchGrade(score, maxScore) : null,
+          grade:
+            at.status === "submitted"
+              ? dutchGrade(score, maxScore, a.settings)
+              : null,
         },
         student: row.student,
         assignment: {
@@ -548,10 +599,8 @@ export const reviewRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { answer, attemptStatus, attemptId } = await getAnswerContext(
-        ctx.db,
-        input.answerId,
-      );
+      const { answer, attemptStatus, attemptId, attemptUserId, studentNumber } =
+        await getAnswerContext(ctx.db, input.answerId);
       if (attemptStatus !== "submitted") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -590,6 +639,21 @@ export const reviewRouter = createTRPCRouter({
       if (input.feedback !== undefined)
         patch.feedback = input.feedback?.trim() ? input.feedback : null;
       await ctx.db.update(answers).set(patch).where(eq(answers.id, answer.id));
+      if (answer.manualScore !== manualScore) {
+        await auditFromCtx(ctx, {
+          action: "answer.score_changed",
+          subjectType: "answer",
+          subjectId: answer.id,
+          subjectUserId: attemptUserId,
+          subjectLabel: studentNumber,
+          details: {
+            answerId: answer.id,
+            attemptId,
+            from: answer.manualScore,
+            to: manualScore,
+          },
+        });
+      }
 
       let recomputed = true;
       try {
@@ -771,9 +835,21 @@ export const reviewRouter = createTRPCRouter({
     }),
 
   exportCsv: adminProcedure
-    .input(z.object({ assignmentId: idSchema }))
+    .input(
+      z.object({
+        assignmentId: idSchema,
+        /** Include the "Focusverlies" column (default: the school's privacy setting). */
+        includeFocus: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const data = await computeResults(ctx.db, input.assignmentId);
+      const requested =
+        input.includeFocus ??
+        (await getPrivacySettings(ctx.db)).settings.exports
+          .includeFocusByDefault;
+      // Only an afname that logged focus events has anything to export.
+      const includeFocus = requested && data.assignment.logFocusEvents;
       const header: CsvCell[] = [
         "Leerlingnummer",
         "Naam",
@@ -786,7 +862,7 @@ export const reviewRouter = createTRPCRouter({
         "Max",
         "Cijfer",
         "Ingeleverd op",
-        "Focusverlies",
+        ...(includeFocus ? ["Focusverlies"] : []),
       ];
       const body: CsvCell[][] = data.rows.map((r) => [
         r.student.studentNumber ?? "",
@@ -800,13 +876,23 @@ export const reviewRouter = createTRPCRouter({
         r.attempt ? r.attempt.maxScore : data.assignment.totalPoints,
         r.attempt?.grade != null ? formatFixedNl(r.attempt.grade, 1) : "",
         r.attempt?.submittedAt ? formatDateTimeNl(r.attempt.submittedAt) : "",
-        r.attempt ? r.attempt.focusLossCount : null,
+        ...(includeFocus ? [r.attempt ? r.attempt.focusLossCount : null] : []),
       ]);
       const date = new Date().toISOString().slice(0, 10);
       const filename = `${slugifyFilename(data.assignment.title, "afname")}-${slugifyFilename(
         data.assignment.className,
         "klas",
       )}-${date}.csv`;
-      return { filename, csv: toCsv([header, ...body]) };
+      await auditFromCtx(ctx, {
+        action: "results.exported",
+        subjectType: "assignment",
+        subjectId: data.assignment.id,
+        details: {
+          assignmentId: data.assignment.id,
+          rows: body.length,
+          includeFocus,
+        },
+      });
+      return { filename, csv: toCsv([header, ...body]), includeFocus };
     }),
 });

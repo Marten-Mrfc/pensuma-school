@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import ReactECharts from 'echarts-for-react/esm/core'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, gaugeThresholds } from '../useChartTheme'
+import { gaugeThresholds, useChartTheme } from '../useChartTheme'
 
 // GaugeChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -21,7 +20,7 @@ export interface GaugeChartProps {
   thresholds?: [number, string][]
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -73,7 +72,7 @@ export const GaugeChart = React.forwardRef<HTMLDivElement, GaugeChartProps>(
           },
           detail: {
             valueAnimation: true,
-            formatter: `{value}${unit ? ' ' + unit : ''}`,
+            formatter: `{value}${unit ? ` ${unit}` : ''}`,
             color: theme.colors[0],
             fontSize: 28,
             fontWeight: 700,
@@ -91,7 +90,7 @@ export const GaugeChart = React.forwardRef<HTMLDivElement, GaugeChartProps>(
 
       return {
         tooltip: {
-          formatter: '{b}: {c}' + (unit ? ` ${unit}` : ''),
+          formatter: `{b}: {c}${unit ? ` ${unit}` : ''}`,
           backgroundColor: theme.tooltipBg,
           borderColor: theme.tooltipBorder,
           textStyle: { color: theme.tooltipText, fontSize: 12 },

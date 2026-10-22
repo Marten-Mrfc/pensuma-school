@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -55,6 +55,7 @@ function StudentForm({
   hideClassPicker,
   onCreated,
 }: StudentFormDialogProps) {
+  const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const editing = Boolean(student);
@@ -146,7 +147,7 @@ function StudentForm({
       <div className="flex flex-col gap-4">
         <FormField
           label="Leerlingnummer"
-          htmlFor="student-number"
+          htmlFor={`${uid}-student-number`}
           required
           error={errors.number}
           description={
@@ -156,7 +157,7 @@ function StudentForm({
           }
         >
           <Input
-            id="student-number"
+            id={`${uid}-student-number`}
             inputMode="numeric"
             autoComplete="off"
             autoFocus={!editing}
@@ -171,12 +172,12 @@ function StudentForm({
 
         <FormField
           label="Naam"
-          htmlFor="student-name"
+          htmlFor={`${uid}-student-name`}
           required
           error={errors.name}
         >
           <Input
-            id="student-name"
+            id={`${uid}-student-name`}
             autoComplete="off"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -188,11 +189,11 @@ function StudentForm({
         {!editing && !hideClassPicker ? (
           <FormField
             label="Klas"
-            htmlFor="student-class"
+            htmlFor={`${uid}-student-class`}
             description="Optioneel. Je kunt dit later nog aanpassen."
           >
             <NativeSelect
-              id="student-class"
+              id={`${uid}-student-class`}
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               disabled={classesQuery.isLoading}

@@ -1,15 +1,29 @@
-# Local development database:   docker compose up -d db
-# Full stack (like Dokploy):     docker compose up -d --build
+# Pensuma with its own PostgreSQL, hardened for production.
+#
+#   Dokploy:  create a "Docker Compose" service from this repository (the
+#             security options below need the Compose type) and set the
+#             variables from .env.example under Environment.
+#   Locally:  docker network create dokploy-network   (once; Dokploy has it)
+#             POSTGRES_PASSWORD=... BETTER_AUTH_SECRET=... BETTER_AUTH_URL=http://localhost:3000 \
+#             ALLOW_INSECURE_HTTP=true docker compose up -d --build
+#             (uncomment the 127.0.0.1:3000 port mapping below first)
+#
+# Development database only: see the commented "dev override" at the bottom.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: pensuma
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pensuma}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: pensuma
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,6 +31,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    security_opt:
+      - no-new-privileges:true
+    # Only reachable by the app: never on dokploy-network, never published.
+    networks:
+      - internal
+    logging: *logging
 
   app:
     build: .
@@ -25,13 +45,65 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://pensuma:${POSTGRES_PASSWORD:-pensuma}@db:5432/pensuma
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET (min. 32 tekens)}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://pensuma:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/pensuma
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET (openssl rand -base64 32)}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL (https://...)}
+      ALLOW_INSECURE_HTTP: ${ALLOW_INSECURE_HTTP:-false}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      LOGIN_IP_MAX_FAILURES: ${LOGIN_IP_MAX_FAILURES:-100}
+      RETENTION_SCHEDULER: ${RETENTION_SCHEDULER:-true}
+      RETENTION_INTERVAL_HOURS: ${RETENTION_INTERVAL_HOURS:-6}
       GRADER_POOL_SIZE: ${GRADER_POOL_SIZE:-2}
-      GRADER_MAX_CONCURRENCY: ${GRADER_MAX_CONCURRENCY:-4}
-    ports:
-      - "3000:3000"
+      GRADER_MAX_CONCURRENCY: ${GRADER_MAX_CONCURRENCY:-3}
+      GRADER_MEMORY_LIMIT_MB: ${GRADER_MEMORY_LIMIT_MB:-768}
+      GRADER_WASM_MEMORY_MB: ${GRADER_WASM_MEMORY_MB:-384}
+      GRADER_JOB_TIMEOUT_MS: ${GRADER_JOB_TIMEOUT_MS:-120000}
+      GRADER_QUEUE_TIMEOUT_MS: ${GRADER_QUEUE_TIMEOUT_MS:-120000}
+      GRADER_MAX_OUTPUT: ${GRADER_MAX_OUTPUT:-65536}
+      GRADER_SNAPSHOT: ${GRADER_SNAPSHOT:-1}
+      NEXT_TELEMETRY_DISABLED: "1"
+    # Traefik reaches the app over dokploy-network; publishing the port
+    # would bypass TLS and let clients forge X-Forwarded-For.
+    expose:
+      - "3000"
+    # Local runs without a proxy:
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+    read_only: true
+    tmpfs:
+      # The grader writes a Pyodide start-up snapshot (up to ~256 MB) here.
+      - /tmp:size=512m
+      - /app/.next/cache:size=256m,uid=1001,gid=1001
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: 4g
+    cpus: "2"
+    networks:
+      - internal
+      - dokploy-network
+    logging: *logging
+
+networks:
+  internal:
+    internal: true
+  dokploy-network:
+    external: true
 
 volumes:
   pgdata:
+
+# Dev override (local development only; never in production): to reach
+# this Postgres from `bun run dev` on the host, create
+# docker-compose.override.yml with
+#
+#   services:
+#     db:
+#       ports:
+#         - "127.0.0.1:5432:5432"
+#
+# and run `docker compose up -d db`. The mapping binds to localhost only;
+# the production database is never published.

@@ -24,4 +24,3 @@ export const passwordInputVariants = cva(
 )
 
 export type PasswordInputVariants = VariantProps<typeof passwordInputVariants>
-

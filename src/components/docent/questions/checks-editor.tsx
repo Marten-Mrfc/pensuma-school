@@ -2,6 +2,7 @@
 
 import { Ban, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useId } from "react";
+import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -112,6 +113,13 @@ export function ChecksEditor({
     onChange(checks.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
 
+  function move(from: number, to: number) {
+    const next = [...checks];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange(next);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {checks.length === 0 ? (
@@ -127,7 +135,9 @@ export function ChecksEditor({
             <CheckRow
               key={check.id}
               index={index}
+              count={checks.length}
               check={check}
+              onMove={move}
               onChange={(patch) => set(check.id, patch)}
               onRemove={() => onChange(checks.filter((c) => c.id !== check.id))}
             />
@@ -173,11 +183,15 @@ export function ChecksEditor({
 function CheckRow({
   check,
   index,
+  count,
+  onMove,
   onChange,
   onRemove,
 }: {
   check: CodeCheck;
   index: number;
+  count: number;
+  onMove: (from: number, to: number) => void;
   onChange: (patch: Partial<CodeCheck>) => void;
   onRemove: () => void;
 }) {
@@ -207,15 +221,24 @@ function CheckRow({
           <span className="sr-only">Eis {index + 1}: </span>
           {describeCheck(check)}
         </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`Eis ${index + 1} verwijderen`}
-          onClick={onRemove}
-          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 className="size-3.5" aria-hidden="true" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <ReorderButtons
+            index={index}
+            count={count}
+            itemLabel={`Eis ${index + 1}`}
+            itemKey={check.id}
+            onMove={onMove}
+          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Eis ${index + 1} verwijderen`}
+            onClick={onRemove}
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-1.5">

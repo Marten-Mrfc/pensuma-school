@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useEffectEvent, useState } from "react";
+import { use, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor } from "@/components/app/code-editor";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -52,6 +52,9 @@ import {
   TimelineMedia,
   TimelineTitle,
 } from "@/components/ui/timeline";
+import { useShortcut } from "@/lib/a11y/shortcuts";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
+import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
 import {
   type CodeGradingResult,
   type MultipleChoiceData,
@@ -62,6 +65,7 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { CodeResultView } from "./code-result-view";
+import { FocusLossCaveat } from "./focus-loss-caveat";
 import { scoreTone } from "./results-view";
 import { ScoreBox } from "./score-box";
 
@@ -85,17 +89,6 @@ export function AttemptReview({
   return <AttemptContent assignmentId={afnameId} data={query.data} />;
 }
 
-function isTypingTarget(el: EventTarget | null) {
-  if (!(el instanceof HTMLElement)) return false;
-  return (
-    el.isContentEditable ||
-    el.tagName === "INPUT" ||
-    el.tagName === "TEXTAREA" ||
-    el.tagName === "SELECT" ||
-    !!el.closest(".cm-editor")
-  );
-}
-
 function AttemptContent({
   assignmentId,
   data,
@@ -107,6 +100,11 @@ function AttemptContent({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { attempt, student, assignment, navigation } = data;
+  const uid = useId();
+  /** Element id of a question card (unique per page: hidden routes stay mounted). */
+  const questionDomId = (questionId: string) => `${uid}-vraag-${questionId}`;
+  const logId = `${uid}-logboek`;
+  useDocumentTitle([student.name, assignment.title, "Poging"]);
 
   const prevHref = navigation.prevAttemptId
     ? routes.docent.attempt(assignmentId, navigation.prevAttemptId)
@@ -115,27 +113,31 @@ function AttemptContent({
     ? routes.docent.attempt(assignmentId, navigation.nextAttemptId)
     : null;
 
-  const onKey = useEffectEvent((e: KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
-    const key = e.key.toLowerCase();
-    if (key === "j" && nextHref) router.push(nextHref);
-    if (key === "k" && prevHref) router.push(prevHref);
+  // Alt+↑ / Alt+↓: previous / next student (no single-key shortcuts, WCAG 2.1.4).
+  useShortcut({
+    id: "docent-review-navigate",
+    label: "Vorige leerling",
+    keys: { key: "ArrowUp", alt: true },
+    enabled: !!prevHref,
+    handler: () => prevHref && router.push(prevHref),
   });
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => onKey(e);
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  useShortcut({
+    id: "docent-review-navigate",
+    label: "Volgende leerling",
+    keys: { key: "ArrowDown", alt: true },
+    enabled: !!nextHref,
+    handler: () => nextHref && router.push(nextHref),
+  });
 
-  // Jump to #vraag-<id> once the content is there.
+  // Deep links from the results: #vraag-<questionId>.
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.startsWith("#vraag-")) {
       document
-        .getElementById(hash.slice(1))
+        .getElementById(`${uid}-vraag-${hash.slice("#vraag-".length)}`)
         ?.scrollIntoView({ block: "start" });
     }
-  }, []);
+  }, [uid]);
 
   const regrade = useMutation(
     trpc.review.regradeAttempt.mutationOptions({
@@ -170,7 +172,9 @@ function AttemptContent({
   ).length;
 
   return (
-    <div className="flex flex-col gap-6">
+    // grid-cols-1 (minmax(0, 1fr)): wide tables scroll inside their region
+    // instead of widening the page on phones.
+    <div className="grid grid-cols-1 gap-6">
       <PageHeader
         backHref={routes.docent.assignmentResults(assignmentId)}
         backLabel={`Resultaten · ${assignment.title}`}
@@ -217,16 +221,22 @@ function AttemptContent({
                 onClick={() => prevHref && router.push(prevHref)}
                 title={
                   navigation.prevName
-                    ? `Vorige: ${navigation.prevName} (K)`
+                    ? `Vorige: ${navigation.prevName} (Alt+↑)`
                     : undefined
                 }
+                aria-keyshortcuts="Alt+ArrowUp"
               >
                 <ChevronLeft aria-hidden="true" />
                 Vorige
-                <Kbd className="hidden sm:inline-flex">K</Kbd>
+                <Kbd className="hidden sm:inline-flex" aria-hidden="true">
+                  Alt+↑
+                </Kbd>
               </Button>
               <span className="px-1 text-xs text-muted-foreground tabular-nums">
-                {navigation.index != null ? navigation.index + 1 : "–"}/
+                <span className="sr-only">Leerling </span>
+                {navigation.index != null ? navigation.index + 1 : "–"}
+                <span aria-hidden="true">/</span>
+                <span className="sr-only"> van </span>
                 {navigation.total}
               </span>
               <Button
@@ -236,11 +246,14 @@ function AttemptContent({
                 onClick={() => nextHref && router.push(nextHref)}
                 title={
                   navigation.nextName
-                    ? `Volgende: ${navigation.nextName} (J)`
+                    ? `Volgende: ${navigation.nextName} (Alt+↓)`
                     : undefined
                 }
+                aria-keyshortcuts="Alt+ArrowDown"
               >
-                <Kbd className="hidden sm:inline-flex">J</Kbd>
+                <Kbd className="hidden sm:inline-flex" aria-hidden="true">
+                  Alt+↓
+                </Kbd>
                 Volgende
                 <ChevronRight aria-hidden="true" />
               </Button>
@@ -297,6 +310,11 @@ function AttemptContent({
               +{attempt.extraMinutes} min extra tijd
             </span>
           ) : null}
+          {attempt.accommodationMinutes ? (
+            <span className="block text-xs text-info-ink">
+              +{attempt.accommodationMinutes} min verlengde tijd
+            </span>
+          ) : null}
         </Summary>
         <Summary label="Vensterwissels">
           <span
@@ -311,6 +329,7 @@ function AttemptContent({
           >
             {attempt.focusLossCount}
           </span>
+          <span className="sr-only"> keer venster verlaten</span>
         </Summary>
       </div>
 
@@ -348,7 +367,7 @@ function AttemptContent({
             {data.items.map((item) => (
               <li key={item.question.id}>
                 <a
-                  href={`#vraag-${item.question.id}`}
+                  href={`#${questionDomId(item.question.id)}`}
                   className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <span className="w-5 shrink-0 text-xs font-semibold text-muted-foreground tabular-nums">
@@ -363,7 +382,7 @@ function AttemptContent({
             ))}
           </ol>
           <a
-            href="#logboek"
+            href={`#${logId}`}
             className="mt-1 flex items-center gap-2 rounded-md border-t px-2 pt-2.5 pb-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <History className="size-4" aria-hidden="true" />
@@ -375,11 +394,19 @@ function AttemptContent({
           {data.items.map((item) => (
             <QuestionCard
               key={item.question.id}
+              domId={questionDomId(item.question.id)}
               item={item}
               attemptSubmitted={attempt.status === "submitted"}
             />
           ))}
-          <EventTimeline events={data.events} />
+          <EventTimeline
+            events={data.events}
+            domId={logId}
+            focusLogged={
+              assignment.settings.logFocusEvents ||
+              assignment.settings.requireFullscreen
+            }
+          />
         </div>
       </div>
     </div>
@@ -424,9 +451,11 @@ function ScorePill({ item }: { item: Item }) {
 
 function QuestionCard({
   item,
+  domId,
   attemptSubmitted,
 }: {
   item: Item;
+  domId: string;
   attemptSubmitted: boolean;
 }) {
   const { question: q, answer: a } = item;
@@ -434,15 +463,15 @@ function QuestionCard({
   const longPrompt = q.prompt.length > 260 || q.prompt.split("\n").length > 5;
   return (
     <article
-      id={`vraag-${q.id}`}
+      id={domId}
       className="scroll-mt-20 overflow-hidden rounded-xl border bg-card shadow-xs"
-      aria-labelledby={`vraag-${q.id}-title`}
+      aria-labelledby={`${domId}-title`}
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-muted/30 px-5 py-3">
         <span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary tabular-nums">
           {item.number}
         </span>
-        <h2 id={`vraag-${q.id}-title`} className="font-semibold">
+        <h2 id={`${domId}-title`} className="font-semibold">
           {q.title}
         </h2>
         <span className="text-xs text-muted-foreground">
@@ -474,8 +503,9 @@ function QuestionCard({
             {longPrompt ? (
               <button
                 type="button"
+                aria-expanded={promptOpen}
                 onClick={() => setPromptOpen((o) => !o)}
-                className="w-fit text-xs font-medium text-primary hover:underline"
+                className="w-fit rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 {promptOpen ? "Opdracht inklappen" : "Hele opdracht tonen"}
               </button>
@@ -516,8 +546,13 @@ function AnswerView({ item }: { item: Item }) {
         : null;
     const blank =
       !code.trim() || code.trim() === (data.starterCode ?? "").trim();
+    const hints = Array.isArray((q.data as { hints?: unknown }).hints)
+      ? ((q.data as { hints: { id: string; penalty: number }[] }).hints ?? [])
+      : [];
+    const used = a?.hintsUsed ?? [];
     return (
       <div className="flex flex-col gap-4">
+        {used.length > 0 ? <HintsUsedChip hints={hints} used={used} /> : null}
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Code van de leerling</span>
           {blank ? (
@@ -682,6 +717,36 @@ function AnswerView({ item }: { item: Item }) {
   );
 }
 
+/** "{n} hints bekeken (−{pct}%)" with the moments they were revealed. */
+function HintsUsedChip({
+  hints,
+  used,
+}: {
+  hints: { id: string; penalty: number }[];
+  used: { id: string; at: string }[];
+}) {
+  const pct = Math.round(hintPenaltyFraction(hints, used) * 100);
+  const order = new Map(hints.map((h, i) => [h.id, i + 1]));
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-info/25 bg-info/[0.06] px-3 py-2 text-sm">
+      <span className="inline-flex items-center gap-1.5 font-medium text-info-ink">
+        <Lightbulb className="size-4" aria-hidden="true" />
+        {used.length} {used.length === 1 ? "hint" : "hints"} bekeken (−{pct}%)
+      </span>
+      <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+        {used.map((u) => (
+          <li key={`${u.id}-${u.at}`}>
+            Hint {order.get(u.id) ?? "?"} om{" "}
+            <time dateTime={u.at} className="tabular-nums">
+              {formatTime(u.at)}
+            </time>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /* --------------------------------- Timeline ------------------------------- */
 
 const EVENT_INFO: Record<
@@ -734,6 +799,14 @@ const EVENT_INFO: Record<
   hint_revealed: { label: "Hint bekeken", icon: Lightbulb, status: "info" },
 };
 
+/** Label of an event; some depend on the details. */
+function eventLabel(e: EventRow, fallback: string): string {
+  const d = (e.details ?? {}) as Record<string, unknown>;
+  if (e.type === "fullscreen_exit" && d.afterEscapeKey)
+    return "Volledig scherm verlaten (na Esc-toets)";
+  return fallback;
+}
+
 function eventDescription(e: EventRow): string | null {
   const d = (e.details ?? {}) as Record<string, unknown>;
   switch (e.type) {
@@ -774,7 +847,15 @@ function eventDescription(e: EventRow): string | null {
   }
 }
 
-function EventTimeline({ events }: { events: EventRow[] }) {
+function EventTimeline({
+  events,
+  domId,
+  focusLogged,
+}: {
+  events: EventRow[];
+  domId: string;
+  focusLogged: boolean;
+}) {
   const [showAll, setShowAll] = useState(false);
   const important = events.filter(
     (e) =>
@@ -794,14 +875,14 @@ function EventTimeline({ events }: { events: EventRow[] }) {
   ).length;
   return (
     <section
-      id="logboek"
+      id={domId}
       className="scroll-mt-20 rounded-xl border bg-card p-5 shadow-xs"
-      aria-labelledby="logboek-title"
+      aria-labelledby={`${domId}-title`}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2
-            id="logboek-title"
+            id={`${domId}-title`}
             className="flex items-center gap-2 font-semibold"
           >
             <History
@@ -825,6 +906,9 @@ function EventTimeline({ events }: { events: EventRow[] }) {
           </Button>
         ) : null}
       </div>
+      {focusLogged || warnings > 0 ? (
+        <FocusLossCaveat className="mb-4" />
+      ) : null}
       {list.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Nog geen gebeurtenissen.
@@ -857,7 +941,7 @@ function EventTimeline({ events }: { events: EventRow[] }) {
                             : "text-warning-ink"),
                       )}
                     >
-                      {info.label}
+                      {eventLabel(e, info.label)}
                     </TimelineTitle>
                     <time
                       dateTime={new Date(e.createdAt).toISOString()}

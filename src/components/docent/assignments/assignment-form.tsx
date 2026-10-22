@@ -9,38 +9,53 @@ import {
   Dumbbell,
   FileCheck2,
   FileCode2,
+  GraduationCap,
   Hand,
   KeyRound,
   Loader2,
   type LucideIcon,
   Play,
+  RotateCcw,
   School,
   Settings2,
+  UserRoundCheck,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
+import { FormErrorSummary } from "@/components/a11y/form-error-summary";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
-import {
-  type AssignmentSettings,
-  SHOW_RESULTS_LABELS,
-} from "@/lib/questions/schema";
+import { Switch } from "@/components/ui/switch";
+import { describeScale } from "@/lib/grading/grade-scale";
+import { SHOW_RESULTS_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import {
-  ACCESS_CODE_REGEX,
-  type AssignmentMode,
-  defaultSettingsForMode,
-  normalizeAccessCode,
-} from "./defaults";
+  type AssignmentFormState,
+  buildCreatePayload,
+  type CodeMode,
+  classesSummary,
+  createdToast,
+  defaultRetakeTitle,
+  effectiveStudentIds,
+  type Preset,
+  parseIdList,
+  presetDefaults,
+  presetMode,
+  type StartMode,
+  studentsSummary,
+  validateAssignmentForm,
+} from "./assignment-form-payload";
+import { ClassMultiSelect } from "./class-multi-select";
+import { normalizeAccessCode } from "./defaults";
 import {
   formatMinutes,
   formatMoment,
@@ -48,15 +63,13 @@ import {
   toDateTimeLocal,
 } from "./format";
 import { AssignmentSettingsFields } from "./settings-fields";
-
-type StartMode = "now" | "scheduled" | "manual";
-type CodeMode = "generate" | "none" | "custom";
+import { StudentPicker } from "./student-picker";
 
 const DURATIONS = [15, 30, 45, 50, 60, 90];
 
-const MODE_INFO: Record<
-  AssignmentMode,
-  { title: string; icon: LucideIcon; points: string[] }
+const PRESET_INFO: Record<
+  Preset,
+  { title: string; icon: LucideIcon; description?: string; points: string[] }
 > = {
   exam: {
     title: "Toets",
@@ -78,6 +91,17 @@ const MODE_INFO: Record<
       "Geen toezicht op vensterwissels",
     ],
   },
+  selfstudy: {
+    title: "Zelfstudie (altijd open)",
+    icon: GraduationCap,
+    description:
+      "Leerlingen kunnen dit hele schooljaar oefenen, zo vaak als ze willen.",
+    points: [
+      "Nu open, zonder eindtijd",
+      "Tot 100 pogingen, direct resultaat",
+      "Hints en modeloplossing na de pogingen",
+    ],
+  },
 };
 
 export function AssignmentForm() {
@@ -94,45 +118,89 @@ export function AssignmentForm() {
 
 type Options = RouterOutputs["assignment"]["formOptions"];
 
+/** Initial state from the query string (?toets, ?klas, ?leerlingen, ?herkansing). */
+function initialState(
+  options: Options,
+  params: URLSearchParams,
+): AssignmentFormState {
+  const preTest = params.get("toets");
+  const preClass = params.get("klas");
+  const retakeOfId = params.get("herkansing");
+  const studentIds = parseIdList(params.get("leerlingen"));
+  const testId = options.tests.some((t) => t.id === preTest)
+    ? (preTest as string)
+    : options.tests.length === 1
+      ? options.tests[0].id
+      : "";
+  const classIds = options.classes.some((c) => c.id === preClass)
+    ? [preClass as string]
+    : options.classes.length === 1
+      ? [options.classes[0].id]
+      : [];
+  const testTitle = options.tests.find((t) => t.id === testId)?.title;
+  const targeted =
+    (studentIds.length > 0 || !!retakeOfId) && classIds.length === 1;
+  const title =
+    testTitle && retakeOfId
+      ? defaultRetakeTitle("herkansing", testTitle)
+      : testTitle && studentIds.length
+        ? defaultRetakeTitle("inhaaltoets", testTitle)
+        : "";
+  const preset: Preset = "exam";
+  return {
+    testId,
+    classIds,
+    studentIds: targeted ? studentIds : null,
+    retakeOfId: retakeOfId || null,
+    title,
+    preset,
+    settings: presetDefaults(preset).settings,
+    startMode: "now",
+    opensAt: "",
+    closesEnabled: false,
+    closesAt: "",
+    timeLimit: "",
+    codeMode: presetDefaults(preset).codeMode,
+    customCode: "",
+    accessCodePerClass: false,
+  };
+}
+
 function AssignmentFormInner({ options }: { options: Options }) {
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const id = useId();
+  const ids = {
+    test: `${id}-test`,
+    class: `${id}-class`,
+    students: `${id}-students`,
+    title: `${id}-title`,
+    opensAt: `${id}-opens`,
+    closesAt: `${id}-closes`,
+    timeLimit: `${id}-limit`,
+    code: `${id}-code`,
+  };
 
-  const preTest = searchParams.get("toets");
-  const preClass = searchParams.get("klas");
-  const [testId, setTestId] = useState(
-    options.tests.some((t) => t.id === preTest)
-      ? (preTest as string)
-      : options.tests.length === 1
-        ? options.tests[0].id
-        : "",
+  const [state, setState] = useState<AssignmentFormState>(() =>
+    initialState(options, new URLSearchParams(searchParams.toString())),
   );
-  const [classId, setClassId] = useState(
-    options.classes.some((c) => c.id === preClass)
-      ? (preClass as string)
-      : options.classes.length === 1
-        ? options.classes[0].id
-        : "",
-  );
-  const [title, setTitle] = useState("");
-  const [mode, setMode] = useState<AssignmentMode>("exam");
-  const [settings, setSettings] = useState<AssignmentSettings>(() =>
-    defaultSettingsForMode("exam"),
-  );
-  const [startMode, setStartMode] = useState<StartMode>("now");
-  const [opensAt, setOpensAt] = useState("");
-  const [closesEnabled, setClosesEnabled] = useState(false);
-  const [closesAt, setClosesAt] = useState("");
-  const [timeLimit, setTimeLimit] = useState("");
-  const [codeMode, setCodeMode] = useState<CodeMode>("generate");
-  const [customCode, setCustomCode] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errorFocusKey, setErrorFocusKey] = useState(0);
+  const set = <K extends keyof AssignmentFormState>(
+    key: K,
+    value: AssignmentFormState[K],
+  ) => setState((s) => ({ ...s, [key]: value }));
 
-  const test = options.tests.find((t) => t.id === testId);
-  const klas = options.classes.find((c) => c.id === classId);
+  const test = options.tests.find((t) => t.id === state.testId);
+  const chosenClasses = options.classes.filter((c) =>
+    state.classIds.includes(c.id),
+  );
+  const singleClass = chosenClasses.length === 1 ? chosenClasses[0] : null;
+  const students = effectiveStudentIds(state);
+  const mode = presetMode(state.preset);
+  const retakeOf = state.retakeOfId;
 
   const create = useMutation(
     trpc.assignment.create.mutationOptions({
@@ -143,91 +211,50 @@ function AssignmentFormInner({ options }: { options: Options }) {
         await queryClient.invalidateQueries({
           queryKey: trpc.dashboard.pathKey(),
         });
-        toast.success(
-          created.effectiveStatus === "open"
-            ? "De afname is open"
-            : "De afname is gepland",
-          {
-            description: created.accessCode
-              ? `Toegangscode: ${created.accessCode}`
-              : undefined,
-          },
+        const count = created.items.length;
+        toast.success(createdToast(count, created.effectiveStatus), {
+          description:
+            count > 1
+              ? created.items.map((i) => i.className).join(", ")
+              : created.accessCode
+                ? `Toegangscode: ${created.accessCode}`
+                : undefined,
+        });
+        router.push(
+          count > 1
+            ? routes.docent.assignments
+            : routes.docent.assignment(created.id),
         );
-        router.push(routes.docent.assignment(created.id));
       },
       onError: (err) => toast.error(getErrorMessage(err)),
     }),
   );
 
-  const chooseMode = (next: AssignmentMode) => {
-    setMode(next);
-    setSettings(defaultSettingsForMode(next));
-    setCodeMode(next === "exam" ? "generate" : "none");
+  const choosePreset = (next: Preset) => {
+    const d = presetDefaults(next);
+    setState((s) => ({
+      ...s,
+      preset: next,
+      settings: d.settings,
+      codeMode: d.codeMode,
+      startMode: d.startMode ?? s.startMode,
+      closesEnabled: d.closesEnabled ?? s.closesEnabled,
+    }));
   };
 
-  const limitMinutes = timeLimit.trim() ? Number.parseInt(timeLimit, 10) : null;
-
-  function validate() {
-    const next: Record<string, string> = {};
-    const now = new Date();
-    if (!testId) next.test = "Kies een toets.";
-    if (!classId) next.class = "Kies een klas.";
-    const open = startMode === "scheduled" ? fromDateTimeLocal(opensAt) : null;
-    if (startMode === "scheduled") {
-      if (!open) next.opensAt = "Kies een starttijd.";
-      else if (open <= now)
-        next.opensAt =
-          "De starttijd ligt in het verleden. Kies ‘Nu openen’ of een later moment.";
-    }
-    if (closesEnabled) {
-      const close = fromDateTimeLocal(closesAt);
-      if (!close)
-        next.closesAt = "Kies een eindtijd of zet automatisch sluiten uit.";
-      else if (close <= now)
-        next.closesAt = "De eindtijd ligt in het verleden.";
-      else if (open && close <= open)
-        next.closesAt = "Het einde moet na de start liggen.";
-    }
-    if (
-      timeLimit.trim() &&
-      (!limitMinutes || limitMinutes < 1 || limitMinutes > 1440)
-    ) {
-      next.timeLimit = "Vul een aantal minuten in tussen 1 en 1440.";
-    }
-    if (
-      codeMode === "custom" &&
-      !ACCESS_CODE_REGEX.test(normalizeAccessCode(customCode))
-    ) {
-      next.code = "Gebruik 3 tot 20 letters, cijfers of streepjes.";
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  }
+  const limitMinutes = state.timeLimit.trim()
+    ? Number.parseInt(state.timeLimit, 10)
+    : null;
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!validate()) {
-      toast.error("Controleer de gemarkeerde velden.");
+    const next = validateAssignmentForm(state);
+    setErrors(next);
+    if (Object.keys(next).length) {
+      setErrorFocusKey((k) => k + 1);
       return;
     }
-    create.mutate({
-      testId,
-      classId,
-      title: title.trim() || null,
-      mode,
-      openNow: startMode === "now",
-      opensAt: startMode === "scheduled" ? fromDateTimeLocal(opensAt) : null,
-      closesAt: closesEnabled ? fromDateTimeLocal(closesAt) : null,
-      timeLimitMinutes: limitMinutes,
-      accessCode:
-        codeMode === "custom"
-          ? normalizeAccessCode(customCode)
-          : codeMode === "none"
-            ? null
-            : undefined,
-      generateAccessCode: codeMode === "generate",
-      settings,
-    });
+    create.mutate(buildCreatePayload(state));
   }
 
   if (options.tests.length === 0) {
@@ -252,31 +279,52 @@ function AssignmentFormInner({ options }: { options: Options }) {
     );
   }
 
-  const submitLabel = startMode === "now" ? "Afname openen" : "Afname plannen";
+  const count = Math.max(1, chosenClasses.length);
+  const submitLabel =
+    count > 1
+      ? `${count} afnames ${state.startMode === "now" ? "openen" : "plannen"}`
+      : state.startMode === "now"
+        ? "Afname openen"
+        : "Afname plannen";
+  const errorItems = (
+    [
+      "test",
+      "class",
+      "students",
+      "opensAt",
+      "closesAt",
+      "timeLimit",
+      "code",
+    ] as const
+  )
+    .filter((k) => errors[k])
+    .map((k) => ({ fieldId: ids[k], message: errors[k] }));
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-6">
       <PageHeader
-        title="Afname plannen"
-        description="Kies een toets en een klas, en bepaal wanneer en hoe de leerlingen hem maken."
+        title={retakeOf ? "Herkansing plannen" : "Afname plannen"}
+        description="Kies een toets en een of meer klassen, en bepaal wanneer en hoe de leerlingen hem maken."
         backHref={routes.docent.assignments}
         backLabel="Afnames"
       />
 
+      <FormErrorSummary errors={errorItems} focusKey={errorFocusKey} />
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
-          <Section step={1} title="Toets en klas" icon={School}>
-            <div className="grid gap-4 md:grid-cols-2">
+          <Section step={1} title="Toets en klassen" icon={School}>
+            <div className="flex flex-col gap-5">
               <Field
                 label="Toets"
-                htmlFor={`${id}-test`}
+                htmlFor={ids.test}
                 error={errors.test}
                 hint="Alleen gepubliceerde toetsen."
               >
                 <NativeSelect
-                  id={`${id}-test`}
-                  value={testId}
-                  onChange={(e) => setTestId(e.target.value)}
+                  id={ids.test}
+                  value={state.testId}
+                  onChange={(e) => set("testId", e.target.value)}
                   aria-invalid={!!errors.test}
                 >
                   <option value="" disabled>
@@ -289,35 +337,78 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   ))}
                 </NativeSelect>
               </Field>
-              <Field label="Klas" htmlFor={`${id}-class`} error={errors.class}>
-                <NativeSelect
-                  id={`${id}-class`}
-                  value={classId}
-                  onChange={(e) => setClassId(e.target.value)}
-                  aria-invalid={!!errors.class}
-                >
-                  <option value="" disabled>
-                    Kies een klas…
-                  </option>
-                  {options.classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.studentCount} leerlingen)
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
+
+              <ClassMultiSelect
+                fieldsetId={ids.class}
+                classes={options.classes}
+                value={state.classIds}
+                onChange={(classIds) =>
+                  setState((s) => ({
+                    ...s,
+                    classIds,
+                    // A student selection belongs to one class.
+                    studentIds:
+                      classIds.length === 1 && classIds[0] === s.classIds[0]
+                        ? s.studentIds
+                        : s.studentIds
+                          ? []
+                          : null,
+                  }))
+                }
+                description="Je kunt meerdere klassen kiezen: elke klas krijgt een eigen afname met dezelfde instellingen."
+                error={errors.class}
+              />
+
+              {singleClass ? (
+                <div className="flex flex-col gap-3 rounded-lg border bg-background/50 p-3">
+                  <label
+                    htmlFor={`${id}-targeted`}
+                    className="flex cursor-pointer items-start gap-3"
+                  >
+                    <UserRoundCheck
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <span className="flex flex-1 flex-col gap-0.5">
+                      <span className="text-sm font-medium">
+                        Alleen voor een paar leerlingen (inhaaltoets of
+                        herkansing)
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Alleen de gekozen leerlingen zien deze afname.
+                      </span>
+                    </span>
+                    <Switch
+                      id={`${id}-targeted`}
+                      checked={state.studentIds !== null}
+                      onCheckedChange={(on) =>
+                        set("studentIds", on ? (state.studentIds ?? []) : null)
+                      }
+                    />
+                  </label>
+                  {state.studentIds !== null ? (
+                    <StudentPicker
+                      fieldsetId={ids.students}
+                      classId={singleClass.id}
+                      value={state.studentIds}
+                      onChange={(v) => set("studentIds", v)}
+                      error={errors.students}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
               <Field
                 label="Titel (optioneel)"
-                htmlFor={`${id}-title`}
+                htmlFor={ids.title}
                 hint="Bijvoorbeeld ‘Toets H3 – herkansing’. Laat leeg om de naam van de toets te gebruiken."
-                className="md:col-span-2"
               >
                 <Input
-                  id={`${id}-title`}
-                  value={title}
+                  id={ids.title}
+                  value={state.title}
                   maxLength={150}
                   placeholder={test?.title ?? "Naam van de toets"}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => set("title", e.target.value)}
                 />
               </Field>
             </div>
@@ -327,22 +418,23 @@ function AssignmentFormInner({ options }: { options: Options }) {
             <div
               role="radiogroup"
               aria-label="Modus"
-              className="grid gap-3 md:grid-cols-2"
+              className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"
             >
-              {(Object.keys(MODE_INFO) as AssignmentMode[]).map((m) => {
-                const info = MODE_INFO[m];
+              {(Object.keys(PRESET_INFO) as Preset[]).map((p) => {
+                const info = PRESET_INFO[p];
                 const Icon = info.icon;
-                const active = mode === m;
+                const active = state.preset === p;
                 return (
                   // biome-ignore lint/a11y/useSemanticElements: card-style radio
                   <button
-                    key={m}
+                    key={p}
                     type="button"
                     role="radio"
                     aria-checked={active}
-                    onClick={() => chooseMode(m)}
+                    onClick={() => choosePreset(p)}
                     className={cn(
                       "relative flex flex-col gap-3 rounded-xl border bg-background p-4 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                      p === "selfstudy" && "md:col-span-2 2xl:col-span-1",
                       active &&
                         "border-primary bg-primary/[0.04] ring-1 ring-primary",
                     )}
@@ -350,7 +442,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                     <span className="flex items-center gap-3">
                       <span
                         className={cn(
-                          "grid size-10 place-items-center rounded-lg",
+                          "grid size-10 shrink-0 place-items-center rounded-lg",
                           active
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground",
@@ -358,21 +450,29 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       >
                         <Icon className="size-5" aria-hidden="true" />
                       </span>
-                      <span className="text-base font-semibold">
+                      <span className="text-base leading-tight font-semibold">
                         {info.title}
                       </span>
                       {active ? (
                         <Check
-                          className="ml-auto size-5 text-primary"
+                          className="ml-auto size-5 shrink-0 text-primary"
                           aria-hidden="true"
                         />
                       ) : null}
                     </span>
+                    {info.description ? (
+                      <span className="text-sm text-foreground/90">
+                        {info.description}
+                      </span>
+                    ) : null}
                     <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
-                      {info.points.map((p) => (
-                        <li key={p} className="flex items-start gap-2">
-                          <span className="mt-2 size-1 shrink-0 rounded-full bg-muted-foreground/60" />
-                          {p}
+                      {info.points.map((pt) => (
+                        <li key={pt} className="flex items-start gap-2">
+                          <span
+                            className="mt-2 size-1 shrink-0 rounded-full bg-muted-foreground/60"
+                            aria-hidden="true"
+                          />
+                          {pt}
                         </li>
                       ))}
                     </ul>
@@ -389,53 +489,59 @@ function AssignmentFormInner({ options }: { options: Options }) {
           <Section step={3} title="Wanneer" icon={CalendarClock}>
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Start</span>
+                <span className="text-sm font-medium" id={`${id}-start`}>
+                  Start
+                </span>
                 <div
                   role="radiogroup"
-                  aria-label="Start"
+                  aria-labelledby={`${id}-start`}
                   className="grid gap-2 sm:grid-cols-3"
                 >
                   <ChoiceButton
-                    active={startMode === "now"}
-                    onClick={() => setStartMode("now")}
+                    active={state.startMode === "now"}
+                    onClick={() => set("startMode", "now" as StartMode)}
                     icon={Play}
                     title="Nu openen"
                     description="Leerlingen kunnen meteen beginnen."
                   />
                   <ChoiceButton
-                    active={startMode === "scheduled"}
+                    active={state.startMode === "scheduled"}
                     onClick={() => {
-                      setStartMode("scheduled");
-                      if (!opensAt) {
+                      setState((s) => {
+                        if (s.opensAt) return { ...s, startMode: "scheduled" };
                         const d = new Date(Date.now() + 60 * 60_000);
                         d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
-                        setOpensAt(toDateTimeLocal(d));
-                      }
+                        return {
+                          ...s,
+                          startMode: "scheduled",
+                          opensAt: toDateTimeLocal(d),
+                        };
+                      });
                     }}
                     icon={CalendarClock}
                     title="Op een tijdstip"
                     description="Gaat vanzelf open."
                   />
                   <ChoiceButton
-                    active={startMode === "manual"}
-                    onClick={() => setStartMode("manual")}
+                    active={state.startMode === "manual"}
+                    onClick={() => set("startMode", "manual" as StartMode)}
                     icon={Hand}
                     title="Zelf openen"
                     description="Jij klikt straks op ‘Openen’."
                   />
                 </div>
-                {startMode === "scheduled" ? (
+                {state.startMode === "scheduled" ? (
                   <Field
                     label="Opent op"
-                    htmlFor={`${id}-opens`}
+                    htmlFor={ids.opensAt}
                     error={errors.opensAt}
                     className="sm:max-w-xs"
                   >
                     <Input
-                      id={`${id}-opens`}
+                      id={ids.opensAt}
                       type="datetime-local"
-                      value={opensAt}
-                      onChange={(e) => setOpensAt(e.target.value)}
+                      value={state.opensAt}
+                      onChange={(e) => set("opensAt", e.target.value)}
                       aria-invalid={!!errors.opensAt}
                     />
                   </Field>
@@ -447,38 +553,44 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   <input
                     type="checkbox"
                     className="size-4 accent-[var(--primary)]"
-                    checked={closesEnabled}
+                    checked={state.closesEnabled}
                     onChange={(e) => {
-                      setClosesEnabled(e.target.checked);
-                      if (e.target.checked && !closesAt) {
+                      const on = e.target.checked;
+                      setState((s) => {
+                        if (!on || s.closesAt)
+                          return { ...s, closesEnabled: on };
                         const base =
-                          startMode === "scheduled" &&
-                          fromDateTimeLocal(opensAt)
-                            ? (fromDateTimeLocal(opensAt) as Date)
+                          s.startMode === "scheduled" &&
+                          fromDateTimeLocal(s.opensAt)
+                            ? (fromDateTimeLocal(s.opensAt) as Date)
                             : new Date();
                         const d = new Date(
                           base.getTime() + (limitMinutes ?? 50) * 60_000,
                         );
                         d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
-                        setClosesAt(toDateTimeLocal(d));
-                      }
+                        return {
+                          ...s,
+                          closesEnabled: true,
+                          closesAt: toDateTimeLocal(d),
+                        };
+                      });
                     }}
                   />
                   Automatisch sluiten op een tijdstip
                 </label>
-                {closesEnabled ? (
+                {state.closesEnabled ? (
                   <Field
                     label="Sluit op"
-                    htmlFor={`${id}-closes`}
+                    htmlFor={ids.closesAt}
                     error={errors.closesAt}
-                    hint="Leerlingen die dan nog bezig zijn, leveren automatisch in."
-                    className="sm:max-w-xs"
+                    hint="Leerlingen die dan nog bezig zijn, leveren automatisch in. Wie verlengde tijd heeft, werkt door tot de eigen eindtijd."
+                    className="sm:max-w-md"
                   >
                     <Input
-                      id={`${id}-closes`}
+                      id={ids.closesAt}
                       type="datetime-local"
-                      value={closesAt}
-                      onChange={(e) => setClosesAt(e.target.value)}
+                      value={state.closesAt}
+                      onChange={(e) => set("closesAt", e.target.value)}
                       aria-invalid={!!errors.closesAt}
                     />
                   </Field>
@@ -491,21 +603,21 @@ function AssignmentFormInner({ options }: { options: Options }) {
 
               <Field
                 label="Tijdslimiet per leerling (minuten, optioneel)"
-                htmlFor={`${id}-limit`}
+                htmlFor={ids.timeLimit}
                 error={errors.timeLimit}
-                hint="De tijd loopt vanaf het moment dat de leerling begint. Leeg = geen limiet."
+                hint="De tijd loopt vanaf het moment dat de leerling begint. Leeg = geen limiet. Verlengde tijd komt er automatisch bij."
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="sm:w-36 sm:shrink-0">
                     <Input
-                      id={`${id}-limit`}
+                      id={ids.timeLimit}
                       type="number"
                       inputMode="numeric"
                       min={1}
                       max={1440}
                       placeholder="Geen limiet"
-                      value={timeLimit}
-                      onChange={(e) => setTimeLimit(e.target.value)}
+                      value={state.timeLimit}
+                      onChange={(e) => set("timeLimit", e.target.value)}
                       aria-invalid={!!errors.timeLimit}
                     />
                   </div>
@@ -514,9 +626,10 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       <button
                         key={m}
                         type="button"
-                        onClick={() => setTimeLimit(String(m))}
+                        aria-pressed={limitMinutes === m}
+                        onClick={() => set("timeLimit", String(m))}
                         className={cn(
-                          "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums transition-colors hover:bg-accent",
+                          "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
                           limitMinutes === m &&
                             "border-primary bg-primary/10 text-primary",
                         )}
@@ -537,42 +650,66 @@ function AssignmentFormInner({ options }: { options: Options }) {
               className="grid gap-2 sm:grid-cols-3"
             >
               <ChoiceButton
-                active={codeMode === "generate"}
-                onClick={() => setCodeMode("generate")}
+                active={state.codeMode === "generate"}
+                onClick={() => set("codeMode", "generate" as CodeMode)}
                 title="Code maken"
                 description="Een willekeurige code van 6 tekens."
               />
               <ChoiceButton
-                active={codeMode === "none"}
-                onClick={() => setCodeMode("none")}
+                active={state.codeMode === "none"}
+                onClick={() => set("codeMode", "none" as CodeMode)}
                 title="Geen code"
                 description="Iedereen in de klas kan starten."
               />
               <ChoiceButton
-                active={codeMode === "custom"}
-                onClick={() => setCodeMode("custom")}
+                active={state.codeMode === "custom"}
+                onClick={() => set("codeMode", "custom" as CodeMode)}
                 title="Zelf kiezen"
                 description="Bijvoorbeeld een woord."
               />
             </div>
-            {codeMode === "custom" ? (
+            {state.codeMode === "custom" ? (
               <Field
                 label="Jouw code"
-                htmlFor={`${id}-code`}
+                htmlFor={ids.code}
                 error={errors.code}
                 className="sm:max-w-xs"
               >
                 <Input
-                  id={`${id}-code`}
-                  value={customCode}
+                  id={ids.code}
+                  value={state.customCode}
                   maxLength={20}
                   autoCapitalize="characters"
                   placeholder="BIJV. PYTHON"
                   className="font-mono tracking-widest uppercase"
-                  onChange={(e) => setCustomCode(e.target.value)}
+                  onChange={(e) => set("customCode", e.target.value)}
                   aria-invalid={!!errors.code}
                 />
               </Field>
+            ) : null}
+            {chosenClasses.length > 1 && state.codeMode === "generate" ? (
+              <label
+                htmlFor={`${id}-per-class`}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background/50 p-3"
+              >
+                <KeyRound
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <span className="flex flex-1 flex-col gap-0.5">
+                  <span className="text-sm font-medium">
+                    Elke klas een eigen toegangscode
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Handig als de klassen niet tegelijk de toets maken.
+                  </span>
+                </span>
+                <Switch
+                  id={`${id}-per-class`}
+                  checked={state.accessCodePerClass}
+                  onCheckedChange={(on) => set("accessCodePerClass", on)}
+                />
+              </label>
             ) : null}
             <p className="text-xs text-muted-foreground">
               Leerlingen typen de code als ze beginnen. Zo start niemand voordat
@@ -581,13 +718,22 @@ function AssignmentFormInner({ options }: { options: Options }) {
           </Section>
 
           <Section step={5} title="Instellingen" icon={Settings2}>
-            <AssignmentSettingsFields value={settings} onChange={setSettings} />
+            <AssignmentSettingsFields
+              value={state.settings}
+              onChange={(settings) => set("settings", settings)}
+              mode={mode}
+            />
           </Section>
         </div>
 
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-20">
+        <aside
+          aria-labelledby={`${id}-summary`}
+          className="flex flex-col gap-4 lg:sticky lg:top-20"
+        >
           <div className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs">
-            <h2 className="font-semibold">Samenvatting</h2>
+            <h2 id={`${id}-summary`} className="font-semibold">
+              Samenvatting
+            </h2>
             <dl className="flex flex-col gap-3 text-sm">
               <SummaryRow icon={FileCode2} label="Toets">
                 {test ? (
@@ -604,32 +750,42 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   </span>
                 )}
               </SummaryRow>
-              <SummaryRow icon={Users} label="Klas">
-                {klas ? (
-                  `${klas.name} · ${klas.studentCount} leerlingen`
+              <SummaryRow
+                icon={Users}
+                label={chosenClasses.length > 1 ? "Klassen" : "Klas"}
+              >
+                {chosenClasses.length ? (
+                  classesSummary(chosenClasses)
                 ) : (
                   <span className="text-muted-foreground">
                     Nog niet gekozen
                   </span>
                 )}
               </SummaryRow>
-              <SummaryRow
-                icon={mode === "exam" ? FileCheck2 : Dumbbell}
-                label="Modus"
-              >
-                {MODE_INFO[mode].title}
+              {students && singleClass ? (
+                <SummaryRow icon={UserRoundCheck} label="Leerlingen">
+                  {studentsSummary(students.length, singleClass.studentCount)}
+                </SummaryRow>
+              ) : null}
+              {retakeOf ? (
+                <SummaryRow icon={RotateCcw} label="Soort">
+                  Herkansing
+                </SummaryRow>
+              ) : null}
+              <SummaryRow icon={PRESET_INFO[state.preset].icon} label="Modus">
+                {PRESET_INFO[state.preset].title}
               </SummaryRow>
               <SummaryRow icon={CalendarClock} label="Tijdvak">
-                {startMode === "now"
+                {state.startMode === "now"
                   ? "Opent direct"
-                  : startMode === "manual"
+                  : state.startMode === "manual"
                     ? "Jij opent hem zelf"
-                    : opensAt
-                      ? `Opent ${formatMoment(fromDateTimeLocal(opensAt))}`
+                    : state.opensAt
+                      ? `Opent ${formatMoment(fromDateTimeLocal(state.opensAt))}`
                       : "Kies een starttijd"}
                 <span className="block text-xs text-muted-foreground">
-                  {closesEnabled && fromDateTimeLocal(closesAt)
-                    ? `Sluit ${formatMoment(fromDateTimeLocal(closesAt))}`
+                  {state.closesEnabled && fromDateTimeLocal(state.closesAt)
+                    ? `Sluit ${formatMoment(fromDateTimeLocal(state.closesAt))}`
                     : "Sluit wanneer jij dat doet"}
                 </span>
               </SummaryRow>
@@ -639,16 +795,21 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 )}
               </SummaryRow>
               <SummaryRow icon={KeyRound} label="Toegangscode">
-                {codeMode === "generate"
-                  ? "Wordt gemaakt"
-                  : codeMode === "none"
+                {state.codeMode === "generate"
+                  ? chosenClasses.length > 1 && state.accessCodePerClass
+                    ? "Per klas een eigen code"
+                    : "Wordt gemaakt"
+                  : state.codeMode === "none"
                     ? "Geen"
-                    : customCode
-                      ? normalizeAccessCode(customCode)
+                    : state.customCode
+                      ? normalizeAccessCode(state.customCode)
                       : "Zelf kiezen"}
               </SummaryRow>
               <SummaryRow icon={Settings2} label="Resultaten">
-                {SHOW_RESULTS_LABELS[settings.showResults]}
+                {SHOW_RESULTS_LABELS[state.settings.showResults]}
+                <span className="block text-xs text-muted-foreground">
+                  {describeScale(state.settings.grading)}
+                </span>
               </SummaryRow>
             </dl>
             <Button
@@ -662,7 +823,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   className="motion-safe:animate-spin"
                   aria-hidden="true"
                 />
-              ) : startMode === "now" ? (
+              ) : state.startMode === "now" ? (
                 <Play aria-hidden="true" />
               ) : (
                 <CalendarPlus aria-hidden="true" />
@@ -690,9 +851,13 @@ function Section({
   return (
     <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs sm:p-6">
       <h2 className="flex items-center gap-3 font-semibold">
-        <span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary tabular-nums">
+        <span
+          className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary tabular-nums"
+          aria-hidden="true"
+        >
           {step}
         </span>
+        <span className="sr-only">Stap {step}: </span>
         {title}
         <Icon
           className="ml-auto size-4 text-muted-foreground"
@@ -726,9 +891,7 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p className="text-xs font-medium text-destructive" role="alert">
-          {error}
-        </p>
+        <p className="text-xs font-medium text-destructive">{error}</p>
       ) : hint ? (
         <p className="text-xs text-muted-foreground">{hint}</p>
       ) : null}
@@ -767,6 +930,7 @@ function ChoiceButton({
             "mt-0.5 size-4 shrink-0",
             active ? "text-primary" : "text-muted-foreground",
           )}
+          aria-hidden="true"
         />
       ) : (
         <span
@@ -774,6 +938,7 @@ function ChoiceButton({
             "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border",
             active ? "border-primary bg-primary" : "border-muted-foreground/40",
           )}
+          aria-hidden="true"
         >
           {active ? (
             <span className="size-1.5 rounded-full bg-primary-foreground" />
@@ -797,16 +962,18 @@ function SummaryRow({
   label: string;
   children: ReactNode;
 }) {
+  // dt and dd sit directly in the wrapping div (valid dl structure); the
+  // icon is part of the term.
   return (
-    <div className="flex gap-3">
-      <Icon
-        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-        aria-hidden="true"
-      />
-      <div className="flex min-w-0 flex-col">
-        <dt className="text-xs text-muted-foreground">{label}</dt>
-        <dd className="font-medium break-words">{children}</dd>
-      </div>
+    <div className="relative flex min-w-0 flex-col pl-7">
+      <dt className="text-xs text-muted-foreground">
+        <Icon
+          className="absolute top-0.5 left-0 size-4 shrink-0 text-muted-foreground"
+          aria-hidden="true"
+        />
+        {label}
+      </dt>
+      <dd className="font-medium break-words">{children}</dd>
     </div>
   );
 }

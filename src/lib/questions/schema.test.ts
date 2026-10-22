@@ -2,10 +2,13 @@ import { describe, expect, test } from "bun:test";
 import {
   ASSIGNMENT_EVENT_TYPES,
   assignmentSettingsSchema,
+  type CodeGradingResult,
+  codeGradingResultSchema,
   codeQuestionDataSchema,
   GRADING_METHOD_LABELS,
   openQuestionDataSchema,
   questionDataForStudent,
+  redactCodeResultForStudent,
   SHOW_SOLUTIONS_LABELS,
   type StudentCodeQuestionData,
 } from "./schema";
@@ -209,5 +212,117 @@ describe("questionDataForStudent", () => {
       },
     });
     expect(JSON.stringify(data)).not.toContain("correct");
+  });
+});
+
+describe("redactCodeResultForStudent", () => {
+  const full: CodeGradingResult = codeGradingResultSchema.parse({
+    kind: "code",
+    status: "ok",
+    error: null,
+    tests: [
+      {
+        testId: "zichtbaar",
+        name: "Invoer: 3",
+        kind: "io",
+        hidden: false,
+        weight: 1,
+        passed: true,
+        stdin: "3",
+        expected: "9",
+        actual: "9",
+        timedOut: false,
+        durationMs: 12,
+        feedback: "Goed zo!",
+      },
+      {
+        testId: "geheim-io",
+        name: "CANARY_HIDDEN_NAME",
+        kind: "io",
+        hidden: true,
+        weight: 2,
+        passed: false,
+        stdin: "CANARY_HIDDEN_STDIN",
+        expected: "CANARY_HIDDEN_EXPECTED",
+        actual: "CANARY_HIDDEN_ACTUAL",
+        stdout: "CANARY_HIDDEN_STDOUT",
+        error: {
+          type: "ValueError",
+          message: "CANARY_HIDDEN_ERROR",
+          line: 2,
+          traceback: "CANARY_HIDDEN_TRACEBACK",
+        },
+        timedOut: false,
+        durationMs: 40,
+        feedback: "CANARY_HIDDEN_FEEDBACK",
+      },
+      {
+        testId: "geheim-fn",
+        name: "dubbel(5) → 10",
+        kind: "function",
+        hidden: true,
+        weight: 1,
+        passed: true,
+        call: "CANARY_HIDDEN_CALL",
+        expected: "10",
+        actual: "10",
+        timedOut: true,
+        durationMs: 5000,
+      },
+    ],
+    checks: [
+      { checkId: "c1", passed: true, weight: 1, message: "Gebruik een lus" },
+    ],
+    passedWeight: 3,
+    totalWeight: 5,
+    fraction: 0.6,
+    gradedAt: "2026-10-22T10:00:00.000Z",
+  });
+
+  test("a hidden test keeps exactly id, generic name, kind, weight and outcome", () => {
+    const redacted = redactCodeResultForStudent(full);
+    expect(redacted.tests[1]).toEqual({
+      testId: "geheim-io",
+      name: "Verborgen test 2",
+      kind: "io",
+      hidden: true,
+      weight: 2,
+      passed: false,
+      timedOut: false,
+      durationMs: 40,
+    });
+    expect(redacted.tests[2]).toEqual({
+      testId: "geheim-fn",
+      name: "Verborgen test 3",
+      kind: "function",
+      hidden: true,
+      weight: 1,
+      passed: true,
+      timedOut: true,
+      durationMs: 5000,
+    });
+    expect(JSON.stringify(redacted)).not.toContain("CANARY_HIDDEN");
+  });
+
+  test("visible tests, checks and totals are unchanged", () => {
+    const redacted = redactCodeResultForStudent(full);
+    expect(redacted.tests[0]).toEqual(full.tests[0]);
+    expect(redacted.checks).toEqual(full.checks);
+    expect(redacted).toMatchObject({
+      kind: "code",
+      status: "ok",
+      passedWeight: 3,
+      totalWeight: 5,
+      fraction: 0.6,
+      gradedAt: full.gradedAt,
+    });
+    // Still a valid result for the student UI.
+    expect(codeGradingResultSchema.safeParse(redacted).success).toBe(true);
+  });
+
+  test("the input is not mutated", () => {
+    const before = JSON.stringify(full);
+    redactCodeResultForStudent(full);
+    expect(JSON.stringify(full)).toBe(before);
   });
 });

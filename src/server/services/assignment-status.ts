@@ -57,6 +57,17 @@ export function computeAttemptDeadline(
   return candidates.length ? new Date(Math.min(...candidates)) : null;
 }
 
+/**
+ * Extra minutes that count for an attempt's deadline: the teacher's manual
+ * extension plus the verlengde tijd (accommodation) snapshotted at start.
+ */
+export function totalExtraMinutes(attempt: {
+  extraMinutes: number;
+  accommodationMinutes?: number | null;
+}): number {
+  return attempt.extraMinutes + (attempt.accommodationMinutes ?? 0);
+}
+
 /** True when the deadline (plus grace) has passed. */
 export function isPastDeadline(
   deadlineAt: Date | null,
@@ -107,9 +118,12 @@ export function dutchGrade(
   );
 }
 
+/** Characters used in generated access codes (no 0/O, 1/I/L). */
+export const ACCESS_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
 /** Random access code without ambiguous characters (no 0/O, 1/I/L). */
 export function generateAccessCode(length = 6): string {
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const alphabet = ACCESS_CODE_ALPHABET;
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }

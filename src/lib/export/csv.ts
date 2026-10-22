@@ -89,12 +89,17 @@ export function cellToText(cell: CsvCell, maxDecimals = 2): string {
 /**
  * Quote a field when needed (it contains the delimiter, a quote, a line
  * break or leading/trailing spaces). Quotes are doubled.
- * Text that Excel would evaluate as a formula (starting with =, +, -, @)
- * gets a leading single quote, unless it is a plain number such as "-2,5".
+ * Text that Excel would evaluate as a formula (starting with =, +, -, @,
+ * a tab or carriage return, also after leading whitespace, and including the
+ * full-width variants ＝ ＋ － ＠ that spreadsheets normalise) gets a leading
+ * single quote, unless it is a plain number such as "-2,5" or "+31".
  */
+const FORMULA_START = /^[\s]*[=+\-@\t\r＝＋－＠]/;
+const PLAIN_NUMBER = /^[-+]?\d+([.,]\d+)?$/;
+
 export function escapeCsvField(value: string, delimiter = ";"): string {
   let text = value;
-  if (/^[=+\-@\t\r]/.test(text) && !/^[-+]?\d+([.,]\d+)?$/.test(text)) {
+  if (FORMULA_START.test(text) && !PLAIN_NUMBER.test(text)) {
     // Neutralise CSV/formula injection ("=HYPERLINK(...)").
     text = `'${text}`;
   }

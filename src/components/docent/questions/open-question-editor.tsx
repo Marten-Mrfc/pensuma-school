@@ -10,15 +10,19 @@ import type {
 import type { QuestionIssue } from "@/lib/questions/validate";
 import { EditorSection, FieldLabel, NumberInput } from "./fields";
 import { IssueList } from "./issue-list";
+import { RubricItemsEditor } from "./rubric-items-editor";
 
 export function OpenQuestionEditor({
   data,
   onChange,
   issues,
+  points,
 }: {
   data: OpenQuestionData;
   onChange: (data: QuestionDataByType["open"]) => void;
   issues: readonly QuestionIssue[];
+  /** The question's points (criteria should add up to this). */
+  points: number;
 }) {
   const id = useId();
   const set = (patch: Partial<OpenQuestionData>) =>
@@ -27,10 +31,12 @@ export function OpenQuestionEditor({
   return (
     <EditorSection
       title="Nakijken"
-      description="Open vragen kijk je zelf na. Het modelantwoord en de rubric zie jij tijdens het nakijken; leerlingen zien ze nooit."
+      description="Open vragen kijk je zelf na. Het modelantwoord, de criteria en de toelichting zie jij tijdens het nakijken; leerlingen zien ze nooit."
       icon={<ClipboardCheck />}
     >
-      <IssueList issues={issues} />
+      <IssueList
+        issues={issues.filter((i) => i.target?.field === "modelAnswer")}
+      />
       <div className="flex flex-col gap-2">
         <FieldLabel htmlFor={`${id}-model`}>Modelantwoord</FieldLabel>
         <MarkdownEditor
@@ -41,14 +47,25 @@ export function OpenQuestionEditor({
           minRows={4}
         />
       </div>
+      <RubricItemsEditor
+        items={data.rubricItems}
+        onChange={(rubricItems) => set({ rubricItems })}
+        points={points}
+      />
+      <IssueList
+        issues={issues.filter((i) => i.target?.field === "rubricItem")}
+        compact
+      />
       <div className="flex flex-col gap-2">
-        <FieldLabel htmlFor={`${id}-rubric`}>Beoordelingsrubric</FieldLabel>
+        <FieldLabel htmlFor={`${id}-rubric`}>
+          Toelichting voor het nakijken
+        </FieldLabel>
         <MarkdownEditor
           id={`${id}-rubric`}
           value={data.rubric}
           onChange={(rubric) => set({ rubric })}
-          placeholder={"- 1 punt: juiste uitleg\n- 1 punt: passend voorbeeld"}
-          minRows={4}
+          placeholder="Bijvoorbeeld: halve punten als de uitleg klopt maar het voorbeeld ontbreekt."
+          minRows={3}
         />
       </div>
       <div className="flex flex-col gap-2 sm:max-w-xs">

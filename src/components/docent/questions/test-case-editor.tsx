@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronRight,
   CircleCheck,
   CircleX,
@@ -17,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
 import {
@@ -518,24 +517,24 @@ function TestCard({
             </button>
           </CollapsibleTrigger>
           <div className="flex shrink-0 items-center">
+            <ReorderButtons
+              index={index}
+              count={count}
+              itemLabel={`Test ${index + 1}`}
+              itemKey={test.id}
+              onMove={(from, to) => onMove(to > from ? 1 : -1)}
+            />
             <IconAction
-              label="Omhoog"
-              onClick={() => onMove(-1)}
-              disabled={index === 0}
+              label={`Test ${index + 1} dupliceren`}
+              onClick={onDuplicate}
             >
-              <ArrowUp className="size-3.5" aria-hidden="true" />
-            </IconAction>
-            <IconAction
-              label="Omlaag"
-              onClick={() => onMove(1)}
-              disabled={index === count - 1}
-            >
-              <ArrowDown className="size-3.5" aria-hidden="true" />
-            </IconAction>
-            <IconAction label="Dupliceren" onClick={onDuplicate}>
               <Copy className="size-3.5" aria-hidden="true" />
             </IconAction>
-            <IconAction label="Verwijderen" onClick={onRemove} destructive>
+            <IconAction
+              label={`Test ${index + 1} verwijderen`}
+              onClick={onRemove}
+              destructive
+            >
               <Trash2 className="size-3.5" aria-hidden="true" />
             </IconAction>
           </div>

@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import { X } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export interface TagsInputProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> {
@@ -105,13 +105,15 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
     }
 
     return (
+      // biome-ignore lint/a11y/useKeyWithClickEvents: pointer convenience only; keyboard users focus the <input> itself
+      // biome-ignore lint/a11y/noStaticElementInteractions: clicking between the tags focuses the input
       <div
         ref={ref}
         data-uipkge=""
         data-slot="tags-input"
         className={cn(
           'border-input bg-background flex flex-wrap items-center gap-2 rounded-md border px-2 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none',
-          'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]',
+          'focus-within:border-ring focus-within:ring-ring focus-within:ring-[3px]',
           'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
           disabled && 'pointer-events-none opacity-50',
           className,
@@ -133,7 +135,7 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
             </span>
             <button
               type="button"
-              aria-label={`Remove ${tag}`}
+              aria-label={`${tag} verwijderen`}
               disabled={disabled}
               data-slot="tags-input-item-delete"
               className="hover:text-foreground focus-visible:ring-ring mr-1 flex rounded bg-transparent focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none"
@@ -169,4 +171,3 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
 TagsInput.displayName = 'TagsInput'
 
 export { TagsInput }
-

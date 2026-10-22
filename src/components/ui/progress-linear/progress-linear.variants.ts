@@ -37,4 +37,3 @@ export const progressLinearVariants = cva('relative overflow-hidden w-full', {
 })
 
 export type ProgressLinearVariants = VariantProps<typeof progressLinearVariants>
-

@@ -1,15 +1,14 @@
 export {
   FileUpload,
-  FileUploadTrigger,
   FileUploadContent,
+  type FileUploadContentProps,
   FileUploadItem,
   FileUploadItemName,
-  FileUploadItemSize,
-  type FileUploadProps,
-  type FileUploadTriggerProps,
-  type FileUploadContentProps,
-  type FileUploadItemProps,
   type FileUploadItemNameProps,
+  type FileUploadItemProps,
+  FileUploadItemSize,
   type FileUploadItemSizeProps,
+  type FileUploadProps,
+  FileUploadTrigger,
+  type FileUploadTriggerProps,
 } from './file-upload'
-

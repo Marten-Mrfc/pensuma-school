@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const VerticalTabs = React.forwardRef<
@@ -89,12 +89,12 @@ const VerticalTabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.
 
       const ro = new ResizeObserver(() => updateIndicator())
       ro.observe(root)
-      root.querySelectorAll('[data-slot="vertical-tabs-trigger"]').forEach((el) => ro.observe(el))
+      for (const el of root.querySelectorAll('[data-slot="vertical-tabs-trigger"]')) ro.observe(el)
 
       const mo = new MutationObserver((mutations) => {
         for (const m of mutations) {
           if (m.type === 'childList') {
-            root.querySelectorAll('[data-slot="vertical-tabs-trigger"]').forEach((el) => ro.observe(el))
+            for (const el of root.querySelectorAll('[data-slot="vertical-tabs-trigger"]')) ro.observe(el)
           }
         }
         updateIndicator()
@@ -175,7 +175,7 @@ const VerticalTabsTrigger = React.forwardRef<
       // restores when data-animated="false" (group-data variants below).
       'group/trigger text-muted-foreground relative z-10 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-[color,background-color] duration-150',
       'hover:bg-muted/60 hover:text-foreground',
-      'focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none',
+      'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
       'disabled:pointer-events-none disabled:opacity-50',
       'data-[state=active]:text-foreground',
       'group-data-[animated=false]/list:data-[state=active]:bg-muted',
@@ -199,7 +199,7 @@ const VerticalTabsContent = React.forwardRef<
     data-uipkge=""
     data-slot="vertical-tabs-content"
     className={cn(
-      'ring-offset-background focus-visible:ring-ring/50 flex-1 focus-visible:ring-2 focus-visible:outline-none',
+      'ring-offset-background focus-visible:ring-ring flex-1 focus-visible:ring-2 focus-visible:outline-none',
       className,
     )}
     {...props}
@@ -208,4 +208,3 @@ const VerticalTabsContent = React.forwardRef<
 VerticalTabsContent.displayName = 'VerticalTabsContent'
 
 export { VerticalTabs, VerticalTabsList, VerticalTabsSection, VerticalTabsTrigger, VerticalTabsContent }
-

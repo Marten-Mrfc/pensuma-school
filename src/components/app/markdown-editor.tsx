@@ -25,6 +25,10 @@ export interface MarkdownEditorProps {
   id?: string;
   className?: string;
   "aria-label"?: string;
+  /** Forwarded to the textarea (FormField sets these automatically). */
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+  "aria-required"?: boolean;
 }
 
 type Edit = {
@@ -95,11 +99,22 @@ export function MarkdownEditor({
   id,
   className,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
+  "aria-required": ariaRequired,
 }: MarkdownEditorProps) {
   const autoId = useId();
   const textareaId = id ?? `md-${autoId}`;
+  const editTabId = `${autoId}-tab-edit`;
+  const previewTabId = `${autoId}-tab-preview`;
+  const editPanelId = `${autoId}-panel-edit`;
+  const previewPanelId = `${autoId}-panel-preview`;
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const tabRefs = useRef<Record<"edit" | "preview", HTMLButtonElement | null>>({
+    edit: null,
+    preview: null,
+  });
   const pendingSelection = useRef<[number, number] | null>(null);
 
   // Grow with the content; restore the caret after toolbar edits.
@@ -133,6 +148,23 @@ export function MarkdownEditor({
     onChange(next);
   }
 
+  /** Tabs pattern: Left/Right/Home/End move between the two tabs. */
+  function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    const order = ["edit", "preview"] as const;
+    const current = order.indexOf(tab);
+    let next: number | null = null;
+    if (e.key === "ArrowRight") next = (current + 1) % order.length;
+    else if (e.key === "ArrowLeft")
+      next = (current - 1 + order.length) % order.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = order.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    const key = order[next] ?? "edit";
+    setTab(key);
+    tabRefs.current[key]?.focus();
+  }
+
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (!(e.ctrlKey || e.metaKey)) return;
     const key = e.key.toLowerCase();
@@ -148,7 +180,7 @@ export function MarkdownEditor({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-input bg-card shadow-xs transition-[box-shadow,border-color] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40",
+        "overflow-hidden rounded-lg border border-input bg-card shadow-xs transition-[box-shadow,border-color] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring",
         className,
       )}
     >
@@ -166,15 +198,19 @@ export function MarkdownEditor({
           ).map(([key, label]) => (
             <button
               key={key}
+              ref={(el) => {
+                tabRefs.current[key] = el;
+              }}
+              id={key === "edit" ? editTabId : previewTabId}
               type="button"
               role="tab"
               aria-selected={tab === key}
-              aria-controls={
-                key === "edit" ? textareaId : `${textareaId}-preview`
-              }
+              aria-controls={key === "edit" ? editPanelId : previewPanelId}
+              tabIndex={tab === key ? 0 : -1}
               onClick={() => setTab(key)}
+              onKeyDown={onTabKeyDown}
               className={cn(
-                "h-7 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+                "h-7 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 tab === key && "bg-background text-foreground shadow-xs",
               )}
             >
@@ -183,11 +219,7 @@ export function MarkdownEditor({
           ))}
         </div>
         {tab === "edit" ? (
-          <div
-            className="flex items-center gap-0.5"
-            role="toolbar"
-            aria-label="Opmaak"
-          >
+          <div className="flex items-center gap-0.5">
             {ACTIONS.map(({ key, label, shortcut, icon: Icon, edit }) => (
               <Tooltip key={key}>
                 <TooltipTrigger asChild>
@@ -196,7 +228,7 @@ export function MarkdownEditor({
                     aria-label={label}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => apply(edit)}
-                    className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                    className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Icon className="size-3.5" aria-hidden="true" />
                   </button>
@@ -214,24 +246,32 @@ export function MarkdownEditor({
       </div>
 
       {tab === "edit" ? (
-        <textarea
-          ref={ref}
-          id={textareaId}
-          aria-label={ariaLabel}
-          value={value}
-          rows={minRows}
-          placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          spellCheck
-          className="block w-full resize-none bg-transparent px-3.5 py-3 font-mono text-[0.85rem] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
-          style={{ minHeight: `calc(${minRows} * 1.5rem + 1.5rem)` }}
-        />
+        <div id={editPanelId} role="tabpanel" aria-labelledby={editTabId}>
+          <textarea
+            ref={ref}
+            id={textareaId}
+            aria-label={ariaLabel}
+            aria-describedby={ariaDescribedBy}
+            aria-invalid={ariaInvalid || undefined}
+            aria-required={ariaRequired || undefined}
+            value={value}
+            rows={minRows}
+            placeholder={placeholder}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            spellCheck
+            className="block w-full resize-none bg-transparent px-3.5 py-3 font-mono text-[0.85rem] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+            style={{ minHeight: `calc(${minRows} * 1.5rem + 1.5rem)` }}
+          />
+        </div>
       ) : (
         <div
-          id={`${textareaId}-preview`}
+          id={previewPanelId}
           role="tabpanel"
-          className="px-4 py-3"
+          aria-labelledby={previewTabId}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: tabs pattern; the panel takes focus after the tab list
+          tabIndex={0}
+          className="px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           style={{ minHeight: `calc(${minRows} * 1.5rem + 1.5rem)` }}
         >
           {value.trim() ? (

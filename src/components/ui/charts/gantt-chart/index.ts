@@ -1,1 +1,1 @@
-export { GanttChart, type GanttChartProps, type GanttTask, type GanttMilestone } from './GanttChart'
+export { GanttChart, type GanttChartProps, type GanttMilestone, type GanttTask } from './GanttChart'

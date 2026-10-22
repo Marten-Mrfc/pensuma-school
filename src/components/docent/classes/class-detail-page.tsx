@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useId, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { PageHeader } from "@/components/app/page-header";
@@ -39,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { routes } from "@/lib/routes";
 import { useTRPC } from "@/trpc/react";
 import { plural } from "../students/format";
@@ -54,6 +55,7 @@ export function ClassDetailPage({
 }: {
   params: Promise<{ klasId: string }>;
 }) {
+  const uid = useId();
   const { klasId } = use(params);
   const trpc = useTRPC();
   const router = useRouter();
@@ -66,6 +68,7 @@ export function ClassDetailPage({
   const setArchived = useMutation(trpc.class.setArchived.mutationOptions());
   const remove = useMutation(trpc.class.delete.mutationOptions());
   const resetPins = useMutation(trpc.student.resetPins.mutationOptions());
+  useDocumentTitle([query.data?.name ?? "Klas", "Klassen"]);
 
   const invalidate = () =>
     Promise.all([
@@ -217,12 +220,12 @@ export function ClassDetailPage({
       </div>
 
       <section
-        aria-labelledby="students-heading"
+        aria-labelledby={`${uid}-students-heading`}
         className="flex flex-col gap-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2
-            id="students-heading"
+            id={`${uid}-students-heading`}
             className="font-display text-lg font-bold tracking-tight"
           >
             Leerlingen

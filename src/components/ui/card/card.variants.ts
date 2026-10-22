@@ -27,4 +27,3 @@ export const cardVariants = cva(
 )
 
 export type CardVariants = VariantProps<typeof cardVariants>
-

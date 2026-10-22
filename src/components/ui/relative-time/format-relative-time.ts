@@ -69,4 +69,3 @@ export function formatVisibleTime(
   if (options?.display === 'absolute') return absolute
   return `${relative} · ${absolute}`
 }
-

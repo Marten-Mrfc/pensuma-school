@@ -1,3 +1,2 @@
-export { Chip, ChipGroup, type ChipProps, type ChipGroupProps, type ChipGroupRenderProps } from './chip'
-export { chipVariants, type ChipVariants } from './chip.variants'
-
+export { Chip, ChipGroup, type ChipGroupProps, type ChipGroupRenderProps, type ChipProps } from './chip'
+export { type ChipVariants, chipVariants } from './chip.variants'

@@ -14,14 +14,14 @@ export function PublicHeader() {
           className="ml-6 hidden items-center gap-1 text-sm md:flex"
         >
           <a
-            href="#hoe-het-werkt"
-            className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            href="/#hoe-het-werkt"
+            className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             Hoe het werkt
           </a>
           <a
-            href="#nakijken"
-            className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            href="/#nakijken"
+            className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             Eerlijk nakijken
           </a>

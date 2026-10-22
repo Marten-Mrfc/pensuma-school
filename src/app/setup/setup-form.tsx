@@ -3,90 +3,73 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
-  Check,
   CircleCheckBig,
-  Eye,
-  EyeOff,
   Loader2,
+  LockKeyhole,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { ErrorState } from "@/components/app/states";
+import { PasswordChecklist } from "@/components/docent/account/password-checklist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { focusElementById } from "@/lib/a11y/focus";
 import { authClient } from "@/lib/auth-client";
-import { ADMIN_MIN_PASSWORD_LENGTH, ROUTES } from "@/lib/auth-shared";
-import { cn } from "@/lib/utils";
+import { ROUTES } from "@/lib/auth-shared";
+import {
+  PASSWORD_HELP,
+  validateTeacherPassword,
+} from "@/lib/security/password-policy";
 import { useTRPC } from "@/trpc/react";
 
-type Errors = Partial<Record<"name" | "email" | "password" | "repeat", string>>;
+type Field = "name" | "email" | "password" | "repeat" | "setupToken";
+type Errors = Partial<Record<Field, string>>;
+const FIELD_ORDER: readonly Field[] = [
+  "setupToken",
+  "name",
+  "email",
+  "password",
+  "repeat",
+];
 
-function Requirement({ ok, children }: { ok: boolean; children: string }) {
-  return (
-    <li
-      className={cn(
-        "flex items-center gap-2 transition-colors",
-        ok ? "text-success-ink" : "text-muted-foreground",
-      )}
-    >
-      <span
-        className={cn(
-          "grid size-4 place-items-center rounded-full border transition-colors",
-          ok
-            ? "border-transparent bg-success text-success-foreground"
-            : "border-border",
-        )}
-        aria-hidden="true"
-      >
-        {ok ? <Check className="size-2.5" strokeWidth={3.5} /> : null}
-      </span>
-      {children}
-      <span className="sr-only">{ok ? "(in orde)" : "(nog niet in orde)"}</span>
-    </li>
-  );
-}
-
-function PasswordToggle({
-  shown,
-  onToggle,
-}: {
-  shown: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={shown ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
-      aria-pressed={shown}
-      className="grid size-7 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-    >
-      {shown ? (
-        <EyeOff className="size-4" aria-hidden="true" />
-      ) : (
-        <Eye className="size-4" aria-hidden="true" />
-      )}
-    </button>
-  );
-}
+const TOKEN_MESSAGES = new Set([
+  "De installatiecode klopt niet.",
+  "De installatie is vergrendeld. Zet SETUP_TOKEN in de serveromgeving.",
+]);
 
 export function SetupForm() {
   const trpc = useTRPC();
   const status = useQuery(trpc.setup.status.queryOptions());
+  const baseId = useId();
+  const ids: Record<Field | "checklist", string> = {
+    name: `${baseId}-name`,
+    email: `${baseId}-email`,
+    password: `${baseId}-password`,
+    repeat: `${baseId}-repeat`,
+    setupToken: `${baseId}-token`,
+    checklist: `${baseId}-checklist`,
+  };
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [setupToken, setSetupToken] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+
+  function showErrors(found: Errors) {
+    setErrors(found);
+    const first = FIELD_ORDER.find((f) => found[f]);
+    if (first) requestAnimationFrame(() => focusElementById(ids[first]));
+  }
 
   const create = useMutation(
     trpc.setup.createFirstAdmin.mutationOptions({
@@ -104,7 +87,26 @@ export function SetupForm() {
         toast.success("Welkom bij Pensuma!");
         window.location.assign(ROUTES.adminHome);
       },
-      onError: (error) => setFormError(getErrorMessage(error)),
+      onError: (error) => {
+        const message = getErrorMessage(error);
+        if (TOKEN_MESSAGES.has(error.message)) {
+          showErrors({ setupToken: error.message });
+          return;
+        }
+        const fields = error.data?.zodError?.fieldErrors as
+          | Record<string, string[] | undefined>
+          | undefined;
+        const found: Errors = {
+          name: fields?.name?.[0],
+          email: fields?.email?.[0],
+          password: fields?.password?.[0],
+        };
+        if (found.name || found.email || found.password) {
+          showErrors(found);
+          return;
+        }
+        setFormError(message);
+      },
     }),
   );
 
@@ -114,6 +116,7 @@ export function SetupForm() {
         className="flex flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm sm:p-8"
         aria-busy="true"
       >
+        <span className="sr-only">Laden…</span>
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-4 w-full" />
         {[0, 1, 2, 3].map((i) => (
@@ -161,24 +164,36 @@ export function SetupForm() {
     );
   }
 
-  const longEnough = password.length >= ADMIN_MIN_PASSWORD_LENGTH;
-  const matches = password.length > 0 && password === repeat;
+  const tokenRequired = status.data.tokenRequired;
   const busy = create.isPending || signingIn || create.isSuccess;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const next: Errors = {};
-    if (name.trim().length < 2) next.name = "Vul je naam in.";
-    if (!/^\S+@\S+\.\S+$/.test(email.trim()))
-      next.email = "Vul een geldig e-mailadres in.";
-    if (!longEnough)
-      next.password = `Je wachtwoord moet minstens ${ADMIN_MIN_PASSWORD_LENGTH} tekens hebben.`;
-    if (!next.password && password !== repeat)
-      next.repeat = "De wachtwoorden zijn niet hetzelfde.";
-    setErrors(next);
+    const found: Errors = {};
+    if (tokenRequired && !setupToken.trim())
+      found.setupToken = "Vul de installatiecode in.";
+    if (name.trim().length < 2) found.name = "Vul je naam in.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      found.email = "Vul een geldig e-mailadres in.";
+    const policy = validateTeacherPassword(password, {
+      email: email.trim(),
+      name: name.trim(),
+    });
+    if (!policy.ok) found.password = policy.message;
+    else if (password !== repeat)
+      found.repeat = "De wachtwoorden zijn niet hetzelfde.";
     setFormError(null);
-    if (Object.keys(next).length > 0) return;
-    create.mutate({ name: name.trim(), email: email.trim(), password });
+    if (Object.keys(found).length > 0) {
+      showErrors(found);
+      return;
+    }
+    setErrors({});
+    create.mutate({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      setupToken: tokenRequired ? setupToken.trim() : undefined,
+    });
   }
 
   return (
@@ -198,29 +213,60 @@ export function SetupForm() {
       <form
         onSubmit={onSubmit}
         noValidate
+        aria-busy={busy}
         className="flex flex-col gap-5 px-6 py-6 sm:px-8 sm:py-7"
       >
-        <FormField label="Naam" htmlFor="name" error={errors.name} required>
+        {tokenRequired ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-dashed bg-muted/30 p-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <LockKeyhole
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+              Deze installatie is beveiligd
+            </p>
+            <FormField
+              label="Installatiecode"
+              htmlFor={ids.setupToken}
+              error={errors.setupToken}
+              description="Je vindt deze code in de omgevingsvariabele SETUP_TOKEN van de server."
+              required
+            >
+              <Input
+                id={ids.setupToken}
+                type="password"
+                size="large"
+                autoComplete="off"
+                spellCheck={false}
+                value={setupToken}
+                onChange={(e) => setSetupToken(e.target.value)}
+                status={errors.setupToken ? "error" : undefined}
+                autoFocus
+              />
+            </FormField>
+          </div>
+        ) : null}
+        <FormField label="Naam" htmlFor={ids.name} error={errors.name} required>
           <Input
-            id="name"
+            id={ids.name}
             size="large"
             autoComplete="name"
             placeholder="Bijvoorbeeld Marieke de Vries"
             value={name}
             onChange={(e) => setName(e.target.value)}
             status={errors.name ? "error" : undefined}
-            autoFocus
+            autoFocus={!tokenRequired}
           />
         </FormField>
         <FormField
           label="E-mailadres"
-          htmlFor="email"
+          htmlFor={ids.email}
           error={errors.email}
           description="Hiermee log je straks in."
           required
         >
           <Input
-            id="email"
+            id={ids.email}
             type="email"
             size="large"
             autoComplete="email"
@@ -233,52 +279,49 @@ export function SetupForm() {
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField
             label="Wachtwoord"
-            htmlFor="password"
+            htmlFor={ids.password}
             error={errors.password}
             required
           >
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              size="large"
+            <PasswordInput
+              id={ids.password}
+              size="lg"
+              placeholder=""
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              status={errors.password ? "error" : undefined}
-              suffix={
-                <PasswordToggle
-                  shown={showPassword}
-                  onToggle={() => setShowPassword((v) => !v)}
-                />
-              }
+              aria-describedby={ids.checklist}
+              className={errors.password ? "border-destructive" : undefined}
             />
           </FormField>
           <FormField
             label="Herhaal wachtwoord"
-            htmlFor="repeat"
+            htmlFor={ids.repeat}
             error={errors.repeat}
             required
           >
-            <Input
-              id="repeat"
-              type={showPassword ? "text" : "password"}
-              size="large"
+            <PasswordInput
+              id={ids.repeat}
+              size="lg"
+              placeholder=""
               autoComplete="new-password"
               value={repeat}
               onChange={(e) => setRepeat(e.target.value)}
-              status={errors.repeat ? "error" : undefined}
+              className={errors.repeat ? "border-destructive" : undefined}
             />
           </FormField>
         </div>
-        <ul
-          className="flex flex-col gap-1.5 text-sm"
-          aria-label="Eisen voor je wachtwoord"
-        >
-          <Requirement
-            ok={longEnough}
-          >{`Minstens ${ADMIN_MIN_PASSWORD_LENGTH} tekens`}</Requirement>
-          <Requirement ok={matches}>Beide wachtwoorden zijn gelijk</Requirement>
-        </ul>
+        <div className="flex flex-col gap-2.5">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {PASSWORD_HELP}
+          </p>
+          <PasswordChecklist
+            id={ids.checklist}
+            password={password}
+            repeat={repeat}
+            context={{ email: email.trim(), name: name.trim() }}
+          />
+        </div>
 
         {formError ? (
           <div

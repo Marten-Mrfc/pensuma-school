@@ -1,17 +1,17 @@
+// biome-ignore-all lint/correctness/useHookAtTopLevel: forwardRef inner component; hooks are at top level
 'use client'
 
-import * as React from 'react'
 import type {
   ColumnDef,
   ColumnFiltersState,
   ColumnPinningState,
-  FilterFn,
-  SortingState,
-  VisibilityState,
   ExpandedState,
+  FilterFn,
   GroupingState,
-  Table as TanstackTable,
   Row,
+  SortingState,
+  Table as TanstackTable,
+  VisibilityState,
 } from '@tanstack/react-table'
 import {
   flexRender,
@@ -23,21 +23,22 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Columns3, Copy, Download, Search, X } from 'lucide-react'
+import * as React from 'react'
 import type { DateRange } from 'react-day-picker'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 // `valueUpdater` lives next to the low-level table primitive (which
 // data-table depends on transitively via registryDependencies). Keep
 // `@/lib/utils` reserved for the cn() helper shipped by the init
 // bootstrap -- importing valueUpdater from there would force every
 // consumer to hand-edit lib/utils.ts on install.
 import { valueUpdater } from '@/components/ui/table/utils'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Copy, Download, X, ChevronDown, ChevronRight } from 'lucide-react'
-
-import { DataTableToolbar } from './DataTableToolbar'
 import { DataTableFilterSheet } from './DataTableFilterSheet'
 import { DataTablePagination } from './DataTablePagination'
+import { DataTableToolbar } from './DataTableToolbar'
+import { dateToIso, isoToDate } from './date-utils'
 import { type FilterDefinition, type FilterOption, resolveOption } from './types'
-import { isoToDate, dateToIso } from './date-utils'
 
 export type { FilterDefinition, FilterOption }
 
@@ -80,7 +81,8 @@ export interface DataTableProps<TData, TValue> {
   enableResize?: boolean
   /** Initial column pinning. Each column id is pinned to the given side. */
   defaultColumnPinning?: { left?: string[]; right?: string[] }
-  /** Allow drag-to-reorder on column headers. */
+  /** Allow reordering columns: drag the header, or use the header's move
+   *  menu ("Kolom naar links" / "Kolom naar rechts") without dragging. */
   enableReorder?: boolean
   /** Initial column ids to group by. Pass an empty array to disable grouping. */
   defaultGrouping?: string[]
@@ -119,7 +121,7 @@ export interface DataTableProps<TData, TValue> {
   onStateChange?: (state: DataTableState) => void
   /** Infinite-scroll: last row entered viewport, time to load more */
   onFetchMore?: () => void
-  /** Custom empty-state content (replaces "No results."). */
+  /** Custom empty-state content (replaces "Geen resultaten"). */
   emptyState?: React.ReactNode
   /** Expanded-row content. Receives the original row + the TanStack row. */
   renderExpanded?: (row: TData, tanstackRow: Row<TData>) => React.ReactNode
@@ -131,7 +133,8 @@ export interface DataTableProps<TData, TValue> {
   toolbarExtra?: React.ReactNode
   /** Consumer-supplied custom filter UI inside the filter surface. */
   customFilters?: React.ReactNode
-  /** Enable keyboard navigation (Arrow keys, J/K, Space/X, Enter, Esc, Cmd+A, Cmd+C). Default true. */
+  /** Enable keyboard navigation (Arrow keys, Space, Enter, Esc, Cmd+A, Cmd+C). Default false:
+   *  the table then becomes a tab stop. No single-letter shortcuts (WCAG 2.1.4). */
   enableKeyboardNavigation?: boolean
   /** Placement of the bulk actions dock: 'floating' (Linear/Raycast HUD dock at bottom-center) or 'inline' (top banner). Default 'floating'. */
   bulkActionPosition?: 'floating' | 'inline'
@@ -145,6 +148,46 @@ export interface DataTableHandle<TData> {
   copyMarkdown: (rows?: Row<TData>[]) => string
 }
 
+/** Utility columns that never move. */
+const NON_REORDERABLE_COLUMNS = new Set(['select', 'actions', 'expander'])
+
+/** Header menu with a non-drag way to move a column (WCAG 2.5.7). */
+function ColumnMoveMenu({
+  label,
+  first,
+  last,
+  onMove,
+}: {
+  label: string
+  first: boolean
+  last: boolean
+  onMove: (direction: -1 | 1) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:ring-ring inline-flex size-6 shrink-0 items-center justify-center rounded transition-colors outline-none focus-visible:ring-2"
+          aria-label={`Kolom ${label} verplaatsen`}
+        >
+          <Columns3 className="size-3.5" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem disabled={first} onSelect={() => onMove(-1)}>
+          <ArrowLeft aria-hidden="true" />
+          Kolom naar links
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={last} onSelect={() => onMove(1)}>
+          <ArrowRight aria-hidden="true" />
+          Kolom naar rechts
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function DataTableInner<TData, TValue>(
   props: DataTableProps<TData, TValue>,
   forwardedRef: React.Ref<DataTableHandle<TData>>,
@@ -153,7 +196,7 @@ function DataTableInner<TData, TValue>(
     columns,
     data,
     filterColumn = '',
-    filterPlaceholder = 'Filter...',
+    filterPlaceholder = 'Filteren…',
     filters = [],
     // Industry default (shadcn / Linear / Airtable): faceted filter chips in the
     // toolbar. Use `modal` for a right Sheet when you have many complex filters.
@@ -187,7 +230,7 @@ function DataTableInner<TData, TValue>(
     renderFooter,
     toolbarExtra,
     customFilters,
-    enableKeyboardNavigation = true,
+    enableKeyboardNavigation = false,
     bulkActionPosition = 'floating',
   } = props
 
@@ -247,7 +290,8 @@ function DataTableInner<TData, TValue>(
     return true
   }
 
-  // Augment columns with custom filter functions based on filter definitions
+  // Augment columns with custom filter functions based on filter definitions.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the filter fns are recreated each render but behave identically; recompute only when columns/filters change
   const processedColumns = React.useMemo(() => {
     return columns.map((col) => {
       const colId = (col as any).accessorKey || (col as any).id
@@ -257,7 +301,6 @@ function DataTableInner<TData, TValue>(
       if (filter.type === 'date') return { ...col, filterFn: dateRangeFilterFn }
       return col
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns, filters])
 
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -427,8 +470,8 @@ function DataTableInner<TData, TValue>(
   function formatDateRange(column: string): string {
     const dr = getDateRangeValue(column)
     if (dr.from && dr.to) return `${dr.from} - ${dr.to}`
-    if (dr.from) return `From ${dr.from}`
-    if (dr.to) return `Until ${dr.to}`
+    if (dr.from) return `Vanaf ${dr.from}`
+    if (dr.to) return `Tot ${dr.to}`
     return ''
   }
 
@@ -558,6 +601,27 @@ function DataTableInner<TData, TValue>(
     if (from === -1 || to === -1) return
     order.splice(to, 0, ...order.splice(from, 1))
     setColumnOrder(order)
+  }
+
+  /** Keyboard / pointer alternative to dragging (WCAG 2.5.7): swap with the neighbouring reorderable column. */
+  function moveColumn(id: string, direction: -1 | 1) {
+    const order = (columnOrder.length ? columnOrder : table.getAllLeafColumns().map((c) => c.id)).slice()
+    const movable = order.filter((colId) => !NON_REORDERABLE_COLUMNS.has(colId))
+    const at = movable.indexOf(id)
+    const neighbour = movable[at + direction]
+    if (at === -1 || neighbour === undefined) return
+    const from = order.indexOf(id)
+    const to = order.indexOf(neighbour)
+    order[from] = neighbour
+    order[to] = id
+    setColumnOrder(order)
+  }
+
+  function columnPosition(id: string): { first: boolean; last: boolean } {
+    const order = columnOrder.length ? columnOrder : table.getAllLeafColumns().map((c) => c.id)
+    const movable = order.filter((colId) => !NON_REORDERABLE_COLUMNS.has(colId))
+    const at = movable.indexOf(id)
+    return { first: at <= 0, last: at === -1 || at === movable.length - 1 }
   }
 
   // ── Pinning — return style for sticky pinned cells (header or body) ──
@@ -699,16 +763,24 @@ function DataTableInner<TData, TValue>(
   function onTableKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (!enableKeyboardNavigation) return
     const target = e.target as HTMLElement | null
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'A' ||
+        target.isContentEditable)
+    ) {
       return
     }
 
     const rows = table.getRowModel().rows
     if (!rows || rows.length === 0) return
 
-    const isDown = e.key === 'ArrowDown' || e.key === 'j'
-    const isUp = e.key === 'ArrowUp' || e.key === 'k'
-    const isSpace = e.key === ' ' || e.key === 'x'
+    const isDown = e.key === 'ArrowDown'
+    const isUp = e.key === 'ArrowUp'
+    const isSpace = e.key === ' '
     const isEnter = e.key === 'Enter'
     const isEscape = e.key === 'Escape'
     const isSelectAll = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a'
@@ -832,12 +904,20 @@ function DataTableInner<TData, TValue>(
   }
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: catches keys bubbling up from the rows; only active with enableKeyboardNavigation
     <div
       data-uipkge=""
       data-slot="data-table"
-      className="focus-visible:ring-border/50 relative w-full outline-none focus-visible:ring-1"
-      tabIndex={0}
-      onKeyDown={onTableKeyDown}
+      className="focus-visible:ring-ring relative w-full outline-none focus-visible:ring-2"
+      {...(enableKeyboardNavigation
+        ? {
+            tabIndex: 0,
+            role: 'group',
+            'aria-label': 'Tabel',
+            'aria-keyshortcuts': 'ArrowUp ArrowDown Space Enter Escape',
+          }
+        : {})}
+      onKeyDown={enableKeyboardNavigation ? onTableKeyDown : undefined}
     >
       {/* Toolbar (above-mode: floats outside the bordered card). */}
       {!hideToolbar && toolbarPosition === 'above' && <DataTableToolbar {...toolbarProps} borderless />}
@@ -881,7 +961,7 @@ function DataTableInner<TData, TValue>(
         {bulkActionPosition === 'inline' && renderBulkActions && selectedRows.length > 0 && (
           <div className="bg-primary/5 border-primary/15 flex items-center gap-3 border-b px-4 py-2">
             <span className="bg-primary/10 text-primary rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums">
-              {selectedRows.length} selected
+              {selectedRows.length} geselecteerd
             </span>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {renderBulkActions(selectedRows, () => table.toggleAllRowsSelected(false))}
@@ -891,7 +971,7 @@ function DataTableInner<TData, TValue>(
               className="text-muted-foreground hover:text-foreground shrink-0 text-xs font-medium transition"
               onClick={() => table.toggleAllRowsSelected(false)}
             >
-              Clear
+              Selectie wissen
             </button>
           </div>
         )}
@@ -918,11 +998,11 @@ function DataTableInner<TData, TValue>(
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
-                    const reorderable =
-                      enableReorder &&
-                      header.column.id !== 'select' &&
-                      header.column.id !== 'actions' &&
-                      header.column.id !== 'expander'
+                    const reorderable = enableReorder && !NON_REORDERABLE_COLUMNS.has(header.column.id)
+                    const columnLabel =
+                      typeof header.column.columnDef.header === 'string'
+                        ? header.column.columnDef.header
+                        : header.column.id
                     // Screen readers announce the active sort from aria-sort on the header cell.
                     const sorted = header.column.getIsSorted()
                     const ariaSort = header.column.getCanSort()
@@ -955,9 +1035,23 @@ function DataTableInner<TData, TValue>(
                         onDragEnd={reorderable ? () => onColDragEnd() : undefined}
                         onDrop={reorderable ? () => onColDrop(header.column.id) : undefined}
                       >
-                        {!header.isPlaceholder && flexRender(header.column.columnDef.header, header.getContext())}
+                        {reorderable && !header.isPlaceholder ? (
+                          <div className="flex items-center gap-1">
+                            <div className="min-w-0 flex-1">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </div>
+                            <ColumnMoveMenu
+                              label={columnLabel}
+                              {...columnPosition(header.column.id)}
+                              onMove={(direction) => moveColumn(header.column.id, direction)}
+                            />
+                          </div>
+                        ) : (
+                          !header.isPlaceholder && flexRender(header.column.columnDef.header, header.getContext())
+                        )}
                         {enableResize && header.column.getCanResize() && (
                           <div
+                            aria-hidden="true"
                             className={[
                               'hover:bg-foreground/30 absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none transition-colors select-none',
                               header.column.getIsResizing() ? 'bg-foreground/60' : '',
@@ -998,11 +1092,15 @@ function DataTableInner<TData, TValue>(
                         onClick={() => row.toggleExpanded()}
                       >
                         <TableCell colSpan={row.getVisibleCells().length}>
-                          <button type="button" className="flex items-center gap-2 text-sm font-medium">
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 text-sm font-medium"
+                            aria-expanded={row.getIsExpanded()}
+                          >
                             {row.getIsExpanded() ? (
-                              <ChevronDown className="size-4" />
+                              <ChevronDown className="size-4" aria-hidden="true" />
                             ) : (
-                              <ChevronRight className="size-4" />
+                              <ChevronRight className="size-4" aria-hidden="true" />
                             )}
                             <span>{String(row.groupingValue ?? '')}</span>
                             <span className="text-muted-foreground font-normal">{row.subRows.length}</span>
@@ -1055,9 +1153,9 @@ function DataTableInner<TData, TValue>(
                           <Search className="size-4" aria-hidden="true" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-foreground text-sm font-medium">No results</p>
+                          <p className="text-foreground text-sm font-medium">Geen resultaten</p>
                           <p className="text-muted-foreground max-w-[28ch] text-xs leading-relaxed">
-                            Try adjusting search or filters to find what you need.
+                            Probeer een andere zoekterm of filter.
                           </p>
                         </div>
                       </div>
@@ -1074,7 +1172,7 @@ function DataTableInner<TData, TValue>(
           {infinite && <div ref={setSentinelNode} className="h-1" />}
           {infinite && loading && (
             <div className="border-border text-muted-foreground border-t px-4 py-3 text-center text-sm">
-              Loading more…
+              Meer laden…
             </div>
           )}
         </div>
@@ -1107,43 +1205,43 @@ function DataTableInner<TData, TValue>(
           className="border-border/80 bg-background/95 text-foreground fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full border px-3.5 py-1.5 shadow-xl backdrop-blur-md select-none sm:absolute"
         >
           <span className="bg-primary/10 text-primary flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-xs font-semibold tabular-nums">
-            {selectedRows.length} selected
+            {selectedRows.length} geselecteerd
           </span>
 
-          <div className="bg-border h-3.5 w-px" />
+          <div className="bg-border h-3.5 w-px" aria-hidden="true" />
 
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-            title="Copy selected rows as TSV (Excel / Sheets)"
+            title="Kopieer geselecteerde rijen als TSV"
             onClick={() => copyTsv(selectedRows)}
           >
-            <Copy className="size-3" />
-            Copy TSV
+            <Copy className="size-3" aria-hidden="true" />
+            Kopieer TSV
           </button>
 
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-            title="Export table as CSV"
+            title="Tabel exporteren als CSV"
             onClick={exportCsv}
           >
-            <Download className="size-3" />
-            Export
+            <Download className="size-3" aria-hidden="true" />
+            Exporteren
           </button>
 
           {renderBulkActions?.(selectedRows, () => table.toggleAllRowsSelected(false))}
 
-          <div className="bg-border h-3.5 w-px" />
+          <div className="bg-border h-3.5 w-px" aria-hidden="true" />
 
           <button
             type="button"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted flex size-5 items-center justify-center rounded-full transition-colors"
-            title="Deselect all (Esc)"
-            aria-label="Clear selection"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted flex size-6 items-center justify-center rounded-full transition-colors"
+            title="Selectie wissen (Esc)"
+            aria-label="Selectie wissen (Esc)"
             onClick={() => table.toggleAllRowsSelected(false)}
           >
-            <X className="size-3.5" />
+            <X className="size-3.5" aria-hidden="true" />
           </button>
         </div>
       )}
@@ -1156,4 +1254,3 @@ function DataTableInner<TData, TValue>(
 export const DataTable = React.forwardRef(DataTableInner) as <TData, TValue = unknown>(
   props: DataTableProps<TData, TValue> & { ref?: React.Ref<DataTableHandle<TData>> },
 ) => React.ReactElement
-

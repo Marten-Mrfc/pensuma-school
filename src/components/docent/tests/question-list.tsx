@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp, GripVertical, Settings2 } from "lucide-react";
+import { GripVertical, Settings2 } from "lucide-react";
 import { useState } from "react";
+import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { IssueDot } from "@/components/docent/questions/issue-list";
 import {
   QUESTION_TYPE_ICONS,
@@ -47,6 +48,7 @@ export interface QuestionListProps {
   onMove: (id: string, delta: -1 | 1) => void;
   onReorder: (orderedIds: string[]) => void;
   onAdd: (template: QuestionTemplate) => void;
+  onOpenBank?: () => void;
   adding: boolean;
   settingsTitle: string;
   settingsHasIssue: boolean;
@@ -60,6 +62,7 @@ export function QuestionList({
   onMove,
   onReorder,
   onAdd,
+  onOpenBank,
   adding,
   settingsTitle,
   settingsHasIssue,
@@ -199,6 +202,7 @@ export function QuestionList({
                     <span
                       className="hidden cursor-grab touch-none py-2 pl-1 text-muted-foreground/50 group-hover/item:text-muted-foreground lg:block"
                       aria-hidden="true"
+                      title="Slepen om te verplaatsen"
                     >
                       <GripVertical className="size-3.5" />
                     </span>
@@ -257,31 +261,21 @@ export function QuestionList({
                         {formatPoints(q.points)} p
                       </span>
                     </button>
-                    <div
+                    <ReorderButtons
+                      index={index}
+                      count={questions.length}
+                      itemLabel={`Vraag ${index + 1}`}
+                      itemKey={q.id}
+                      onMove={(from, to) => onMove(q.id, to > from ? 1 : -1)}
                       className={cn(
-                        "flex shrink-0 flex-col opacity-100 transition-opacity lg:opacity-0 lg:group-focus-within/item:opacity-100 lg:group-hover/item:opacity-100",
-                        selected && "lg:opacity-100",
+                        "shrink-0 transition-opacity",
+                        // Desktop: other rows show the buttons on hover or
+                        // focus, floating over the points, so they don't
+                        // take room from the title.
+                        !selected &&
+                          "lg:pointer-events-none lg:absolute lg:top-1/2 lg:right-1 lg:-translate-y-1/2 lg:rounded-md lg:bg-popover lg:opacity-0 lg:shadow-sm lg:ring-1 lg:ring-border lg:group-focus-within/item:pointer-events-auto lg:group-focus-within/item:opacity-100 lg:group-hover/item:pointer-events-auto lg:group-hover/item:opacity-100",
                       )}
-                    >
-                      <button
-                        type="button"
-                        aria-label={`Vraag ${index + 1} omhoog`}
-                        disabled={index === 0}
-                        onClick={() => onMove(q.id, -1)}
-                        className="grid h-4 w-6 place-items-center rounded text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-30"
-                      >
-                        <ArrowUp className="size-3" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Vraag ${index + 1} omlaag`}
-                        disabled={index === questions.length - 1}
-                        onClick={() => onMove(q.id, 1)}
-                        className="grid h-4 w-6 place-items-center rounded text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-30"
-                      >
-                        <ArrowDown className="size-3" aria-hidden="true" />
-                      </button>
-                    </div>
+                    />
                   </div>
                 </li>
               );
@@ -291,6 +285,7 @@ export function QuestionList({
         <div className="flex flex-col gap-2.5 border-t p-3">
           <AddQuestionMenu
             onAdd={onAdd}
+            onOpenBank={onOpenBank}
             pending={adding}
             disabled={full}
             className="w-full"
@@ -319,7 +314,7 @@ export function QuestionList({
                   : "bg-success/10 text-success-ink",
               )}
             >
-              <dt className="text-[0.68rem] opacity-80">Problemen</dt>
+              <dt className="text-[0.68rem]">Problemen</dt>
               <dd className="font-semibold tabular-nums">{errorCount}</dd>
             </div>
           </dl>

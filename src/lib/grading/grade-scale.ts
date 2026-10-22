@@ -17,11 +17,14 @@ export const LINEAR_SCALE: GradingScale = {
 };
 
 /**
- * Same rounding as the original `dutchGrade` (one decimal, half up on the
- * floating-point value), so existing grades do not change.
+ * One decimal, half up. The value is first snapped to 6 decimals so exact
+ * halves that floating point stores just below .x5 still round up:
+ * 1 + 9 × 3/20 = 2.35 (stored as 2.34999…) → 2,4 instead of 2,3.
+ * (The original `dutchGrade` rounded such values down.)
  */
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
+export function round1(value: number): number {
+  const snapped = Math.round(value * 1e6) / 1e5;
+  return Math.round(snapped) / 10;
 }
 
 function clamp(value: number, min: number, max: number): number {

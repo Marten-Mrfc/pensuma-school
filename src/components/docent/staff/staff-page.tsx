@@ -113,6 +113,11 @@ function TeacherRow({ teacher: t }: { teacher: Teacher }) {
               Jij
             </span>
           ) : null}
+          {t.passwordChangeRequired ? (
+            <span className="inline-flex h-5 items-center rounded-full bg-warning/15 px-2 text-[0.7rem] font-semibold text-warning-ink ring-1 ring-warning/30">
+              Tijdelijk wachtwoord
+            </span>
+          ) : null}
         </span>
         <span className="truncate text-sm text-muted-foreground">
           {t.email}
@@ -162,11 +167,14 @@ function TeacherRow({ teacher: t }: { teacher: Teacher }) {
         open={dialog === "reset"}
         onOpenChange={close}
         title={`Wachtwoord van ${t.name} resetten?`}
-        description="Er wordt een nieuw tijdelijk wachtwoord gemaakt. De docent wordt op alle apparaten uitgelogd en kan het oude wachtwoord niet meer gebruiken."
+        description="Er wordt een nieuw tijdelijk wachtwoord gemaakt. De docent wordt op alle apparaten uitgelogd, kan het oude wachtwoord niet meer gebruiken en kiest bij de volgende keer inloggen een eigen wachtwoord."
         confirmLabel="Nieuw wachtwoord maken"
         onConfirm={async () => {
           const res = await resetPassword.mutateAsync({ id: t.id });
           setPassword(res.password);
+          await queryClient.invalidateQueries({
+            queryKey: trpc.staff.pathKey(),
+          });
         }}
       />
       <ConfirmDialog

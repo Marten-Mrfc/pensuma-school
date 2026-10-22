@@ -5,9 +5,11 @@ import {
   Ban,
   CircleCheck,
   KeyRound,
+  LockOpen,
   MoreHorizontal,
   Pencil,
   Printer,
+  TimerReset,
   Trash2,
   UserMinus,
   UserRound,
@@ -16,6 +18,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,14 +30,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/lib/routes";
 import { useTRPC } from "@/trpc/react";
+import { ExtraTimeDialog } from "./extra-time-dialog";
 import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { StudentFormDialog } from "./student-form-dialog";
+import { isLoginLocked } from "./student-status";
 
 export type ActionStudent = {
   id: string;
   name: string;
   studentNumber: string;
   banned: boolean;
+  /** Login lockout (too many wrong PINs); offers “Inlogblokkade opheffen”. */
+  loginLockedUntil?: Date | string | null;
+  /** Current verlengde tijd; with `showExtraTime` offers a quick change. */
+  extraTimePercent?: number;
 };
 
 export interface StudentActionsMenuProps {
@@ -46,9 +55,18 @@ export interface StudentActionsMenuProps {
   showDetailsLink?: boolean;
   /** Called after the student was deleted (e.g. navigate away). */
   onDeleted?: () => void;
+  /** Offer “Verlengde tijd instellen…” (class lists). */
+  showExtraTime?: boolean;
 }
 
-type DialogName = "reset" | "edit" | "remove" | "deactivate" | "delete" | null;
+type DialogName =
+  | "reset"
+  | "edit"
+  | "remove"
+  | "deactivate"
+  | "delete"
+  | "extraTime"
+  | null;
 
 /** Row actions for a student: PIN resetten, bewerken, uit klas halen, (de)activeren, verwijderen. */
 export function StudentActionsMenu({
@@ -57,6 +75,7 @@ export function StudentActionsMenu({
   className,
   showDetailsLink,
   onDeleted,
+  showExtraTime,
 }: StudentActionsMenuProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -73,6 +92,16 @@ export function StudentActionsMenu({
   const removeMember = useMutation(trpc.class.removeMember.mutationOptions());
   const setActive = useMutation(trpc.student.setActive.mutationOptions());
   const remove = useMutation(trpc.student.delete.mutationOptions());
+  const unlock = useMutation(
+    trpc.student.unlockLogin.mutationOptions({
+      onSuccess: async () => {
+        await invalidate();
+        toast.success(`De inlogblokkade van ${student.name} is opgeheven.`);
+      },
+      onError: (error) => toast.error(getErrorMessage(error)),
+    }),
+  );
+  const locked = isLoginLocked(student.loginLockedUntil);
 
   const printHref = classId
     ? `${routes.docent.classLoginCards(classId)}?ids=${encodeURIComponent(student.id)}`
@@ -117,6 +146,15 @@ export function StudentActionsMenu({
               </Link>
             </DropdownMenuItem>
           ) : null}
+          {locked ? (
+            <DropdownMenuItem
+              onSelect={() => unlock.mutate({ id: student.id })}
+              disabled={unlock.isPending}
+            >
+              <LockOpen />
+              Inlogblokkade opheffen
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={() => setDialog("reset")}>
             <KeyRound />
             Pincode resetten
@@ -131,6 +169,12 @@ export function StudentActionsMenu({
             <Pencil />
             Bewerken
           </DropdownMenuItem>
+          {showExtraTime ? (
+            <DropdownMenuItem onSelect={() => setDialog("extraTime")}>
+              <TimerReset />
+              Verlengde tijd instellen…
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator />
           {classId ? (
             <DropdownMenuItem onSelect={() => setDialog("remove")}>
@@ -163,7 +207,7 @@ export function StudentActionsMenu({
         open={dialog === "reset"}
         onOpenChange={close}
         title={`Pincode van ${student.name} resetten?`}
-        description="De leerling krijgt een nieuwe pincode en wordt op alle apparaten uitgelogd. Een afname die bezig is, blijft bewaard."
+        description="De leerling krijgt een nieuwe pincode en wordt op alle apparaten uitgelogd. Een eventuele inlogblokkade wordt opgeheven. Een afname die bezig is, blijft bewaard."
         confirmLabel="Nieuwe pincode maken"
         onConfirm={async () => {
           const res = await resetPin.mutateAsync({ id: student.id });
@@ -214,6 +258,15 @@ export function StudentActionsMenu({
           onDeleted?.();
         }}
       />
+
+      {showExtraTime ? (
+        <ExtraTimeDialog
+          open={dialog === "extraTime"}
+          onOpenChange={close}
+          students={[{ id: student.id, name: student.name }]}
+          initialPercent={student.extraTimePercent ?? 0}
+        />
+      ) : null}
 
       <StudentFormDialog
         open={dialog === "edit"}

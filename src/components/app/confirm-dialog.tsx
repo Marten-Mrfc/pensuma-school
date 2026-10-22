@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert, Loader2, TriangleAlert } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +34,12 @@ export interface ConfirmDialogProps {
   onConfirm: () => Promise<void> | void;
   /** Extra content between the description and the buttons. */
   children?: ReactNode;
+  /**
+   * Where focus goes after closing when the element that opened the dialog
+   * no longer exists (e.g. the row that was just deleted), instead of the
+   * page body.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /** "Weet je het zeker?" dialog with async confirm handling. */
@@ -48,8 +54,10 @@ export function ConfirmDialog({
   destructive = false,
   onConfirm,
   children,
+  returnFocusRef,
 }: ConfirmDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const openedFrom = useRef<HTMLElement | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = openProp ?? internalOpen;
@@ -86,6 +94,21 @@ export function ConfirmDialog({
         className="gap-5 sm:max-w-md"
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
+        onOpenAutoFocus={() => {
+          // Still the element that opened the dialog at this point.
+          openedFrom.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(e) => {
+          if (openedFrom.current?.isConnected) return;
+          const fallback = returnFocusRef?.current;
+          if (fallback?.isConnected) {
+            e.preventDefault();
+            fallback.focus();
+          }
+        }}
       >
         <div className="flex gap-4">
           <span

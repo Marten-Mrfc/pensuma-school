@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   KeyRound,
+  LockOpen,
   Pencil,
   Printer,
   School,
@@ -15,13 +16,16 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, use, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { getErrorMessage } from "@/components/app/get-error-message";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { AccommodationPanel } from "./accommodation-panel";
 import {
   formatDate,
   formatDateTime,
@@ -33,7 +37,7 @@ import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
 import { StudentActionsMenu } from "./student-actions-menu";
 import { StudentFormDialog } from "./student-form-dialog";
-import { StudentStatus } from "./student-status";
+import { LoginLockBadge, StudentStatus } from "./student-status";
 
 type Student = RouterOutputs["student"]["get"];
 type Attempt = Student["attempts"][number];
@@ -64,6 +68,18 @@ export function StudentDetailPage({
       queryClient.invalidateQueries({ queryKey: trpc.student.pathKey() }),
       queryClient.invalidateQueries({ queryKey: trpc.class.pathKey() }),
     ]);
+  const unlock = useMutation(
+    trpc.student.unlockLogin.mutationOptions({
+      onSuccess: async () => {
+        await invalidate();
+        toast.success(
+          `De inlogblokkade van ${query.data?.name ?? "de leerling"} is opgeheven.`,
+        );
+      },
+      onError: (error) => toast.error(getErrorMessage(error)),
+    }),
+  );
+  useDocumentTitle([query.data?.name ?? "Leerling", "Leerlingen"]);
 
   if (query.isLoading) return <LoadingState />;
   if (query.isError || !query.data) {
@@ -104,7 +120,12 @@ export function StudentDetailPage({
             {s.name}
           </span>
         }
-        badge={<StudentStatus banned={s.banned} />}
+        badge={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <StudentStatus banned={s.banned} />
+            <LoginLockBadge lockedUntil={s.loginLockedUntil} />
+          </span>
+        }
         backHref={routes.docent.students}
         backLabel="Leerlingen"
         description={
@@ -127,6 +148,7 @@ export function StudentDetailPage({
                 name: s.name,
                 studentNumber: s.studentNumber,
                 banned: s.banned,
+                loginLockedUntil: s.loginLockedUntil,
               }}
               onDeleted={() => router.push(routes.docent.students)}
             />
@@ -151,6 +173,26 @@ export function StudentDetailPage({
                 </span>
                 <PinReveal userId={s.id} hasPin={s.hasPin} size="lg" />
               </div>
+              {s.loginLockedUntil &&
+              new Date(s.loginLockedUntil) > new Date() ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/[0.07] p-3">
+                  <LoginLockBadge lockedUntil={s.loginLockedUntil} />
+                  <p className="text-xs text-muted-foreground">
+                    De leerling heeft {s.recentFailures} keer een verkeerde
+                    pincode ingevuld.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    disabled={unlock.isPending}
+                    onClick={() => unlock.mutate({ id: s.id })}
+                  >
+                    <LockOpen aria-hidden="true" />
+                    Inlogblokkade opheffen
+                  </Button>
+                </div>
+              ) : null}
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt className="text-xs text-muted-foreground">
@@ -195,6 +237,12 @@ export function StudentDetailPage({
               </div>
             </div>
           </Panel>
+
+          <AccommodationPanel
+            key={JSON.stringify(s.accommodation)}
+            userId={s.id}
+            value={s.accommodation}
+          />
 
           <Panel title="Klassen" icon={<School className="size-4" />}>
             {s.classes.length === 0 ? (

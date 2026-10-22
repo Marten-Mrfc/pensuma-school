@@ -25,4 +25,3 @@ const KpiGrid = React.forwardRef<HTMLDivElement, KpiGridProps>(
 KpiGrid.displayName = 'KpiGrid'
 
 export { KpiGrid }
-

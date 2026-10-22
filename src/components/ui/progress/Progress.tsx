@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import * as ProgressPrimitive from '@radix-ui/react-progress'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const Progress = React.forwardRef<
@@ -18,7 +18,7 @@ const Progress = React.forwardRef<
       ref={ref}
       data-uipkge=""
       data-slot="progress"
-      aria-label={labelled ? undefined : 'Progress'}
+      aria-label={labelled ? undefined : 'Voortgang'}
       value={clamped}
       className={cn('bg-primary/20 relative h-2 w-full overflow-hidden rounded-full', className)}
       {...props}
@@ -32,7 +32,6 @@ const Progress = React.forwardRef<
     </ProgressPrimitive.Root>
   )
 })
-Progress.displayName = 'Progress'
+Progress.displayName = ProgressPrimitive.Root.displayName
 
 export { Progress }
-

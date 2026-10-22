@@ -9,7 +9,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FormField } from "@/components/app/form-field";
@@ -19,8 +19,8 @@ import { ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { ADMIN_MIN_PASSWORD_LENGTH } from "@/lib/auth-shared";
 import { useTRPC } from "@/trpc/react";
+import { ChangePasswordForm } from "../account/change-password-form";
 import { formatDate, plural } from "../students/format";
 
 /** Refresh the cached session cookie so the shell shows the new name. */
@@ -56,7 +56,7 @@ export function AccountPage() {
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <ProfilePanel name={me.name} email={me.email} />
-        <PasswordPanel />
+        <PasswordPanel name={me.name} email={me.email} />
         <SessionsPanel activeSessions={me.activeSessions} />
       </div>
     </>
@@ -104,6 +104,8 @@ function ProfilePanel({
   const queryClient = useQueryClient();
   const [name, setName] = useState(initialName);
   const [error, setError] = useState<string>();
+  const nameId = useId();
+  const emailId = useId();
 
   const update = useMutation(
     trpc.staff.updateMe.mutationOptions({
@@ -134,9 +136,9 @@ function ProfilePanel({
       icon={<UserRound />}
     >
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-        <FormField label="Naam" htmlFor="me-name" error={error}>
+        <FormField label="Naam" htmlFor={nameId} error={error}>
           <Input
-            id="me-name"
+            id={nameId}
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoComplete="name"
@@ -144,10 +146,10 @@ function ProfilePanel({
         </FormField>
         <FormField
           label="E-mailadres"
-          htmlFor="me-email"
+          htmlFor={emailId}
           description="Wil je een ander e-mailadres? Laat een andere docent een nieuw account voor je maken."
         >
-          <Input id="me-email" value={email} readOnly disabled />
+          <Input id={emailId} value={email} readOnly disabled />
         </FormField>
         <Button
           type="submit"
@@ -165,144 +167,14 @@ function ProfilePanel({
   );
 }
 
-function PasswordPanel() {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [repeat, setRepeat] = useState("");
-  const [errors, setErrors] = useState<{
-    current?: string;
-    next?: string;
-    repeat?: string;
-    form?: string;
-  }>({});
-  const [pending, setPending] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const v: typeof errors = {};
-    if (!current) v.current = "Vul je huidige wachtwoord in.";
-    if (next.length < ADMIN_MIN_PASSWORD_LENGTH) {
-      v.next = `Je nieuwe wachtwoord moet minstens ${ADMIN_MIN_PASSWORD_LENGTH} tekens hebben.`;
-    } else if (next === current)
-      v.next = "Kies een ander wachtwoord dan je huidige.";
-    if (repeat !== next) v.repeat = "De wachtwoorden zijn niet hetzelfde.";
-    setErrors(v);
-    if (Object.keys(v).length > 0) return;
-
-    setPending(true);
-    const { error } = await authClient.changePassword({
-      currentPassword: current,
-      newPassword: next,
-      revokeOtherSessions: true,
-    });
-    setPending(false);
-    if (error) {
-      const code = (error as { code?: string }).code ?? "";
-      if (
-        code === "INVALID_PASSWORD" ||
-        /invalid password/i.test(error.message ?? "")
-      ) {
-        setErrors({ current: "Je huidige wachtwoord klopt niet." });
-      } else if (code === "PASSWORD_TOO_LONG") {
-        setErrors({
-          next: "Je nieuwe wachtwoord is te lang (maximaal 128 tekens).",
-        });
-      } else {
-        setErrors({
-          form: "Wachtwoord wijzigen lukte niet. Probeer het opnieuw.",
-        });
-      }
-      return;
-    }
-    setCurrent("");
-    setNext("");
-    setRepeat("");
-    await queryClient.invalidateQueries({ queryKey: trpc.staff.me.queryKey() });
-    toast.success("Je wachtwoord is gewijzigd", {
-      description: "Je bent op je andere apparaten uitgelogd.",
-    });
-  }
-
+function PasswordPanel({ name, email }: { name: string; email: string }) {
   return (
     <Panel
       title="Wachtwoord wijzigen"
       description="Na het wijzigen word je op al je andere apparaten uitgelogd."
       icon={<KeyRound />}
     >
-      <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-        {/* Hidden username helps password managers. */}
-        <input
-          type="text"
-          name="username"
-          autoComplete="username"
-          className="hidden"
-          readOnly
-        />
-        <FormField
-          label="Huidig wachtwoord"
-          htmlFor="pw-current"
-          error={errors.current}
-        >
-          <Input
-            id="pw-current"
-            type="password"
-            showPasswordToggle
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            autoComplete="current-password"
-          />
-        </FormField>
-        <FormField
-          label="Nieuw wachtwoord"
-          htmlFor="pw-new"
-          error={errors.next}
-          description={`Minstens ${ADMIN_MIN_PASSWORD_LENGTH} tekens. Een zin van een paar woorden werkt goed.`}
-        >
-          <Input
-            id="pw-new"
-            type="password"
-            showPasswordToggle
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-            autoComplete="new-password"
-          />
-        </FormField>
-        <FormField
-          label="Herhaal nieuw wachtwoord"
-          htmlFor="pw-repeat"
-          error={errors.repeat}
-        >
-          <Input
-            id="pw-repeat"
-            type="password"
-            showPasswordToggle
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value)}
-            autoComplete="new-password"
-          />
-        </FormField>
-        {errors.form ? (
-          <p
-            role="alert"
-            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
-          >
-            {errors.form}
-          </p>
-        ) : null}
-        <Button
-          type="submit"
-          className="w-fit"
-          disabled={pending}
-          aria-busy={pending}
-        >
-          {pending ? (
-            <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
-          ) : null}
-          Wachtwoord wijzigen
-        </Button>
-      </form>
+      <ChangePasswordForm email={email} name={name} />
     </Panel>
   );
 }
@@ -310,6 +182,9 @@ function PasswordPanel() {
 function SessionsPanel({ activeSessions }: { activeSessions: number }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const signOutOthers = useMutation(
+    trpc.staff.signOutOtherSessions.mutationOptions(),
+  );
   const others = Math.max(0, activeSessions - 1);
 
   return (
@@ -335,9 +210,7 @@ function SessionsPanel({ activeSessions }: { activeSessions: number }) {
           description="Je blijft op dit apparaat ingelogd. Overal anders moet je opnieuw inloggen."
           confirmLabel="Uitloggen"
           onConfirm={async () => {
-            const { error } = await authClient.revokeOtherSessions();
-            if (error)
-              throw new Error("Uitloggen op andere apparaten lukte niet.");
+            await signOutOthers.mutateAsync();
             await queryClient.invalidateQueries({
               queryKey: trpc.staff.me.queryKey(),
             });

@@ -1,1 +1,1 @@
-export { HeikinAshiChart, type HeikinAshiChartProps, type HACandle } from './HeikinAshiChart'
+export { type HACandle, HeikinAshiChart, type HeikinAshiChartProps } from './HeikinAshiChart'

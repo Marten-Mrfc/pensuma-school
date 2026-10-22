@@ -81,12 +81,12 @@ export const timelineMediaVariants = cva(
       {
         variant: 'icon',
         status: 'success',
-        class: 'border-success/40 bg-success/10 text-success ring-4 ring-success/10',
+        class: 'border-success/40 bg-success/10 text-success-ink ring-4 ring-success/10',
       },
       {
         variant: 'icon',
         status: 'warning',
-        class: 'border-warning/40 bg-warning/10 text-warning ring-4 ring-warning/10',
+        class: 'border-warning/40 bg-warning/10 text-warning-ink ring-4 ring-warning/10',
       },
       {
         variant: 'icon',
@@ -96,7 +96,7 @@ export const timelineMediaVariants = cva(
       {
         variant: 'icon',
         status: 'info',
-        class: 'border-info/40 bg-info/10 text-info ring-4 ring-info/10',
+        class: 'border-info/40 bg-info/10 text-info-ink ring-4 ring-info/10',
       },
       {
         variant: 'icon',
@@ -118,12 +118,12 @@ export const timelineMediaVariants = cva(
       {
         variant: 'outline',
         status: 'success',
-        class: 'border-success text-success bg-background',
+        class: 'border-success text-success-ink bg-background',
       },
       {
         variant: 'outline',
         status: 'warning',
-        class: 'border-warning text-warning bg-background',
+        class: 'border-warning text-warning-ink bg-background',
       },
       {
         variant: 'outline',
@@ -133,7 +133,7 @@ export const timelineMediaVariants = cva(
       {
         variant: 'outline',
         status: 'info',
-        class: 'border-info text-info bg-background',
+        class: 'border-info text-info-ink bg-background',
       },
       {
         variant: 'outline',
@@ -150,4 +150,3 @@ export const timelineMediaVariants = cva(
 
 export type TimelineMediaVariantsProps = VariantProps<typeof timelineMediaVariants>
 export type TimelineMediaVariant = 'dot' | 'icon' | 'avatar' | 'outline'
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, Suspense } from "react";
@@ -42,7 +42,7 @@ function DocentNavGroups({ pathname }: { pathname: string | null }) {
     <>
       {DOCENT_NAV.map((group) => (
         <SidebarGroup key={group.label} className="py-1">
-          <SidebarGroupLabel className="text-[0.68rem] font-semibold tracking-[0.08em] text-sidebar-foreground/55 uppercase">
+          <SidebarGroupLabel className="text-[0.68rem] font-semibold tracking-[0.08em] text-sidebar-foreground/70 uppercase">
             {group.label}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -105,7 +105,7 @@ function CurrentSection() {
 }
 
 function ShellTrigger() {
-  const { toggleSidebar, isMobile, open } = useSidebar();
+  const { toggleSidebar, isMobile, open, openMobile } = useSidebar();
   const label = isMobile
     ? "Menu openen"
     : open
@@ -119,6 +119,7 @@ function ShellTrigger() {
           size="icon-sm"
           onClick={toggleSidebar}
           aria-label={label}
+          aria-expanded={isMobile ? openMobile : open}
           className="-ml-1 text-muted-foreground hover:text-foreground"
         >
           <PanelLeft aria-hidden="true" />
@@ -129,6 +130,23 @@ function ShellTrigger() {
         <span className="ml-1.5 opacity-60">Ctrl+B</span>
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+/** Visible close control for the phone menu (the sheet hides its own). */
+function MobileCloseButton() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  if (!isMobile) return null;
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Menu sluiten"
+      onClick={() => setOpenMobile(false)}
+      className="ml-auto shrink-0 text-muted-foreground hover:text-foreground"
+    >
+      <X aria-hidden="true" />
+    </Button>
   );
 }
 
@@ -147,9 +165,10 @@ export function DocentShell({ userMenu, children }: DocentShellProps) {
   return (
     <SidebarProvider className="bg-sidebar">
       <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader className="px-3 pt-4 pb-2 group-data-[collapsible=icon]:px-2">
+        <SidebarHeader className="flex-row items-center px-3 pt-4 pb-2 group-data-[collapsible=icon]:px-2">
           <Link
             href="/docent"
+            aria-label="Pensuma, naar het dashboard"
             className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
             <LogoMark className="size-8" />
@@ -162,6 +181,7 @@ export function DocentShell({ userMenu, children }: DocentShellProps) {
               </span>
             </span>
           </Link>
+          <MobileCloseButton />
         </SidebarHeader>
         <SidebarContent className="pt-2">
           <nav aria-label="Hoofdmenu" className="flex flex-col">
@@ -191,7 +211,11 @@ export function DocentShell({ userMenu, children }: DocentShellProps) {
             <ThemeToggle />
           </div>
         </header>
-        <div id="inhoud" className="flex-1 px-4 py-6 sm:px-6 md:py-8 lg:px-10">
+        <div
+          id="inhoud"
+          tabIndex={-1}
+          className="flex-1 px-4 py-6 sm:px-6 md:py-8 lg:px-10"
+        >
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             {children}
           </div>

@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import type { ChoiceData } from "./types";
 
 export interface ChoiceQuestionProps {
+  /** Question number, for the group's accessible name. */
+  number: number;
   data: ChoiceData;
   selected: string[];
   onChange: (selected: string[]) => void;
@@ -17,6 +19,7 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** Big selectable option cards (radio or checkbox behaviour). */
 export function ChoiceQuestion({
+  number,
   data,
   selected,
   onChange,
@@ -39,6 +42,7 @@ export function ChoiceQuestion({
   return (
     <fieldset className="flex flex-col gap-3" disabled={disabled}>
       <legend className="mb-3 text-sm text-muted-foreground">
+        <span className="sr-only">Vraag {number}: </span>
         {data.multiple ? "Kies alle goede antwoorden." : "Kies één antwoord."}
       </legend>
       {data.options.map((option, index) => {

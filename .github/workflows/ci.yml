@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  BUN_VERSION: "1.4.2"
+  NODE_VERSION: "22"
+
+jobs:
+  static:
+    name: Biome, types, migrations, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # postinstall copies the Pyodide runtime to public/pyodide
+      - run: bun install --frozen-lockfile
+      - run: bunx biome ci --reporter=github .
+      - run: bun run typecheck
+      - name: Migrations match the Drizzle schema
+        run: |
+          bunx drizzle-kit generate --name ci_drift_check
+          if [ -n "$(git status --porcelain -- drizzle)" ]; then
+            echo "::error::Schema changed without a migration. Run: bun run db:generate --name <change> and commit drizzle/."
+            git status --porcelain -- drizzle
+            exit 1
+          fi
+      - name: Unit tests (no database)
+        run: bun run test
+
+  integration:
+    name: Integration + security tests (Postgres)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pensuma
+          POSTGRES_PASSWORD: pensuma
+          POSTGRES_DB: pensuma_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pensuma -d pensuma_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://pensuma:pensuma@localhost:5432/pensuma_test
+      # No running app server in this job: the HTTP-surface suite skips itself.
+      SECURITY_BASE_URL: http://localhost:9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run test:integration
+
+  grader:
+    name: Python sandbox (real Pyodide)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      # The sandboxes run under node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run test:grader
+
+  e2e:
+    name: E2E + accessibility (Playwright, axe)
+    needs: [static]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pensuma
+          POSTGRES_PASSWORD: pensuma
+          POSTGRES_DB: pensuma_e2e_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pensuma -d pensuma_e2e_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_DATABASE_URL: postgresql://pensuma:pensuma@localhost:5432/pensuma_e2e_test
+      E2E_SKIP_BUILD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('bun.lock') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx', 'src/**/*.css') }}
+          restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('bun.lock') }}-
+      - name: Build
+        run: bun run build
+        env:
+          SKIP_ENV_VALIDATION: "1"
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          # Synthetic data only; keep it short anyway.
+          retention-days: 7
+
+  docker:
+    name: Docker image builds
+    needs: [static]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: pensuma:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

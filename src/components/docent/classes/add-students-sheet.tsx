@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardPaste, UserSearch } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -31,6 +31,7 @@ export function AddStudentsSheet({
   classId,
   className,
 }: AddStudentsSheetProps) {
+  const uid = useId();
   const [tab, setTab] = useState("import");
   const [result, setResult] = useState<ImportResult | null>(null);
   // Bumped to reset the import panel ("Nog een lijst importeren").
@@ -53,7 +54,7 @@ export function AddStudentsSheet({
       <SheetContent
         side="right"
         className="w-full gap-0 sm:max-w-2xl"
-        aria-describedby="add-students-description"
+        aria-describedby={`${uid}-add-students-description`}
       >
         <SheetHeader className="px-4 pt-5 pb-4 sm:px-6">
           <SheetTitle className="font-display text-xl tracking-tight">
@@ -61,7 +62,7 @@ export function AddStudentsSheet({
               ? "Import voltooid"
               : `Leerlingen toevoegen aan ${className}`}
           </SheetTitle>
-          <SheetDescription id="add-students-description">
+          <SheetDescription id={`${uid}-add-students-description`}>
             {result
               ? "Print de inlogkaarten en deel ze uit in de klas."
               : "Importeer een lijst met nieuwe leerlingen of voeg leerlingen toe die al een account hebben."}

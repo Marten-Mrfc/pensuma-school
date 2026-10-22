@@ -5,7 +5,9 @@ import {
   ArrowDown,
   ArrowUp,
   Award,
+  Ban,
   CheckCircle2,
+  ChevronDown,
   Download,
   EyeOff,
   Gauge,
@@ -13,13 +15,17 @@ import {
   MessageSquareText,
   NotebookPen,
   RefreshCw,
+  RotateCcw,
   Send,
+  UserRoundCheck,
+  UserRoundPlus,
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useId, useState } from "react";
 import { toast } from "sonner";
+import { AccessibleChart } from "@/components/a11y/accessible-chart";
+import { ScrollRegion } from "@/components/a11y/scroll-region";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { PageHeader } from "@/components/app/page-header";
@@ -34,17 +40,29 @@ import {
 } from "@/components/docent/assignments/format";
 import { ModeBadge } from "@/components/docent/assignments/shared";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { downloadTextFile } from "@/lib/export/download";
+import { describeScale } from "@/lib/grading/grade-scale";
 import { QUESTION_TYPE_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { GradeDistributionChart, QuestionAverageChart } from "./charts";
+import { retakeGroups } from "./retake-groups";
 
 type Results = RouterOutputs["review"]["results"];
 type Row = Results["rows"][number];
@@ -90,8 +108,13 @@ export function ResultsView({
 function ResultsContent({ data }: { data: Results }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const id = useId();
   const a = data.assignment;
+  useDocumentTitle([a.title, "Resultaten"]);
+  const [includeFocus, setIncludeFocus] = useState(
+    data.exportOptions.includeFocusByDefault,
+  );
+  const retake = retakeGroups(data.rows);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({
     key: "name",
     dir: 1,
@@ -171,7 +194,9 @@ function ResultsContent({ data }: { data: Results }) {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    // grid-cols-1 (minmax(0, 1fr)): wide tables scroll inside their region
+    // instead of widening the page on phones.
+    <div className="grid grid-cols-1 gap-6">
       <PageHeader
         backHref={routes.docent.assignments}
         backLabel="Afnames"
@@ -211,8 +236,22 @@ function ResultsContent({ data }: { data: Results }) {
                   : "Resultaten vrijgeven"}
               </Button>
             ) : null}
+            <RetakeMenu
+              testId={a.testId}
+              classId={a.classId}
+              assignmentId={a.id}
+              failed={retake.failed}
+              missed={retake.missed}
+            />
             <Button
-              onClick={() => exportCsv.mutate({ assignmentId: a.id })}
+              onClick={() =>
+                exportCsv.mutate({
+                  assignmentId: a.id,
+                  includeFocus: data.exportOptions.logFocusEvents
+                    ? includeFocus
+                    : false,
+                })
+              }
               disabled={exportCsv.isPending}
             >
               {exportCsv.isPending ? (
@@ -233,6 +272,27 @@ function ResultsContent({ data }: { data: Results }) {
         active="results"
         needsReview={data.stats.needsReview}
       />
+
+      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <p className="text-muted-foreground">
+          Cijferberekening:{" "}
+          <span className="font-medium text-foreground">
+            {describeScale(a.grading)}
+          </span>
+          <span className="block text-xs sm:ml-2 sm:inline">
+            Pas je dit aan in de instellingen, dan worden alle cijfers opnieuw
+            berekend.
+          </span>
+        </p>
+        {data.exportOptions.logFocusEvents ? (
+          <Checkbox
+            id={`${id}-focus-export`}
+            checked={includeFocus}
+            onCheckedChange={(v) => setIncludeFocus(v === true)}
+            label="Focusverlies meenemen in export"
+          />
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -290,10 +350,13 @@ function ResultsContent({ data }: { data: Results }) {
       {data.rows.length === 0 ? (
         <EmptyBlock icon={Users} title="Deze klas heeft nog geen leerlingen" />
       ) : (
-        <section className="flex flex-col gap-3" aria-labelledby="matrix-title">
+        <section
+          className="flex flex-col gap-3"
+          aria-labelledby={`${id}-matrix`}
+        >
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 id="matrix-title" className="font-semibold">
+              <h2 id={`${id}-matrix`} className="font-semibold">
                 Scores per vraag
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -303,8 +366,14 @@ function ResultsContent({ data }: { data: Results }) {
             </div>
             <Legend />
           </div>
-          <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
+          <ScrollRegion
+            label="Resultaten per leerling en vraag"
+            className="relative rounded-xl border bg-card shadow-xs"
+          >
             <table className="w-full border-separate border-spacing-0 text-sm">
+              <caption className="sr-only">
+                Resultaten per leerling en vraag
+              </caption>
               <thead>
                 <tr className="text-xs text-muted-foreground">
                   <th
@@ -319,38 +388,54 @@ function ResultsContent({ data }: { data: Results }) {
                       Leerling
                     </SortButton>
                   </th>
-                  {data.questions.map((q, i) => (
-                    <th
-                      key={q.id}
-                      scope="col"
-                      className="min-w-14 border-b bg-muted/30 px-1 py-2 text-center font-medium"
-                    >
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <SortButton
-                              active={sort.key === `q:${q.id}`}
-                              dir={sort.dir}
-                              onClick={() => toggleSort(`q:${q.id}`)}
-                              className="justify-center"
-                            >
-                              V{i + 1}
-                            </SortButton>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <span className="font-medium">{q.title}</span>
-                          <span className="block text-xs opacity-80">
-                            {QUESTION_TYPE_LABELS[q.type]} ·{" "}
-                            {formatNumber(q.points)} pt
-                          </span>
-                        </TooltipContent>
-                      </Tooltip>
-                      <span className="block text-[10px] font-normal tabular-nums opacity-70">
-                        {formatNumber(q.points)} pt
-                      </span>
-                    </th>
-                  ))}
+                  {data.questions.map((q, i) => {
+                    const neutralized = data.neutralized[q.id];
+                    return (
+                      <th
+                        key={q.id}
+                        scope="col"
+                        className="min-w-16 border-b bg-muted/30 px-1 py-2 text-center font-medium"
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <SortButton
+                                active={sort.key === `q:${q.id}`}
+                                dir={sort.dir}
+                                onClick={() => toggleSort(`q:${q.id}`)}
+                                className="justify-center"
+                              >
+                                <abbr
+                                  title={`Vraag ${i + 1}`}
+                                  className="no-underline"
+                                >
+                                  V{i + 1}
+                                </abbr>
+                                <span className="sr-only">: {q.title}</span>
+                              </SortButton>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <span className="font-medium">{q.title}</span>
+                            <span className="block text-xs opacity-80">
+                              {QUESTION_TYPE_LABELS[q.type]} ·{" "}
+                              {formatNumber(q.points)} pt
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+                        <span className="block text-[10px] font-normal tabular-nums opacity-70">
+                          {neutralized ? (
+                            <span className="inline-flex items-center gap-0.5 font-medium text-warning-ink">
+                              <Ban className="size-2.5" aria-hidden="true" />
+                              Vervallen
+                            </span>
+                          ) : (
+                            `${formatNumber(q.points)} pt`
+                          )}
+                        </span>
+                      </th>
+                    );
+                  })}
                   <th
                     scope="col"
                     className="min-w-20 border-b border-l px-3 py-2 text-right font-medium"
@@ -381,12 +466,7 @@ function ResultsContent({ data }: { data: Results }) {
               </thead>
               <tbody>
                 {sorted.map((row) => (
-                  <ResultRow
-                    key={row.student.id}
-                    row={row}
-                    data={data}
-                    onOpen={(href) => router.push(href)}
-                  />
+                  <ResultRow key={row.student.id} row={row} data={data} />
                 ))}
               </tbody>
               {data.stats.submitted > 0 ? (
@@ -419,7 +499,7 @@ function ResultsContent({ data }: { data: Results }) {
                 </tfoot>
               ) : null}
             </table>
-          </div>
+          </ScrollRegion>
           <span className="sr-only">{questionIndex.size} vragen</span>
         </section>
       )}
@@ -434,18 +514,36 @@ function ResultsContent({ data }: { data: Results }) {
               />
               Gemiddelde score per vraag
             </h2>
+            <AccessibleChart
+              title="Percentage van de punten per vraag"
+              summary={questionAverageSummary(data, statsByQuestion)}
+              columns={[
+                { key: "vraag", header: "Vraag" },
+                { key: "titel", header: "Titel" },
+                { key: "gemiddeld", header: "Gemiddeld (% van de punten)" },
+              ]}
+              rows={data.questions.map((q, i) => ({
+                vraag: `V${i + 1}`,
+                titel: q.title,
+                gemiddeld: Math.round(
+                  (statsByQuestion.get(q.id)?.averagePercentage ?? 0) * 100,
+                ),
+              }))}
+            >
+              <QuestionAverageChart
+                ariaLabel={questionAverageSummary(data, statsByQuestion)}
+                items={data.questions.map((q, i) => ({
+                  label: `V${i + 1}`,
+                  title: q.title,
+                  percentage:
+                    statsByQuestion.get(q.id)?.averagePercentage ?? null,
+                }))}
+              />
+            </AccessibleChart>
             <p className="text-xs text-muted-foreground">
               Percentage van de punten, gemiddeld over {data.stats.submitted}{" "}
               ingeleverde pogingen. Rood = minder dan 50%.
             </p>
-            <QuestionAverageChart
-              items={data.questions.map((q, i) => ({
-                label: `V${i + 1}`,
-                title: q.title,
-                percentage:
-                  statsByQuestion.get(q.id)?.averagePercentage ?? null,
-              }))}
-            />
           </section>
           <section className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-xs">
             <h2 className="flex items-center gap-2 font-semibold">
@@ -455,11 +553,27 @@ function ResultsContent({ data }: { data: Results }) {
               />
               Cijferverdeling
             </h2>
+            <AccessibleChart
+              title="Aantal leerlingen per cijfer"
+              summary={distributionSummary(data)}
+              columns={[
+                { key: "cijfer", header: "Cijfer" },
+                { key: "aantal", header: "Aantal leerlingen" },
+              ]}
+              rows={data.stats.distribution.map((b) => ({
+                cijfer: b.label,
+                aantal: b.count,
+              }))}
+            >
+              <GradeDistributionChart
+                bins={data.stats.distribution}
+                ariaLabel={distributionSummary(data)}
+              />
+            </AccessibleChart>
             <p className="text-xs text-muted-foreground">
-              Aantal leerlingen per cijfer (1 + 9 × score/max). Rood = lager dan
-              5.
+              Aantal leerlingen per cijfer ({describeScale(a.grading)}). Rood =
+              lager dan 5.
             </p>
-            <GradeDistributionChart bins={data.stats.distribution} />
           </section>
         </div>
       ) : null}
@@ -497,15 +611,7 @@ function ResultsContent({ data }: { data: Results }) {
   );
 }
 
-function ResultRow({
-  row,
-  data,
-  onOpen,
-}: {
-  row: Row;
-  data: Results;
-  onOpen: (href: string) => void;
-}) {
+function ResultRow({ row, data }: { row: Row; data: Results }) {
   const at = row.attempt;
   const attemptHref = at
     ? routes.docent.attempt(data.assignment.id, at.id)
@@ -575,19 +681,33 @@ function ResultRow({
           const href = `${attemptHref}#vraag-${q.id}`;
           const review =
             cell.status === "needs_review" && cell.manualScore == null;
+          const extra = [
+            review ? "nog nakijken" : null,
+            cell.manualScore != null ? "handmatig aangepast" : null,
+            cell.hasFeedback ? "met feedback" : null,
+          ].filter(Boolean);
           return (
             <td key={q.id} className="border-b p-1 text-center">
-              <button
-                type="button"
-                onClick={() => onOpen(href)}
-                title={`${q.title}: ${formatNumber(cell.score)} van ${formatNumber(cell.maxScore)}${review ? " (nog nakijken)" : ""}${cell.manualScore != null ? " · handmatig aangepast" : ""}`}
+              <Link
+                href={href}
+                title={`${q.title}: ${formatNumber(cell.score)} van ${formatNumber(cell.maxScore)}${extra.length ? ` (${extra.join(", ")})` : ""}`}
                 className={cn(
-                  "relative inline-flex h-8 w-full min-w-11 items-center justify-center rounded-md text-xs font-semibold tabular-nums transition-all outline-none hover:brightness-95 hover:ring-2 hover:ring-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "relative inline-flex h-8 w-full min-w-12 items-center justify-center rounded-md px-1 text-xs font-semibold whitespace-nowrap tabular-nums transition-all outline-none hover:brightness-95 hover:ring-2 hover:ring-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
                   scoreTone(cell),
-                  !cell.answered && !review && "font-normal opacity-70",
+                  !cell.answered && !review && "font-normal opacity-80",
                 )}
               >
-                {review ? "?" : formatNumber(cell.score, 1)}
+                {review ? (
+                  <>
+                    <span aria-hidden="true">?</span>
+                    <span className="sr-only">nog nakijken</span>
+                  </>
+                ) : (
+                  `${formatNumber(cell.score, 1)}/${formatNumber(cell.maxScore, 1)}`
+                )}
+                {extra.length && !review ? (
+                  <span className="sr-only"> ({extra.join(", ")})</span>
+                ) : null}
                 {cell.manualScore != null ? (
                   <span
                     className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary"
@@ -600,7 +720,7 @@ function ResultRow({
                     aria-hidden="true"
                   />
                 ) : null}
-              </button>
+              </Link>
             </td>
           );
         })
@@ -621,7 +741,7 @@ function ResultRow({
         {at?.status === "submitted" && at.grade != null ? (
           <span
             className={cn(
-              "inline-flex min-w-11 justify-center rounded-md px-2 py-1 text-sm font-bold",
+              "inline-flex min-w-12 justify-center rounded-md px-2 py-1 text-sm font-bold",
               at.grade >= 5.5
                 ? "bg-success/12 text-success-ink"
                 : "bg-destructive/10 text-destructive-ink",
@@ -633,8 +753,20 @@ function ResultRow({
                 : undefined
             }
           >
-            {formatGrade(at.grade)}
-            {at.provisional ? "*" : ""}
+            <span className="flex flex-col items-center leading-tight">
+              <span>
+                {formatGrade(at.grade)}
+                {at.provisional ? (
+                  <>
+                    <span aria-hidden="true">*</span>
+                    <span className="sr-only"> (voorlopig)</span>
+                  </>
+                ) : null}
+              </span>
+              {at.grade < 5.5 ? (
+                <span className="text-[10px] font-medium">onvoldoende</span>
+              ) : null}
+            </span>
           </span>
         ) : (
           <span className="text-muted-foreground">–</span>
@@ -711,14 +843,19 @@ function Legend() {
 }
 
 function QuestionStatsTable({ data }: { data: Results }) {
+  const id = useId();
   const stats = new Map(data.stats.perQuestion.map((s) => [s.questionId, s]));
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="question-stats">
-      <h2 id="question-stats" className="font-semibold">
+    <section className="flex flex-col gap-3" aria-labelledby={id}>
+      <h2 id={id} className="font-semibold">
         Per vraag
       </h2>
-      <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
+      <ScrollRegion
+        label="Gemiddelde per vraag"
+        className="relative rounded-xl border bg-card shadow-xs"
+      >
         <table className="w-full text-sm">
+          <caption className="sr-only">Gemiddelde per vraag</caption>
           <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
               <th scope="col" className="px-4 py-2.5 font-medium">
@@ -756,12 +893,20 @@ function QuestionStatsTable({ data }: { data: Results }) {
               const pct = s?.averagePercentage ?? null;
               return (
                 <tr key={q.id}>
-                  <td className="px-4 py-2.5">
+                  <th scope="row" className="px-4 py-2.5 text-left font-normal">
                     <span className="mr-2 text-xs font-semibold text-muted-foreground tabular-nums">
-                      V{i + 1}
+                      <abbr title={`Vraag ${i + 1}`} className="no-underline">
+                        V{i + 1}
+                      </abbr>
                     </span>
                     <span className="font-medium">{q.title}</span>
-                  </td>
+                    {data.neutralized[q.id] ? (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning/12 px-1.5 py-0.5 text-[11px] font-medium text-warning-ink">
+                        <Ban className="size-3" aria-hidden="true" />
+                        Vervallen
+                      </span>
+                    ) : null}
+                  </th>
                   <td className="hidden px-3 py-2.5 text-muted-foreground sm:table-cell">
                     {QUESTION_TYPE_LABELS[q.type]}
                   </td>
@@ -804,7 +949,103 @@ function QuestionStatsTable({ data }: { data: Results }) {
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </section>
+  );
+}
+
+function questionAverageSummary(
+  data: Results,
+  stats: Map<string, Results["stats"]["perQuestion"][number]>,
+): string {
+  const items = data.questions
+    .map((q, i) => ({
+      label: `V${i + 1}`,
+      pct: stats.get(q.id)?.averagePercentage ?? null,
+    }))
+    .filter((x): x is { label: string; pct: number } => x.pct != null);
+  if (!items.length) return "Nog geen gemiddelden.";
+  const lowest = items.reduce((m, x) => (x.pct < m.pct ? x : m));
+  const highest = items.reduce((m, x) => (x.pct > m.pct ? x : m));
+  return `Het best gemaakt: ${highest.label} (${formatPercent(highest.pct)}). Het minst goed: ${lowest.label} (${formatPercent(lowest.pct)}).`;
+}
+
+function distributionSummary(data: Results): string {
+  const { submitted, passed, averageGrade } = data.stats;
+  if (!submitted) return "Nog geen cijfers.";
+  return `${passed} van de ${submitted} leerlingen hebben een voldoende. Het gemiddelde cijfer is ${formatGrade(averageGrade)}.`;
+}
+
+/** "Herkansing plannen": onvoldoendes, who missed it, or choose students. */
+function RetakeMenu({
+  testId,
+  classId,
+  assignmentId,
+  failed,
+  missed,
+}: {
+  testId: string;
+  classId: string;
+  assignmentId: string;
+  failed: string[];
+  missed: string[];
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline">
+          <RotateCcw aria-hidden="true" />
+          Herkansing plannen
+          <ChevronDown aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel>
+          Nieuwe afname voor een paar leerlingen
+        </DropdownMenuLabel>
+        <DropdownMenuItem asChild disabled={failed.length === 0}>
+          <Link
+            href={routes.docent.newAssignment({
+              testId,
+              classId,
+              studentIds: failed,
+              retakeOf: assignmentId,
+            })}
+            aria-disabled={failed.length === 0 || undefined}
+            onClick={(e) => failed.length === 0 && e.preventDefault()}
+          >
+            <RotateCcw aria-hidden="true" />
+            Herkansing voor onvoldoendes ({failed.length})
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild disabled={missed.length === 0}>
+          <Link
+            href={routes.docent.newAssignment({
+              testId,
+              classId,
+              studentIds: missed,
+            })}
+            aria-disabled={missed.length === 0 || undefined}
+            onClick={(e) => missed.length === 0 && e.preventDefault()}
+          >
+            <UserRoundPlus aria-hidden="true" />
+            Inhaaltoets voor wie niet heeft meegedaan ({missed.length})
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link
+            href={routes.docent.newAssignment({
+              testId,
+              classId,
+              retakeOf: assignmentId,
+            })}
+          >
+            <UserRoundCheck aria-hidden="true" />
+            Leerlingen kiezen…
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -1,20 +1,19 @@
 'use client'
 
-import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
+import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react'
+import * as React from 'react'
 import {
   Controller,
-  FormProvider,
-  useFormContext,
-  useFormState,
   type ControllerProps,
   type FieldPath,
   type FieldValues,
+  FormProvider,
+  useFormContext,
+  useFormState,
 } from 'react-hook-form'
-import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react'
-
-import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 export type FormStatusValue = 'error' | 'warning' | 'success' | null | undefined
 
@@ -144,8 +143,8 @@ function FormItem({
               className={cn(
                 'text-xs',
                 status === 'error' && 'text-destructive',
-                status === 'warning' && 'text-warning',
-                status === 'success' && 'text-success',
+                status === 'warning' && 'text-warning-ink',
+                status === 'success' && 'text-success-ink',
                 !status && 'text-muted-foreground',
               )}
             >
@@ -295,11 +294,11 @@ const statusConfig = {
   },
   warning: {
     icon: TriangleAlert,
-    container: 'bg-warning/10 text-warning border-warning/30',
+    container: 'bg-warning/10 text-warning-ink border-warning/30',
   },
   success: {
     icon: CircleCheck,
-    container: 'bg-success/10 text-success border-success/30',
+    container: 'bg-success/10 text-success-ink border-success/30',
   },
 } as const
 

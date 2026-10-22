@@ -7,6 +7,19 @@ import {
   LINEAR_SCALE,
 } from "./grade-scale";
 
+/**
+ * The linear formula 1 + 9 × score/max with exact half-up rounding to one
+ * decimal, computed with integers (score in half points): the reference the
+ * floating-point implementation must match.
+ */
+function exactLinearGrade(halfPoints: number, maxScore: number): number {
+  // grade × 10 = 10 + 90 × score/max = (10·max + 90·score) / max
+  const num = 20 * maxScore + 90 * halfPoints; // doubled numerator
+  const den = 2 * maxScore;
+  // floor(num/den + 1/2) = floor((2·num + den) / (2·den))
+  return Math.floor((2 * num + den) / (2 * den)) / 10;
+}
+
 /** The formula `dutchGrade` used before grading scales existed. */
 function oldDutchGrade(score: number, maxScore: number): number | null {
   if (!maxScore) return null;
@@ -32,19 +45,26 @@ describe("computeGrade", () => {
     expect(computeGrade(3, 0, cesuur(60))).toBeNull();
   });
 
-  test("linear equals the old formula for every score 0..max", () => {
+  test("linear rounds exact halves up, unlike the old formula", () => {
+    let changed = 0;
     for (const max of [1, 3, 7, 10, 12, 20, 33, 40, 64, 100]) {
-      for (let score = 0; score <= max; score++) {
-        expect(computeGrade(score, max)).toBe(oldDutchGrade(score, max));
-        expect(computeGrade(score, max, LINEAR_SCALE)).toBe(
-          oldDutchGrade(score, max),
-        );
-      }
-      // Half points too.
-      for (let half = 1; half < 2 * max; half += 2) {
-        expect(computeGrade(half / 2, max)).toBe(oldDutchGrade(half / 2, max));
+      // Whole and half points.
+      for (let half = 0; half <= 2 * max; half++) {
+        const exact = exactLinearGrade(half, max);
+        expect(computeGrade(half / 2, max)).toBe(exact);
+        expect(computeGrade(half / 2, max, LINEAR_SCALE)).toBe(exact);
+        const old = oldDutchGrade(half / 2, max);
+        if (old !== exact) {
+          changed++;
+          // The old formula only ever rounded a .x5 down by one tenth.
+          expect(Math.round((exact - (old ?? 0)) * 10)).toBe(1);
+        }
       }
     }
+    // The documented case: 3/20 → 1 + 9 × 0.15 = 2.35 → 2,4 (was 2,3).
+    expect(computeGrade(3, 20)).toBe(2.4);
+    expect(oldDutchGrade(3, 20)).toBe(2.3);
+    expect(changed).toBeGreaterThan(0);
   });
 
   test("scores outside 0..max are clamped", () => {
@@ -94,6 +114,10 @@ describe("computeGrade", () => {
     expect(computeGrade(3, 4)).toBe(7.8);
     // Cesuur 50%: 1 + 4.5 × 0.25 / 0.5 = 3.25 → 3.3
     expect(computeGrade(1, 4, cesuur(50))).toBe(3.3);
+    // Values stored just below .x5 in floating point still round up.
+    expect(computeGrade(3, 20)).toBe(2.4);
+    expect(computeGrade(7, 20)).toBe(4.2); // 4.15
+    expect(computeGrade(11, 20)).toBe(6); // 5.95
   });
 });
 

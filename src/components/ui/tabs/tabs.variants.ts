@@ -55,7 +55,7 @@ export const tabsTriggerVariants = cva(
   // z-10 keeps label above the sliding indicator; active surface paints on the indicator
   // when the parent list has data-animated="true". Static active chrome restores when
   // data-animated="false" (see group-data variants below).
-  'relative z-10 inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap font-medium ring-offset-background [&_svg]:shrink-0 transition-colors duration-200 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+  'relative z-10 inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap font-medium ring-offset-background [&_svg]:shrink-0 transition-colors duration-200 focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -95,4 +95,3 @@ export const tabsTriggerVariants = cva(
 export type TabsListVariants = VariantProps<typeof tabsListVariants>
 
 export type TabsTriggerVariants = VariantProps<typeof tabsTriggerVariants>
-

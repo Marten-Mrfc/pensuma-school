@@ -1,19 +1,18 @@
 'use client'
 
-import * as React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { DayPicker, type DateRange } from 'react-day-picker'
-import { cn } from '@/lib/utils'
+import type * as React from 'react'
+import { type DateRange, DayPicker } from 'react-day-picker'
+import { nl } from 'react-day-picker/locale'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 // `selected`/`onSelect` are re-declared explicitly: a bare
 // Omit<ComponentProps<DayPicker>, 'mode'> distributes over DayPicker's prop
 // union and drops `selected` (not common to every mode), so consumers couldn't
 // pass a range. Forcing mode="range" makes the range shape exact.
-export interface RangeCalendarProps extends Omit<
-  React.ComponentProps<typeof DayPicker>,
-  'mode' | 'selected' | 'onSelect'
-> {
+export interface RangeCalendarProps
+  extends Omit<React.ComponentProps<typeof DayPicker>, 'mode' | 'selected' | 'onSelect'> {
   selected?: DateRange
   onSelect?: (range: DateRange | undefined) => void
 }
@@ -40,6 +39,7 @@ function RangeCalendar({
       onSelect={onSelect}
       data-uipkge=""
       data-slot="range-calendar"
+      locale={nl}
       showOutsideDays={showOutsideDays}
       className={cn('p-3', className)}
       classNames={{
@@ -123,4 +123,3 @@ function RangeCalendar({
 RangeCalendar.displayName = 'RangeCalendar'
 
 export { RangeCalendar }
-

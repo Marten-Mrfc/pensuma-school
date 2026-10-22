@@ -17,7 +17,7 @@ export interface LiquidFillChartProps {
   showLabel?: boolean
   unit?: string
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -32,7 +32,7 @@ export const LiquidFillChart = React.forwardRef<HTMLDivElement, LiquidFillChartP
         ref={ref}
         height={height}
         className={cn('flex items-center justify-center', className)}
-        ariaLabel={ariaLabel || `Liquid fill chart at ${Math.round(pct)}${unit}`}
+        ariaLabel={ariaLabel || `Vulmeter op ${Math.round(pct)}${unit}`}
       >
         <svg viewBox="0 0 200 200" className="aspect-square h-full max-h-full" role="presentation">
           <defs>

@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import { Minus, Plus } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export type NumberFieldSize = 'small' | 'middle' | 'large'
@@ -241,7 +241,7 @@ const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
         data-uipkge=""
         data-slot="decrement"
         tabIndex={-1}
-        aria-label="Decrease"
+        aria-label="Verlagen"
         disabled={disabled || readOnly || (min !== undefined && (currentValue ?? 0) <= min)}
         onClick={() => handleDecrease()}
         className={cn(
@@ -261,7 +261,7 @@ const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
         data-uipkge=""
         data-slot="increment"
         tabIndex={-1}
-        aria-label="Increase"
+        aria-label="Verhogen"
         disabled={disabled || readOnly || (max !== undefined && (currentValue ?? 0) >= max)}
         onClick={() => handleIncrease()}
         className={cn(
@@ -309,7 +309,6 @@ const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          aria-roledescription="Number field"
           onFocus={() => setIsUserTyping(true)}
           onChange={(e) => setDisplayValue(e.target.value)}
           onBlur={commitValue}
@@ -317,7 +316,7 @@ const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
           onWheel={handleWheel}
           className={cn(
             'placeholder:text-muted-foreground w-full bg-transparent text-center shadow-sm transition-colors outline-none disabled:cursor-not-allowed disabled:opacity-50',
-            !isRight && 'border-input focus-visible:ring-ring rounded-md border focus-visible:ring-1',
+            !isRight && 'border-input focus-visible:ring-ring rounded-md border focus-visible:ring-2',
             isRight && 'rounded-none border-0 focus-visible:ring-0',
             prefix && 'pl-6',
             suffix && 'pr-6',
@@ -347,4 +346,3 @@ const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
 NumberField.displayName = 'NumberField'
 
 export { NumberField }
-

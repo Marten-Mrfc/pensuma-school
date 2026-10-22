@@ -1,13 +1,11 @@
 'use client'
 
-import * as React from 'react'
 import { FileIcon, X } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-export interface FileUploadProps extends Omit<
-  React.HTMLAttributes<HTMLDivElement>,
-  'onChange' | 'value' | 'defaultValue' | 'content'
-> {
+export interface FileUploadProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange' | 'value' | 'defaultValue' | 'content'> {
   accept?: string
   multiple?: boolean
   disabled?: boolean
@@ -41,7 +39,8 @@ const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
     )
 
     const isControlled = value !== undefined
-    const [internal, setInternal] = React.useState<File[]>(defaultValue ?? [])
+    // Uncontrolled mode keeps its own list (the dropzone itself does not render it).
+    const [, setInternal] = React.useState<File[]>(defaultValue ?? [])
 
     const [isDragging, setIsDragging] = React.useState(false)
 
@@ -83,14 +82,6 @@ const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
       innerRef.current?.click()
     }
 
-    function onDropzoneKeyDown(e: React.KeyboardEvent) {
-      if (disabled) return
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        openFilePicker()
-      }
-    }
-
     return (
       <div className={cn('space-y-3', className)} {...props}>
         <input
@@ -104,24 +95,22 @@ const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
           onChange={handleInputChange}
         />
 
-        <div
-          role="button"
-          tabIndex={disabled ? -1 : 0}
-          aria-disabled={disabled || undefined}
-          aria-label={multiple ? 'Upload files' : 'Upload file'}
+        <button
+          type="button"
+          disabled={disabled}
           className={cn(
-            'border-muted-foreground/25 hover:border-muted-foreground/50 bg-muted/50 focus-visible:ring-ring flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none',
+            'border-muted-foreground/25 hover:border-muted-foreground/50 bg-muted/50 focus-visible:ring-ring flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none',
             isDragging && 'border-primary bg-primary/5',
             disabled && 'pointer-events-none opacity-50',
           )}
           onClick={openFilePicker}
-          onKeyDown={onDropzoneKeyDown}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
         >
           {icon ?? (
             <svg
+              aria-hidden="true"
               className="text-muted-foreground mb-2 size-10"
               fill="none"
               stroke="currentColor"
@@ -137,13 +126,16 @@ const FileUpload = React.forwardRef<HTMLInputElement, FileUploadProps>(
           )}
           {children ?? (
             <>
-              <p className="text-muted-foreground text-sm">
-                <span className="text-foreground font-semibold">Click to upload</span> or drag and drop
-              </p>
-              {accept && <p className="text-muted-foreground/70 mt-1 text-xs">{accept}</p>}
+              <span className="text-muted-foreground block text-sm">
+                <span className="text-foreground font-semibold">
+                  {multiple ? 'Klik om bestanden te kiezen' : 'Klik om een bestand te kiezen'}
+                </span>{' '}
+                of sleep {multiple ? 'ze' : 'het'} hierheen
+              </span>
+              {accept && <span className="text-muted-foreground mt-1 block text-xs">{accept}</span>}
             </>
           )}
-        </div>
+        </button>
 
         {content}
       </div>
@@ -189,18 +181,18 @@ const FileUploadItem = React.forwardRef<HTMLDivElement, FileUploadItemProps>(
     <div ref={ref} className={cn('bg-muted/50 flex items-center gap-3 rounded-md border p-3', className)} {...props}>
       {children ?? (
         <>
-          <FileIcon className="text-muted-foreground size-8 shrink-0" />
+          <FileIcon className="text-muted-foreground size-8 shrink-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{file.name}</p>
             <p className="text-muted-foreground text-xs">{(file.size / 1024).toFixed(1)} KB</p>
           </div>
           <button
             type="button"
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring ml-auto rounded-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:outline-none"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring ml-auto rounded-sm p-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
             onClick={onRemove}
           >
             <X className="size-4" aria-hidden="true" />
-            <span className="sr-only">Remove file</span>
+            <span className="sr-only">Bestand verwijderen</span>
           </button>
         </>
       )}
@@ -236,4 +228,3 @@ const FileUploadItemSize = React.forwardRef<HTMLSpanElement, FileUploadItemSizeP
 FileUploadItemSize.displayName = 'FileUploadItemSize'
 
 export { FileUpload, FileUploadTrigger, FileUploadContent, FileUploadItem, FileUploadItemName, FileUploadItemSize }
-

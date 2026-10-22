@@ -5,11 +5,11 @@ import { cn } from '@/lib/utils'
 import {
   formatAbsoluteTime,
   formatVisibleTime,
-  toDate,
   type RelativeTimeDisplay,
   type RelativeTimeNumeric,
   type RelativeTimeParseAs,
   type RelativeTimeStyle,
+  toDate,
 } from './format-relative-time'
 
 export interface RelativeTimeProps extends Omit<React.TimeHTMLAttributes<HTMLTimeElement>, 'dateTime'> {
@@ -21,7 +21,7 @@ export interface RelativeTimeProps extends Omit<React.TimeHTMLAttributes<HTMLTim
   formatStyle?: RelativeTimeStyle
   /** `auto` yields "yesterday"; `always` yields "1 day ago". */
   numeric?: RelativeTimeNumeric
-  /** BCP 47 locale. Defaults to the runtime locale. */
+  /** BCP 47 locale. Defaults to Dutch (nl-NL), so server and browser render the same text. */
   locale?: string
   /** Visible label: relative (default), absolute clock, or both. */
   display?: RelativeTimeDisplay
@@ -40,7 +40,7 @@ const RelativeTime = React.forwardRef<HTMLTimeElement, RelativeTimeProps>(
       now,
       formatStyle = 'long',
       numeric = 'auto',
-      locale,
+      locale = 'nl-NL',
       display = 'relative',
       timeZone,
       parseAs = 'local',
@@ -93,4 +93,3 @@ const RelativeTime = React.forwardRef<HTMLTimeElement, RelativeTimeProps>(
 RelativeTime.displayName = 'RelativeTime'
 
 export { RelativeTime }
-

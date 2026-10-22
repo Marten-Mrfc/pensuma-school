@@ -2,13 +2,24 @@
  * Student portal: everything a student (leerling) does.
  *
  * Every procedure checks that the student is a member of the assignment's
- * class and, for attempts, that the attempt belongs to them. Nothing a
- * student may not see (correct options, solutions, hidden tests, model
- * answers, the access code) ever leaves this router.
+ * class (and is targeted by it) and, for attempts, that the attempt belongs
+ * to them. Nothing a student may not see (correct options, solutions,
+ * hidden tests, model answers, the access code) ever leaves this router.
+ *
+ * After a teacher closes an afname, attempts with a personal deadline in
+ * the future (verlengde tijd) keep working: saving, logging, heartbeats and
+ * submitting follow the attempt's status and deadline, not the afname.
  */
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
+import { accommodationMinutes } from "@/lib/accommodations";
+import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
+import {
+  isEventAllowed,
+  MONITORING_EVENT_TYPES,
+  sanitizeEventDetails,
+} from "@/lib/privacy/event-details";
 import {
   type AnswerResponse,
   answerResponseSchema,
@@ -17,13 +28,11 @@ import {
   codeResponseSchema,
   multipleChoiceResponseSchema,
   openResponseSchema,
-  parseQuestionData,
   type QuestionDataByType,
   type QuestionType,
   questionDataForStudent,
   redactCodeResultForStudent,
   type ShowResults,
-  type TypedQuestionData,
 } from "@/lib/questions/schema";
 import { createTRPCRouter, studentProcedure } from "@/server/api/trpc";
 import { db } from "@/server/db";
@@ -34,9 +43,20 @@ import {
   attempts,
   classes,
   classMembers,
+  questionNeutralizations,
   questions,
   tests,
 } from "@/server/db/schema";
+import {
+  ACCESS_CODE_FAILURE_DELAY_MS,
+  ACCESS_CODE_LOCKED_MESSAGE,
+  ACCESS_CODE_WRONG_MESSAGE,
+  accessCodeKey,
+  accessCodesMatch,
+  clearAccessCodeFailures,
+  isAccessCodeLocked,
+  recordAccessCodeFailure,
+} from "@/server/services/access-code-guard";
 import {
   DEADLINE_GRACE_MS,
   dutchGrade,
@@ -44,23 +64,32 @@ import {
   parseAssignmentSettings,
   resultsVisible,
 } from "@/server/services/assignment-status";
+import { assignmentVisibleToStudent } from "@/server/services/assignment-targets";
 import {
   AttemptStartError,
   autoSubmitIfExpired,
   createOrResumeAttempt,
   findResumableAttempt,
   isAttemptExpired,
-  isClassMember,
   logServerEvent,
   optionOrderFor,
   scheduleGrading,
   submitAttempt,
 } from "@/server/services/attempts";
+import { auditFromCtx } from "@/server/services/audit";
 import {
   effectiveScore,
   isBlankResponse,
   isGradingInFlight,
 } from "@/server/services/grading";
+import {
+  loadAccommodation,
+  loadAssignmentForStudent,
+  loadOwnedAttempt,
+  notFound,
+  studentSettings,
+  typedData,
+} from "@/server/services/student-access";
 
 /* --------------------------------- Helpers -------------------------------- */
 
@@ -71,56 +100,33 @@ type AssignmentRow = typeof assignments.$inferSelect;
 type AttemptRow = typeof attempts.$inferSelect;
 type QuestionRow = typeof questions.$inferSelect;
 
-/** Event types a student's browser may log (server-only types excluded). */
-const CLIENT_EVENT_TYPES = [
-  "focus_lost",
-  "focus_gained",
-  "visibility_hidden",
-  "visibility_visible",
-  "fullscreen_enter",
-  "fullscreen_exit",
-  "paste",
-  "copy",
-  "code_run",
-  "self_test",
-] as const;
+/** Losses of focus counted in `attempts.focusLossCount`. */
 const FOCUS_LOSS_EVENTS = new Set<string>([
   "focus_lost",
   "visibility_hidden",
   "fullscreen_exit",
 ]);
 
-const notFound = (
-  message = "Deze toets bestaat niet of is niet voor jouw klas.",
-) => new TRPCError({ code: "NOT_FOUND", message });
+/**
+ * Flat event details from the browser: at most 10 keys, short strings,
+ * numbers, booleans or null. Nested objects are rejected (BAD_REQUEST).
+ */
+const eventDetailsSchema = z
+  .record(
+    z.string().max(40),
+    z.union([z.string().max(500), z.number(), z.boolean(), z.null()]),
+  )
+  .refine((details) => Object.keys(details).length <= 10, {
+    error: "Te veel details bij een gebeurtenis.",
+  });
 
-/** Question data parsed leniently (bad data falls back to defaults). */
-function typedData(q: Pick<QuestionRow, "type" | "data">): TypedQuestionData {
-  try {
-    return {
-      type: q.type,
-      data: parseQuestionData(q.type, q.data),
-    } as TypedQuestionData;
-  } catch {
-    return {
-      type: q.type,
-      data: parseQuestionData(q.type, {}),
-    } as TypedQuestionData;
-  }
-}
+/** Shown instead of the grader's own message when grading broke down. */
+const INTERNAL_ERROR_MESSAGE =
+  "Er ging iets mis bij het nakijken. Je docent kijkt deze vraag na.";
+const ANSWERS_HIDDEN_MESSAGE =
+  "De juiste antwoorden zie je pas als je geen pogingen meer hebt of de toets gesloten is.";
 
-function studentSettings(settings: unknown) {
-  const s = parseAssignmentSettings(settings);
-  return {
-    requireFullscreen: s.requireFullscreen,
-    logFocusEvents: s.logFocusEvents,
-    blockPaste: s.blockPaste,
-    allowCodeRun: s.allowCodeRun,
-    allowSelfTest: s.allowSelfTest,
-    maxAttempts: s.maxAttempts,
-    showResults: s.showResults,
-  };
-}
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /** Count and total points of the questions per test. */
 async function testStats(testIds: string[]) {
@@ -130,6 +136,8 @@ async function testStats(testIds: string[]) {
       questionCount: number;
       totalPoints: number;
       types: Record<QuestionType, number>;
+      /** Code questions that have at least one hint. */
+      hintQuestions: number;
     }
   >();
   if (testIds.length === 0) return map;
@@ -139,6 +147,7 @@ async function testStats(testIds: string[]) {
       type: questions.type,
       count: sql<number>`count(*)::int`,
       points: sql<number>`coalesce(sum(${questions.points}), 0)::float8`,
+      withHints: sql<number>`count(*) filter (where jsonb_typeof(${questions.data}->'hints') = 'array' and jsonb_array_length(${questions.data}->'hints') > 0)::int`,
     })
     .from(questions)
     .where(inArray(questions.testId, testIds))
@@ -148,63 +157,15 @@ async function testStats(testIds: string[]) {
       questionCount: 0,
       totalPoints: 0,
       types: { code: 0, multiple_choice: 0, open: 0 },
+      hintQuestions: 0,
     };
     entry.questionCount += Number(r.count);
+    if (r.type === "code") entry.hintQuestions += Number(r.withHints);
     entry.totalPoints += Number(r.points);
     entry.types[r.type] += Number(r.count);
     map.set(r.testId, entry);
   }
   return map;
-}
-
-/** Load an assignment of one of the student's classes (hidden if not visible yet). */
-async function loadAssignmentForStudent(userId: string, assignmentId: string) {
-  const [row] = await db
-    .select({
-      assignment: assignments,
-      testTitle: tests.title,
-      testDescription: tests.description,
-      className: classes.name,
-    })
-    .from(assignments)
-    .innerJoin(tests, eq(tests.id, assignments.testId))
-    .innerJoin(classes, eq(classes.id, assignments.classId))
-    .innerJoin(
-      classMembers,
-      and(
-        eq(classMembers.classId, assignments.classId),
-        eq(classMembers.userId, userId),
-      ),
-    )
-    .where(eq(assignments.id, assignmentId))
-    .limit(1);
-  if (!row) throw notFound();
-  const status = effectiveAssignmentStatus(row.assignment);
-  if (status === "planned" && !row.assignment.opensAt) throw notFound();
-  return { ...row, status };
-}
-
-/** Load an attempt owned by the student, whose class they still belong to. */
-async function loadOwnedAttempt(userId: string, attemptId: string) {
-  const [row] = await db
-    .select({
-      attempt: attempts,
-      assignment: assignments,
-      testTitle: tests.title,
-    })
-    .from(attempts)
-    .innerJoin(assignments, eq(assignments.id, attempts.assignmentId))
-    .innerJoin(tests, eq(tests.id, assignments.testId))
-    .where(and(eq(attempts.id, attemptId), eq(attempts.userId, userId)))
-    .limit(1);
-  if (!row) throw notFound("Deze poging bestaat niet.");
-  if (!(await isClassMember(userId, row.assignment.classId))) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Deze toets is niet (meer) voor jouw klas.",
-    });
-  }
-  return row;
 }
 
 /** Auto-submit an expired attempt and return its fresh row. */
@@ -282,10 +243,35 @@ function validateResponse(
   }
 }
 
+/**
+ * A code grading result as the student sees it: a grader breakdown gets a
+ * friendly message (no traceback), and while the right answers are hidden
+ * the expected output of the visible tests is left out.
+ */
+function studentCodeResult(
+  result: CodeGradingResult,
+  answersHidden: boolean,
+): CodeGradingResult {
+  const error =
+    result.status === "internal_error" && result.error
+      ? { ...result.error, message: INTERNAL_ERROR_MESSAGE, traceback: "" }
+      : result.error;
+  return {
+    ...result,
+    error,
+    tests: answersHidden
+      ? result.tests.map(({ expected: _e, feedback: _f, ...t }) => t)
+      : result.tests,
+  };
+}
+
 /* --------------------------------- Router --------------------------------- */
 
 export const portalRouter = createTRPCRouter({
-  /** Open, upcoming and finished assignments of the student's classes. */
+  /**
+   * Open, upcoming and finished assignments of the student's classes
+   * (targeted afnames only when the student is one of the targets).
+   */
   dashboard: studentProcedure.query(async ({ ctx }) => {
     const userId = ctx.user.id;
     const now = new Date();
@@ -300,7 +286,12 @@ export const portalRouter = createTRPCRouter({
       .innerJoin(assignments, eq(assignments.classId, classMembers.classId))
       .innerJoin(tests, eq(tests.id, assignments.testId))
       .innerJoin(classes, eq(classes.id, assignments.classId))
-      .where(eq(classMembers.userId, userId));
+      .where(
+        and(
+          eq(classMembers.userId, userId),
+          assignmentVisibleToStudent(userId),
+        ),
+      );
 
     const visibleRows = rows
       .map((r) => ({
@@ -393,7 +384,7 @@ export const portalRouter = createTRPCRouter({
                   last.gradingStatus !== "pending" &&
                   last.score != null &&
                   last.maxScore
-                    ? dutchGrade(last.score, last.maxScore)
+                    ? dutchGrade(last.score, last.maxScore, a.settings)
                     : null,
               }
             : null,
@@ -407,7 +398,8 @@ export const portalRouter = createTRPCRouter({
     const finished: Item[] = [];
     for (const item of items) {
       if (item.status === "planned") upcoming.push(item);
-      else if (item.status === "open" && (item.inProgress || item.canStart))
+      // A running attempt stays open after the afname closed (verlengde tijd).
+      else if (item.inProgress || (item.status === "open" && item.canStart))
         open.push(item);
       else if (
         item.status === "open" ||
@@ -446,8 +438,11 @@ export const portalRouter = createTRPCRouter({
         className,
         status,
       } = await loadAssignmentForStudent(ctx.user.id, input.id);
-      const settings = studentSettings(a.settings);
+      const accommodation = await loadAccommodation(ctx.user.id);
+      const settings = studentSettings(a, accommodation);
       const stats = (await testStats([a.testId])).get(a.testId);
+      const now = new Date();
+      const extraTimePercent = accommodation?.extraTimePercent ?? 0;
 
       const inProgress = await findResumableAttempt(a, ctx.user.id);
       const mine = await db
@@ -491,7 +486,17 @@ export const portalRouter = createTRPCRouter({
         inProgressAttemptId: inProgress?.id ?? null,
         inProgressDeadlineAt: inProgress?.deadlineAt ?? null,
         lastSubmittedAttemptId: lastSubmitted?.id ?? null,
-        serverNow: new Date(),
+        /** Verlengde tijd of this student (0 = none). */
+        extraTimePercent,
+        /** Time limit including verlengde tijd; null without a limit. */
+        personalTimeMinutes:
+          a.timeLimitMinutes != null
+            ? a.timeLimitMinutes +
+              accommodationMinutes(a, now, extraTimePercent)
+            : null,
+        /** Whether hints can be revealed in this test (allowHints and hints). */
+        hasHints: settings.allowHints && (stats?.hintQuestions ?? 0) > 0,
+        serverNow: now,
       };
     }),
 
@@ -526,15 +531,40 @@ export const portalRouter = createTRPCRouter({
         });
       }
       if (a.accessCode) {
-        const given = (input.accessCode ?? "").trim().toUpperCase();
-        if (given !== a.accessCode.trim().toUpperCase()) {
-          // Small delay makes guessing codes unattractive.
-          await new Promise((r) => setTimeout(r, 400));
+        const key = accessCodeKey(ctx.user.id, a.id);
+        // Locked after 5 wrong codes, even when this one is right.
+        if (isAccessCodeLocked(key)) {
           throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Onjuiste toegangscode",
+            code: "TOO_MANY_REQUESTS",
+            message: ACCESS_CODE_LOCKED_MESSAGE,
           });
         }
+        if (!accessCodesMatch(input.accessCode ?? "", a.accessCode)) {
+          const failure = recordAccessCodeFailure(key);
+          if (failure.shouldAudit) {
+            await auditFromCtx(ctx, {
+              action: "security.access_code_failed",
+              subjectType: "assignment",
+              subjectId: a.id,
+              subjectUserId: ctx.user.id,
+              subjectLabel: ctx.user.username ?? null,
+              details: { assignmentId: a.id },
+            }).catch((error: unknown) => {
+              console.error("[portal] access code audit failed", error);
+            });
+          }
+          // Small delay makes guessing codes unattractive.
+          await new Promise((r) => setTimeout(r, ACCESS_CODE_FAILURE_DELAY_MS));
+          throw new TRPCError(
+            failure.locked
+              ? {
+                  code: "TOO_MANY_REQUESTS",
+                  message: ACCESS_CODE_LOCKED_MESSAGE,
+                }
+              : { code: "BAD_REQUEST", message: ACCESS_CODE_WRONG_MESSAGE },
+          );
+        }
+        clearAccessCodeFailures(key);
       }
 
       try {
@@ -542,7 +572,10 @@ export const portalRouter = createTRPCRouter({
       } catch (err) {
         if (err instanceof AttemptStartError) {
           throw new TRPCError({
-            code: "PRECONDITION_FAILED",
+            code:
+              err.reason === "cooldown"
+                ? "TOO_MANY_REQUESTS"
+                : "PRECONDITION_FAILED",
             message: err.message,
           });
         }
@@ -557,21 +590,31 @@ export const portalRouter = createTRPCRouter({
       const row = await loadOwnedAttempt(ctx.user.id, input.attemptId);
       const attempt = await refreshIfExpired(row.attempt, row.assignment);
       const a = row.assignment;
+      const accommodation = await loadAccommodation(ctx.user.id);
 
-      const order = attempt.questionOrder ?? [];
+      // Exam confidentiality: a handed-in exam shows no questions or
+      // answers until its results are visible.
+      const contentHidden =
+        attempt.status === "submitted" &&
+        a.mode === "exam" &&
+        !resultsVisible(a);
+
+      const order = contentHidden ? [] : (attempt.questionOrder ?? []);
       const qRows = order.length
         ? await db.select().from(questions).where(inArray(questions.id, order))
         : [];
       const byId = new Map(qRows.map((q) => [q.id, q]));
-      const aRows = await db
-        .select({
-          questionId: answers.questionId,
-          response: answers.response,
-          status: answers.status,
-          savedAt: answers.savedAt,
-        })
-        .from(answers)
-        .where(eq(answers.attemptId, attempt.id));
+      const aRows = contentHidden
+        ? []
+        : await db
+            .select({
+              questionId: answers.questionId,
+              response: answers.response,
+              status: answers.status,
+              savedAt: answers.savedAt,
+            })
+            .from(answers)
+            .where(eq(answers.attemptId, attempt.id));
 
       const list = order
         .map((id) => byId.get(id))
@@ -612,6 +655,8 @@ export const portalRouter = createTRPCRouter({
           deadlineAt: attempt.deadlineAt,
           submittedAt: attempt.submittedAt,
           autoSubmitted: attempt.autoSubmitted,
+          /** Minutes of verlengde tijd included in deadlineAt. */
+          accommodationMinutes: attempt.accommodationMinutes,
         },
         serverNow: new Date(),
         graceMs: DEADLINE_GRACE_MS,
@@ -619,8 +664,10 @@ export const portalRouter = createTRPCRouter({
           id: a.id,
           title: assignmentTitle(a, row.testTitle),
           mode: a.mode,
-          settings: studentSettings(a.settings),
+          settings: studentSettings(a, accommodation),
         },
+        /** True for a handed-in exam whose results are not visible yet. */
+        contentHidden,
         questions: list,
         answers: aRows,
       };
@@ -692,7 +739,13 @@ export const portalRouter = createTRPCRouter({
       return { savedAt: now, status };
     }),
 
-  /** Batched activity log (focus, fullscreen, paste, runs). */
+  /**
+   * Batched activity log (focus, fullscreen, paste, runs). Data
+   * minimisation: only events the afname's settings ask for are stored
+   * (effective settings, so a student with ignoreFocusEvents logs no focus
+   * events), and only allowlisted details. A paste event carries only
+   * { questionId, length, blocked }: never the pasted text.
+   */
   logEvents: studentProcedure
     .input(
       z.object({
@@ -700,9 +753,9 @@ export const portalRouter = createTRPCRouter({
         events: z
           .array(
             z.object({
-              type: z.enum(CLIENT_EVENT_TYPES),
+              type: z.enum(MONITORING_EVENT_TYPES),
               at: z.coerce.date().optional(),
-              details: z.record(z.string(), z.unknown()).optional(),
+              details: eventDetailsSchema.optional(),
             }),
           )
           .min(1)
@@ -710,27 +763,32 @@ export const portalRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { attempt } = await loadOwnedAttempt(ctx.user.id, input.attemptId);
-      if (attempt.status !== "in_progress") return { logged: 0 };
+      const row = await loadOwnedAttempt(ctx.user.id, input.attemptId);
+      const { attempt } = row;
+      if (attempt.status !== "in_progress") {
+        return { logged: 0, dropped: input.events.length };
+      }
+      const accommodation = await loadAccommodation(ctx.user.id);
+      const settings = studentSettings(row.assignment, accommodation);
+      const allowed = input.events.filter((e) =>
+        isEventAllowed(e.type, settings),
+      );
       const now = new Date();
       const earliest = attempt.startedAt.getTime() - 60_000;
-      const values = input.events.map((e) => {
+      const values = allowed.map((e) => {
         const at =
           e.at && !Number.isNaN(e.at.getTime())
             ? e.at.getTime()
             : now.getTime();
         const clamped = Math.min(Math.max(at, earliest), now.getTime());
-        let details = e.details;
-        if (details && JSON.stringify(details).length > 2000)
-          details = { truncated: true };
         return {
           attemptId: attempt.id,
           type: e.type,
-          details: details ?? null,
+          details: sanitizeEventDetails(e.type, e.details),
           createdAt: new Date(clamped),
         };
       });
-      await db.insert(attemptEvents).values(values);
+      if (values.length) await db.insert(attemptEvents).values(values);
       const losses = values.filter((v) => FOCUS_LOSS_EVENTS.has(v.type)).length;
       await db
         .update(attempts)
@@ -741,7 +799,10 @@ export const portalRouter = createTRPCRouter({
             : {}),
         })
         .where(eq(attempts.id, attempt.id));
-      return { logged: values.length };
+      return {
+        logged: values.length,
+        dropped: input.events.length - values.length,
+      };
     }),
 
   /** Cheap keep-alive: updates "last activity" and returns server time + deadline. */
@@ -808,10 +869,17 @@ export const portalRouter = createTRPCRouter({
       const now = new Date();
       const status = effectiveAssignmentStatus(a, now);
 
-      const attemptsUsed = await db.$count(
-        attempts,
-        and(eq(attempts.assignmentId, a.id), eq(attempts.userId, ctx.user.id)),
-      );
+      const mine = await db
+        .select({ status: attempts.status })
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.assignmentId, a.id),
+            eq(attempts.userId, ctx.user.id),
+          ),
+        );
+      const attemptsUsed = mine.length;
+      const hasRunningAttempt = mine.some((t) => t.status === "in_progress");
       const base = {
         attemptId: attempt.id,
         assignmentId: a.id,
@@ -858,6 +926,13 @@ export const portalRouter = createTRPCRouter({
         scheduleGrading(attempt.id);
       }
 
+      // Exam confidentiality: while another attempt is possible (or
+      // running), the right answers stay hidden.
+      const answersHidden =
+        a.mode === "exam" &&
+        (hasRunningAttempt ||
+          (status === "open" && attemptsUsed < settings.maxAttempts));
+
       const order = attempt.questionOrder ?? [];
       const qRows = order.length
         ? await db.select().from(questions).where(inArray(questions.id, order))
@@ -868,6 +943,17 @@ export const portalRouter = createTRPCRouter({
         .from(answers)
         .where(eq(answers.attemptId, attempt.id));
       const answerByQ = new Map(aRows.map((r) => [r.questionId, r]));
+      const neutralized = new Map(
+        (
+          await db
+            .select({
+              questionId: questionNeutralizations.questionId,
+              mode: questionNeutralizations.mode,
+            })
+            .from(questionNeutralizations)
+            .where(eq(questionNeutralizations.assignmentId, a.id))
+        ).map((n) => [n.questionId, n.mode]),
+      );
 
       const list = order
         .map((id) => byId.get(id))
@@ -882,8 +968,12 @@ export const portalRouter = createTRPCRouter({
           let codeResult: CodeGradingResult | null = null;
           if (typed.type === "code" && ans?.result?.kind === "code") {
             const parsed = codeGradingResultSchema.safeParse(ans.result);
-            if (parsed.success)
-              codeResult = redactCodeResultForStudent(parsed.data);
+            if (parsed.success) {
+              codeResult = studentCodeResult(
+                redactCodeResultForStudent(parsed.data),
+                answersHidden,
+              );
+            }
           }
 
           let choice: {
@@ -893,7 +983,8 @@ export const portalRouter = createTRPCRouter({
               id: string;
               text: string;
               selected: boolean;
-              correct: boolean;
+              /** Null while the right answers are hidden. */
+              correct: boolean | null;
             }[];
           } | null = null;
           if (typed.type === "multiple_choice") {
@@ -916,10 +1007,38 @@ export const portalRouter = createTRPCRouter({
                 id: o.id,
                 text: o.text,
                 selected: selected.has(o.id),
-                correct: o.correct,
+                correct: answersHidden ? null : o.correct,
               })),
             };
           }
+
+          // Hints the student revealed, and what they cost.
+          const points = ans?.maxScore ?? q.points;
+          const hintsUsed = typed.type === "code" ? (ans?.hintsUsed ?? []) : [];
+          const hints =
+            typed.type === "code" && hintsUsed.length
+              ? {
+                  used: hintsUsed.filter((h) =>
+                    typed.data.hints.some((d) => d.id === h.id),
+                  ).length,
+                  penaltyPoints: round2(
+                    hintPenaltyFraction(typed.data.hints, hintsUsed) * points,
+                  ),
+                }
+              : null;
+
+          // Rubric criteria the teacher ticked (open questions).
+          const rubric =
+            typed.type === "open" &&
+            typed.data.rubricItems.length &&
+            ans?.rubricChecked
+              ? typed.data.rubricItems.map((item) => ({
+                  id: item.id,
+                  label: item.label,
+                  points: item.points,
+                  achieved: ans.rubricChecked?.includes(item.id) ?? false,
+                }))
+              : null;
 
           return {
             id: q.id,
@@ -927,8 +1046,12 @@ export const portalRouter = createTRPCRouter({
             type: q.type,
             title: q.title,
             prompt: q.prompt,
-            points: ans?.maxScore ?? q.points,
+            points,
             earned: graded && ans ? effectiveScore(ans) : null,
+            /** The question "vervalt": dropped (max 0) or full points for all. */
+            neutralized:
+              neutralized.get(q.id) ??
+              (ans && ans.maxScore === 0 && q.points > 0 ? "drop" : null),
             status: ans?.status ?? "empty",
             reviewed: ans?.manualScore != null,
             answered: !isBlankResponse(
@@ -940,6 +1063,8 @@ export const portalRouter = createTRPCRouter({
             response,
             codeResult,
             choice,
+            hints,
+            rubric,
           };
         });
 
@@ -955,7 +1080,17 @@ export const portalRouter = createTRPCRouter({
         grade:
           attempt.gradingStatus === "pending"
             ? null
-            : dutchGrade(score, maxScore),
+            : dutchGrade(score, maxScore, a.settings),
+        /**
+         * Exam score that may still change: not fully graded, or the
+         * teacher can still review it (afname open, results not released).
+         */
+        provisional:
+          a.mode === "exam" &&
+          (attempt.gradingStatus !== "graded" ||
+            (status !== "closed" && !a.resultsReleased)),
+        answersHidden,
+        answersHiddenMessage: answersHidden ? ANSWERS_HIDDEN_MESSAGE : null,
         /** While pending: how many answers have been graded so far. */
         gradingProgress: {
           done: aRows.filter(
@@ -1021,7 +1156,7 @@ export const portalRouter = createTRPCRouter({
         maxScore: done ? t.maxScore : null,
         grade:
           done && t.score != null && t.maxScore
-            ? dutchGrade(t.score, t.maxScore)
+            ? dutchGrade(t.score, t.maxScore, a.settings)
             : null,
       };
     });

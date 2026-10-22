@@ -1,12 +1,12 @@
 export {
   Dialog,
-  DialogTrigger,
   DialogClose,
-  DialogOverlay,
   DialogContent,
-  DialogScrollContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogScrollContent,
+  DialogTitle,
+  DialogTrigger,
 } from './dialog'

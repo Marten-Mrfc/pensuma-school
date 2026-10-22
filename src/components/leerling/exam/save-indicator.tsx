@@ -4,7 +4,11 @@ import { CheckCircle2, CloudOff, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaverSnapshot } from "./answer-saver";
 
-/** "Alles opgeslagen ✓" / "Opslaan…" / "Offline: we proberen het opnieuw". */
+/**
+ * "Alles opgeslagen ✓" / "Opslaan…" / "Offline: we proberen het opnieuw".
+ * Deliberately not a live region: autosave every few seconds must not
+ * interrupt a screen reader. The exam runner announces transitions only.
+ */
 export function SaveIndicator({
   snapshot,
   className,
@@ -34,8 +38,7 @@ export function SaveIndicator({
     tone = "text-muted-foreground";
   }
   return (
-    <output
-      aria-live="polite"
+    <span
       title={label}
       className={cn(
         "inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-sm font-medium whitespace-nowrap",
@@ -50,6 +53,6 @@ export function SaveIndicator({
       <span aria-hidden="true" className="hidden sm:inline lg:hidden">
         {short}
       </span>
-    </output>
+    </span>
   );
 }

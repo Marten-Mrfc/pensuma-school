@@ -95,7 +95,8 @@ export function StatusBadge({ kind, status, className }: StatusBadgeProps) {
         {entry.pulse ? (
           <span
             className={cn(
-              "absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping",
+              // Stops after 3 pulses (WCAG 2.2.2: no endless motion).
+              "absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping motion-safe:[animation-iteration-count:3]",
               DOT_CLASS[entry.tone],
             )}
           />

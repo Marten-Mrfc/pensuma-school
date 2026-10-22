@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock, toRgba } from '../useChartTheme'
+import { mergeOptionBlock, toRgba, useChartTheme } from '../useChartTheme'
 
 // RangeAreaChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ export interface RangeAreaChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 

@@ -1,3 +1,4 @@
+export type { SidebarMenuButtonProps, SidebarProps, SidebarProviderProps } from './sidebar'
 export {
   Sidebar,
   SidebarContent,
@@ -24,9 +25,7 @@ export {
   SidebarTrigger,
   useSidebar,
 } from './sidebar'
-export type { SidebarProps, SidebarProviderProps, SidebarMenuButtonProps } from './sidebar'
 
 // Re-export variant API from the sibling file (mirrors the Vue registry's
 // `<name>.variants.ts` convention to avoid a component <-> index import cycle).
-export { sidebarMenuButtonVariants, type SidebarMenuButtonVariants } from './sidebar.variants'
-
+export { type SidebarMenuButtonVariants, sidebarMenuButtonVariants } from './sidebar.variants'

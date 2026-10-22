@@ -11,10 +11,12 @@ import {
   MoreHorizontal,
   NotebookPen,
   Radio,
+  UserRoundCheck,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -31,7 +33,8 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { formatMinutes, formatWindow } from "./format";
-import { AssignmentProgress, ModeBadge } from "./shared";
+import { SelectStudentsDialogById } from "./select-students-dialog";
+import { AssignmentProgress, ModeBadge, TargetingBadges } from "./shared";
 
 type Row = RouterOutputs["assignment"]["list"][number];
 type Tab = "open" | "planned" | "closed";
@@ -94,7 +97,7 @@ export function AssignmentList() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Afnames"
-        description="Een afname is een toets voor één klas, met een eigen tijdvak, toegangscode en instellingen."
+        description="Een afname is een toets voor één klas (of een paar leerlingen), met een eigen tijdvak, toegangscode en instellingen."
         actions={
           <Button asChild>
             <Link href={routes.docent.newAssignment()}>
@@ -162,6 +165,7 @@ export function AssignmentList() {
 
 function AssignmentRow({ row }: { row: Row }) {
   const href = routes.docent.assignment(row.id);
+  const [choosingStudents, setChoosingStudents] = useState(false);
   const showProgress =
     row.effectiveStatus !== "planned" || row.counts.started > 0;
   return (
@@ -170,6 +174,10 @@ function AssignmentRow({ row }: { row: Row }) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge kind="assignment" status={row.effectiveStatus} />
           <ModeBadge mode={row.mode} />
+          <TargetingBadges
+            retakeOf={row.retakeOf}
+            targetedStudentCount={row.targetedStudentCount}
+          />
           {row.hasAccessCode ? (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <KeyRound className="size-3.5" aria-hidden="true" />
@@ -241,6 +249,10 @@ function AssignmentRow({ row }: { row: Row }) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setChoosingStudents(true)}>
+                <UserRoundCheck aria-hidden="true" />
+                Leerlingen kiezen…
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link
                   href={routes.docent.newAssignment({
@@ -260,6 +272,11 @@ function AssignmentRow({ row }: { row: Row }) {
           />
         </div>
       </div>
+      <SelectStudentsDialogById
+        assignmentId={row.id}
+        open={choosingStudents}
+        onOpenChange={setChoosingStudents}
+      />
     </li>
   );
 }

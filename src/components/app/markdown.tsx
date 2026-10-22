@@ -1,8 +1,29 @@
+import { ExternalLink, ImageOff } from "lucide-react";
 import { isValidElement, type ReactNode } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, {
+  type Components,
+  defaultUrlTransform,
+  type UrlTransform,
+} from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ScrollRegion } from "@/components/a11y/scroll-region";
+import { VisuallyHidden } from "@/components/a11y/visually-hidden";
+import { isAllowedImageSrc, isHttpUrl } from "@/lib/markdown/external-content";
 import { cn } from "@/lib/utils";
 import { HighlightedCode } from "./highlighted-code";
+
+const NEW_TAB = " (opent in een nieuw tabblad)";
+
+/**
+ * react-markdown's default URL filter, with one narrow exception: base64
+ * data: images (png/jpeg/gif/webp/svg) may stay in an <img src>, so images
+ * pasted into a question still show without contacting anyone. Links and
+ * every other attribute go through the default filter unchanged.
+ */
+const urlTransform: UrlTransform = (url, key, node) =>
+  key === "src" && node.tagName === "img" && isAllowedImageSrc(url)
+    ? url
+    : defaultUrlTransform(url);
 
 const components: Components = {
   h1: ({ node: _node, className, ...props }) => (
@@ -56,8 +77,8 @@ const components: Components = {
       {...props}
     />
   ),
-  a: ({ node: _node, className, href, ...props }) => {
-    const external = typeof href === "string" && /^https?:\/\//.test(href);
+  a: ({ node: _node, className, href, children, ...props }) => {
+    const external = isHttpUrl(href);
     return (
       <a
         href={href}
@@ -65,9 +86,26 @@ const components: Components = {
           "font-medium text-primary underline decoration-primary/40 underline-offset-[3px] transition-colors hover:decoration-primary",
           className,
         )}
-        {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        {...(external
+          ? {
+              target: "_blank",
+              rel: "noopener noreferrer",
+              referrerPolicy: "no-referrer",
+            }
+          : {})}
         {...props}
-      />
+      >
+        {children}
+        {external ? (
+          <>
+            <ExternalLink
+              className="ml-0.5 inline size-[0.85em] -translate-y-px"
+              aria-hidden="true"
+            />
+            <VisuallyHidden>{NEW_TAB}</VisuallyHidden>
+          </>
+        ) : null}
+      </a>
     );
   },
   ul: ({ node: _node, className, ...props }) => (
@@ -110,21 +148,57 @@ const components: Components = {
   hr: ({ node: _node, className, ...props }) => (
     <hr className={cn("my-6 border-border", className)} {...props} />
   ),
-  img: ({ node: _node, className, alt, ...props }) => (
-    // biome-ignore lint/performance/noImgElement: user-authored Markdown images have unknown sizes
-    <img
-      alt={alt ?? ""}
-      className={cn("my-4 max-w-full rounded-lg border", className)}
-      {...props}
-    />
-  ),
+  img: ({ node: _node, className, alt, src }) => {
+    const source = typeof src === "string" ? src : "";
+    if (isAllowedImageSrc(source)) {
+      return (
+        // biome-ignore lint/performance/noImgElement: user-authored Markdown images have unknown sizes
+        <img
+          src={source}
+          alt={alt ?? ""}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
+          className={cn("my-4 max-w-full rounded-lg border", className)}
+        />
+      );
+    }
+    // Privacy: never let a student's browser fetch a third-party image just
+    // by opening the page. Nothing is requested unless the link is clicked.
+    const label = `Externe afbeelding (niet automatisch geladen)${alt ? `: ${alt}` : ""}`;
+    const body = (
+      <>
+        <ImageOff className="size-4 shrink-0" aria-hidden="true" />
+        <span>{label}</span>
+      </>
+    );
+    const chip =
+      "inline-flex items-center gap-1.5 rounded-md border border-dashed bg-muted/50 px-2 py-1 text-sm text-muted-foreground";
+    return isHttpUrl(source) ? (
+      <a
+        href={source}
+        target="_blank"
+        rel="noopener noreferrer"
+        referrerPolicy="no-referrer"
+        className={cn(
+          chip,
+          "underline-offset-[3px] hover:text-foreground hover:underline",
+        )}
+      >
+        {body}
+        <VisuallyHidden>{NEW_TAB}</VisuallyHidden>
+      </a>
+    ) : (
+      <span className={chip}>{body}</span>
+    );
+  },
   table: ({ node: _node, className, ...props }) => (
-    <div className="my-4 w-full overflow-x-auto rounded-lg border">
+    <ScrollRegion label="Tabel" className="my-4 w-full rounded-lg border">
       <table
         className={cn("w-full border-collapse text-sm", className)}
         {...props}
       />
-    </div>
+    </ScrollRegion>
   ),
   thead: ({ node: _node, className, ...props }) => (
     <thead className={cn("bg-muted/60", className)} {...props} />
@@ -155,7 +229,12 @@ const components: Components = {
       );
     }
     return (
-      <pre className="my-4 overflow-x-auto rounded-lg border p-3 font-mono text-sm">
+      <pre
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable code must be reachable by keyboard
+        tabIndex={0}
+        translate="no"
+        className="my-4 overflow-x-auto rounded-lg border p-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         {children}
       </pre>
     );
@@ -186,9 +265,17 @@ export function Markdown({ children, className }: MarkdownProps) {
         className,
       )}
     >
+      {/*
+        Security: raw HTML is skipped (skipHtml) and urlTransform is the
+        default filter (strips javascript:/data: links) plus data: images in
+        <img src> only. Never add rehype-raw or a more permissive
+        urlTransform: Markdown comes from teachers but is shown to every
+        student.
+      */}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={components}
+        urlTransform={urlTransform}
         skipHtml
       >
         {children}

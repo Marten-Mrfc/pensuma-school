@@ -36,7 +36,7 @@ export interface SegmentedGaugeProps {
   className?: string
   /** Rendered into the dish centre (the Vue `center` slot). */
   children?: React.ReactNode
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -97,7 +97,6 @@ export const SegmentedGauge = React.forwardRef<HTMLDivElement, SegmentedGaugePro
         ref={ref}
         data-uipkge=""
         data-slot="segmented-gauge"
-        tabIndex={0}
         style={{ height: heightToStyle(height) }}
         className={cn(
           'focus-visible:ring-ring relative w-full focus-visible:ring-2 focus-visible:outline-none',
@@ -109,7 +108,7 @@ export const SegmentedGauge = React.forwardRef<HTMLDivElement, SegmentedGaugePro
           className="block h-full w-full"
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          aria-label={ariaLabel || 'Chart'}
+          aria-label={ariaLabel || 'Grafiek'}
         >
           {showTrack && (
             <path

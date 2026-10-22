@@ -1,12 +1,13 @@
 'use client'
 
-import * as React from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { passwordInputVariants, type PasswordInputVariants } from './password-input.variants'
+import { type PasswordInputVariants, passwordInputVariants } from './password-input.variants'
 
 export interface PasswordInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'>, PasswordInputVariants {
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'>,
+    PasswordInputVariants {
   defaultValue?: string
   showStrength?: boolean
   showToggle?: boolean
@@ -21,6 +22,13 @@ interface StrengthResult {
   color: string
   barColor: string
   percent: number
+}
+
+const STRENGTH_LABELS: Record<StrengthResult['label'], string> = {
+  weak: 'Zwak',
+  fair: 'Redelijk',
+  good: 'Goed',
+  strong: 'Sterk',
 }
 
 function computeStrength(pwd: string): StrengthResult {
@@ -40,7 +48,7 @@ function computeStrength(pwd: string): StrengthResult {
     return {
       score,
       label: 'fair',
-      color: 'text-warning',
+      color: 'text-warning-ink',
       barColor: 'bg-warning',
       percent: 50,
     }
@@ -49,7 +57,7 @@ function computeStrength(pwd: string): StrengthResult {
     return {
       score,
       label: 'good',
-      color: 'text-info',
+      color: 'text-info-ink',
       barColor: 'bg-info',
       percent: 75,
     }
@@ -57,7 +65,7 @@ function computeStrength(pwd: string): StrengthResult {
   return {
     score,
     label: 'strong',
-    color: 'text-success',
+    color: 'text-success-ink',
     barColor: 'bg-success',
     percent: 100,
   }
@@ -68,7 +76,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
     {
       value,
       defaultValue,
-      placeholder = 'Enter password',
+      placeholder = 'Wachtwoord',
       size = 'default',
       variant = 'outlined',
       disabled = false,
@@ -121,7 +129,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 
     const wrapperClasses = cn(
       passwordInputVariants({ size, variant }),
-      'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]',
+      'focus-within:border-ring focus-within:ring-ring focus-within:ring-[3px]',
       disabled && 'pointer-events-none opacity-50 cursor-not-allowed bg-muted/30',
       className,
     )
@@ -162,12 +170,12 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
             <div className={cn('flex shrink-0 items-center', togglePadding)}>
               <button
                 type="button"
-                aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+                aria-label="Wachtwoord tonen"
                 aria-pressed={passwordVisible}
                 disabled={disabled || readOnly}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={toggleVisibility}
-                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 shrink-0 rounded p-0.5 transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring shrink-0 rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed"
               >
                 {/* Visible password → EyeOff (click to hide); hidden → Eye (click to show). Matches Input. */}
                 {passwordVisible ? (
@@ -181,31 +189,33 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         </div>
 
         {showStrength && currentValue && (
-          <div
+          <output
             className="flex flex-col gap-1.5"
-            role="status"
             aria-live="polite"
-            aria-label={`Password strength: ${strength.label}`}
+            aria-label={`Wachtwoordsterkte: ${STRENGTH_LABELS[strength.label].toLowerCase()}`}
           >
-            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full" aria-hidden="true">
-              <div
-                className={cn('h-full rounded-full transition-[width] duration-300', strength.barColor)}
+            <span className="bg-muted block h-1.5 w-full overflow-hidden rounded-full" aria-hidden="true">
+              <span
+                className={cn('block h-full rounded-full transition-[width] duration-300', strength.barColor)}
                 style={{ width: `${strength.percent}%` }}
               />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className={cn('font-medium capitalize', strength.color)}>{strength.label}</span>
+            </span>
+            <span className="flex items-center justify-between text-xs">
+              <span className={cn('font-medium', strength.color)}>
+                <span className="sr-only">Wachtwoordsterkte: </span>
+                {STRENGTH_LABELS[strength.label]}
+              </span>
               {minLength > 0 && (
-                <span className={meetsMinLength ? 'text-success' : 'text-muted-foreground'}>
-                  {currentValue.length} / {minLength} chars
+                <span className={meetsMinLength ? 'text-success-ink' : 'text-muted-foreground'}>
+                  {currentValue.length} / {minLength} tekens
                 </span>
               )}
-            </div>
-          </div>
+            </span>
+          </output>
         )}
 
         {minLength > 0 && !showStrength && currentValue && (
-          <p className="text-muted-foreground text-xs">Minimum {minLength} characters</p>
+          <p className="text-muted-foreground text-xs">Minimaal {minLength} tekens</p>
         )}
       </div>
     )
@@ -214,4 +224,3 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 PasswordInput.displayName = 'PasswordInput'
 
 export { PasswordInput }
-

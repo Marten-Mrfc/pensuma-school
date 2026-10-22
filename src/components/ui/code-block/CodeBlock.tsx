@@ -1,10 +1,10 @@
 'use client'
 
-import * as React from 'react'
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react'
-import { codeToTokens, type ThemedToken, type BundledLanguage } from 'shiki/bundle/web'
-import { cn } from '@/lib/utils'
+import * as React from 'react'
+import { type BundledLanguage, codeToTokens, type ThemedToken } from 'shiki/bundle/web'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export interface CodeBlockProps {
   /** Source code to display. */
@@ -58,7 +58,7 @@ function CodeBlock({
   const bodyId = `code-block-${React.useId()}`
   const lines = React.useMemo(() => code.split('\n'), [code])
   const bodyVisible = !showHeader || isExpanded
-  const copyLabel = copyStatus === 'copied' ? 'Copied' : copyStatus === 'error' ? 'Copy failed' : 'Copy'
+  const copyLabel = copyStatus === 'copied' ? 'Gekopieerd' : copyStatus === 'error' ? 'Kopiëren mislukt' : 'Kopiëren'
 
   React.useEffect(() => {
     return () => {
@@ -113,7 +113,7 @@ function CodeBlock({
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="xs" className="h-7 gap-1.5 px-2" onClick={copyToClipboard}>
               {copyStatus === 'copied' ? (
-                <Check className="text-success size-3" aria-hidden="true" />
+                <Check className="text-success-ink size-3" aria-hidden="true" />
               ) : (
                 <Copy className="size-3" aria-hidden="true" />
               )}
@@ -138,7 +138,7 @@ function CodeBlock({
               ) : (
                 <ChevronDown className="size-3" aria-hidden="true" />
               )}
-              <span className="text-xs">{isExpanded ? 'Hide' : 'Show'} code</span>
+              <span className="text-xs">{isExpanded ? 'Code verbergen' : 'Code tonen'}</span>
             </Button>
           </div>
         </div>
@@ -146,11 +146,12 @@ function CodeBlock({
 
       {/* Shiki token offsets preserve the original source exactly, including
           whitespace between highlighted tokens. */}
-      <div
+      <section
         id={bodyId}
-        role="region"
-        aria-label={`${language} code sample`}
+        aria-label={`Codevoorbeeld (${language})`}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be reachable by keyboard (WCAG 2.1.1)
         tabIndex={0}
+        translate="no"
         hidden={!bodyVisible}
         className="bg-background/40 focus-visible:ring-ring overflow-auto font-mono text-sm leading-relaxed focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
         style={{ maxHeight }}
@@ -185,7 +186,7 @@ function CodeBlock({
             </code>
           </pre>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

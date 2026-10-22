@@ -1,0 +1,15 @@
+[test]
+# Mocks `server-only` and the Python grader, and points DATABASE_URL at a
+# dedicated *_test database (never the shared dev DB). See the file itself.
+preload = ["./tests/setup/preload.ts"]
+# Playwright specs live in e2e/ and use *.spec.ts, which bun would otherwise
+# pick up; build output and reports are never tests.
+pathIgnorePatterns = [
+  "e2e/**",
+  "playwright-report/**",
+  "test-results/**",
+  ".next*/**",
+  "node_modules/**",
+]
+timeout = 15000
+coverageSkipTestFiles = true

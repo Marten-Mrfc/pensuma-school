@@ -7,6 +7,7 @@ import {
   SquareTerminal,
 } from "lucide-react";
 import { useState } from "react";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { CodeEditor } from "@/components/app/code-editor";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Markdown } from "@/components/app/markdown";
@@ -18,14 +19,20 @@ import {
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { CodeTipsButton } from "./code-tips";
 import { CodeRunTab, CodeTestTab, type RunHandle } from "./code-tools";
+import { HintPanel } from "./hint-panel";
 import { QuestionHeader, type QuestionViewProps } from "./question-view";
 import { codeData } from "./types";
 import { useMediaQuery } from "./use-media-query";
 
 export function CodeQuestion(props: QuestionViewProps) {
-  const { question, response, onChange, settings, onLog, disabled } = props;
+  const { attemptId, question, response, onChange, settings, onLog, disabled } =
+    props;
   const data = codeData(question);
+  const announce = useAnnounce();
+  // The student-safe checks carry no weight; the browser self-test needs one.
+  const checks = (data.checks ?? []).map((c) => ({ ...c, weight: 1 }));
   const code =
     response && "code" in response ? response.code : data.starterCode;
   const wide = useMediaQuery("(min-width: 1024px)");
@@ -39,7 +46,12 @@ export function CodeQuestion(props: QuestionViewProps) {
 
   const onPaste = () => {
     onLog("paste", { questionId: question.id, blocked: settings.blockPaste });
-    if (settings.blockPaste) setPasteBlockedAt(Date.now());
+    if (settings.blockPaste) {
+      setPasteBlockedAt(Date.now());
+      announce("Plakken is uitgezet tijdens deze toets.", {
+        dedupeKey: "paste",
+      });
+    }
   };
 
   const runNow = () => {
@@ -49,11 +61,23 @@ export function CodeQuestion(props: QuestionViewProps) {
   };
 
   const header = <QuestionHeader {...props} />;
-  const prompt = question.prompt.trim() ? (
-    <div className="text-[0.95rem]">
-      <Markdown>{question.prompt}</Markdown>
-    </div>
-  ) : null;
+  const prompt = (
+    <>
+      {question.prompt.trim() ? (
+        <div className="text-[0.95rem]">
+          <Markdown>{question.prompt}</Markdown>
+        </div>
+      ) : null}
+      {settings.allowHints ? (
+        <HintPanel
+          attemptId={attemptId}
+          questionId={question.id}
+          points={question.points}
+          disabled={disabled}
+        />
+      ) : null}
+    </>
+  );
 
   const editorToolbar = (
     <div className="flex flex-wrap items-center gap-2">
@@ -71,6 +95,16 @@ export function CodeQuestion(props: QuestionViewProps) {
         </span>
       ) : null}
       <div className="ml-auto flex items-center gap-1.5">
+        {settings.codeTips ? (
+          <CodeTipsButton
+            code={code}
+            options={{
+              starterCode: data.starterCode,
+              functionNames: data.functionNames,
+              hasIoTests: data.hasIoTests,
+            }}
+          />
+        ) : null}
         {data.starterCode.trim() || code.trim() ? (
           <Button
             variant="ghost"
@@ -106,7 +140,8 @@ export function CodeQuestion(props: QuestionViewProps) {
         onPaste={onPaste}
         minHeight={wide ? "100%" : 260}
         maxHeight={wide ? undefined : "60vh"}
-        aria-label={`Code voor vraag ${props.number}: ${question.title}`}
+        aria-labelledby={props.headingId}
+        escapeHint={settings.requireFullscreen ? "ctrl-m" : "escape"}
         className={cn(
           wide && "h-full min-h-0 flex-1 [&>div:first-child]:h-full",
         )}
@@ -165,7 +200,7 @@ export function CodeQuestion(props: QuestionViewProps) {
           <CodeTestTab
             code={code}
             tests={data.tests}
-            checks={data.checks}
+            checks={checks}
             timeLimitMs={data.timeLimitMs}
             disabled={disabled}
             onResult={(result) =>

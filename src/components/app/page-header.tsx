@@ -32,7 +32,7 @@ export function PageHeader({
       {backHref ? (
         <Link
           href={backHref}
-          className="-ml-1 inline-flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="-ml-1 inline-flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
           {backLabel}

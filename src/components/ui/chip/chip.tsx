@@ -1,9 +1,9 @@
 'use client'
 
-import * as React from 'react'
 import { X } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { chipVariants, type ChipVariants } from './chip.variants'
+import { type ChipVariants, chipVariants } from './chip.variants'
 
 export interface ChipProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'onClose'>, ChipVariants {
   closable?: boolean
@@ -74,7 +74,7 @@ const Chip = React.forwardRef<HTMLSpanElement, ChipProps>(
         {closable ? (
           <button
             type="button"
-            aria-label="Remove item"
+            aria-label="Verwijderen"
             className="focus-visible:ring-ring hover:bg-foreground/10 ml-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full transition-transform duration-150 focus-visible:ring-1 focus-visible:outline-none active:scale-90"
             onClick={handleClose}
           >
@@ -153,6 +153,7 @@ const ChipGroup = React.forwardRef<HTMLDivElement, ChipGroupProps>(
     }
 
     return (
+      // biome-ignore lint/a11y/useSemanticElements: ARIA group of toggle chips; <fieldset> would add form semantics
       <div
         ref={ref}
         role="group"
@@ -169,4 +170,3 @@ const ChipGroup = React.forwardRef<HTMLDivElement, ChipGroupProps>(
 ChipGroup.displayName = 'ChipGroup'
 
 export { Chip, ChipGroup }
-

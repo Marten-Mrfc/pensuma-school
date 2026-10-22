@@ -8,4 +8,3 @@ import { cva } from 'class-variance-authority'
 export const circularProgressVariants = cva('relative inline-flex items-center justify-center')
 
 export type CircularProgressVariants = VariantProps<typeof circularProgressVariants>
-

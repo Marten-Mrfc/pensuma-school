@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export type PopoverCloseBehavior = 'auto' | 'click-outside' | 'esc' | 'manual' | 'none'
@@ -39,22 +39,30 @@ function Popover({
   const isControlled = open !== undefined
   const [localOpen, setLocalOpen] = React.useState<boolean>(defaultOpen ?? false)
 
-  // Hydrate from localStorage on mount.
+  // Hydrate from localStorage on mount (once per storage key, not on every open/close callback change).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hydration must run only when the storage key changes
   React.useEffect(() => {
     if (!storageKey || typeof localStorage === 'undefined') return
-    if (localStorage.getItem(storageKey) === '1') {
-      setLocalOpen(true)
-      if (!isControlled) onOpenChange?.(true)
+    try {
+      if (localStorage.getItem(storageKey) === '1') {
+        setLocalOpen(true)
+        if (!isControlled) onOpenChange?.(true)
+      }
+    } catch {
+      // Storage blocked (private mode): start closed.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey])
 
   // Persist current open state.
   const effectiveOpen = isControlled ? open : localOpen
   React.useEffect(() => {
     if (!storageKey || typeof localStorage === 'undefined') return
-    if (effectiveOpen) localStorage.setItem(storageKey, '1')
-    else localStorage.removeItem(storageKey)
+    try {
+      if (effectiveOpen) localStorage.setItem(storageKey, '1')
+      else localStorage.removeItem(storageKey)
+    } catch {
+      // Storage blocked: persistence is a convenience only.
+    }
   }, [storageKey, effectiveOpen])
 
   function handleOpenChange(value: boolean) {
@@ -138,4 +146,3 @@ const PopoverContent = React.forwardRef<
 PopoverContent.displayName = PopoverPrimitive.Content.displayName
 
 export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent }
-

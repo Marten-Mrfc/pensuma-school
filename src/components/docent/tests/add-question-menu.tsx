@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { Library, Loader2, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   QUESTION_TYPE_ICONS,
@@ -32,6 +32,7 @@ const GROUPS: { type: QuestionType; label: string }[] = [
 
 export function AddQuestionMenu({
   onAdd,
+  onOpenBank,
   disabled,
   pending,
   trigger,
@@ -41,6 +42,8 @@ export function AddQuestionMenu({
   align = "start",
 }: {
   onAdd: (template: QuestionTemplate) => void;
+  /** "Uit vragenbank…": copy existing questions (opens a dialog). */
+  onOpenBank?: () => void;
   disabled?: boolean;
   pending?: boolean;
   trigger?: ReactNode;
@@ -127,6 +130,26 @@ export function AddQuestionMenu({
             </div>
           ))}
         </div>
+        {onOpenBank ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={onOpenBank}
+              className="items-start gap-3 py-2"
+            >
+              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground">
+                <Library className="size-4" aria-hidden="true" />
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-sm font-medium">Uit vragenbank…</span>
+                <span className="text-xs leading-snug whitespace-normal text-muted-foreground">
+                  Hergebruik vragen uit je andere toetsen, gezocht op onderwerp
+                  of tekst.
+                </span>
+              </span>
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

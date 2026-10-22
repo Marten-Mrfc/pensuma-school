@@ -1,24 +1,22 @@
+export type { TimelineAlign, TimelineDensity, TimelineDirection, TimelineSide, TimelineStatus } from './context'
 export {
   Timeline,
-  TimelineItem,
-  TimelineMedia,
-  TimelineSeparator,
   TimelineContent,
-  TimelineHeader,
-  TimelineTitle,
-  TimelineDescription,
   TimelineDate,
-  type TimelineProps,
+  TimelineDescription,
+  TimelineHeader,
+  TimelineItem,
   type TimelineItemProps,
   type TimelineItemRenderProps,
+  TimelineMedia,
   type TimelineMediaProps,
+  type TimelineProps,
+  TimelineSeparator,
   type TimelineSeparatorProps,
+  TimelineTitle,
   type TimelineTitleProps,
 } from './timeline'
 
-export type { TimelineDirection, TimelineAlign, TimelineSide, TimelineStatus, TimelineDensity } from './context'
-
 // Re-export variant API from the sibling file (kept separate to avoid the
 // component <-> index circular import that broke dev SSR for Card).
-export { timelineMediaVariants, type TimelineMediaVariantsProps, type TimelineMediaVariant } from './timeline.variants'
-
+export { type TimelineMediaVariant, type TimelineMediaVariantsProps, timelineMediaVariants } from './timeline.variants'

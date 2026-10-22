@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useId, useState } from "react";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { focusElementById } from "@/lib/a11y/focus";
 import { ADMIN_MIN_PASSWORD_LENGTH } from "@/lib/auth-shared";
+import {
+  PASSWORD_HELP,
+  validateTeacherPassword,
+} from "@/lib/security/password-policy";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
+import { PasswordChecklist } from "../account/password-checklist";
 import { TemporaryPasswordView } from "./temporary-password-view";
+
+type Mode = "generate" | "manual";
+const MODES: readonly Mode[] = ["generate", "manual"];
 
 export interface AddTeacherDialogProps {
   open: boolean;
@@ -48,7 +57,16 @@ function AddTeacherForm({
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [mode, setMode] = useState<"generate" | "manual">("generate");
+  const [mode, setMode] = useState<Mode>("generate");
+  const baseId = useId();
+  const ids = {
+    name: `${baseId}-name`,
+    email: `${baseId}-email`,
+    password: `${baseId}-password`,
+    checklist: `${baseId}-checklist`,
+    legend: `${baseId}-legend`,
+    mode: (m: Mode) => `${baseId}-mode-${m}`,
+  };
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{
     name?: string;
@@ -72,9 +90,37 @@ function AddTeacherForm({
           password: res.temporaryPassword,
         });
       },
-      onError: (e) => setErrors({ form: getErrorMessage(e) }),
+      onError: (e) => {
+        const fields = e.data?.zodError?.fieldErrors as
+          | Record<string, string[] | undefined>
+          | undefined;
+        const found = {
+          name: fields?.name?.[0],
+          email: fields?.email?.[0],
+          password: fields?.password?.[0],
+        };
+        if (found.name || found.email || found.password) showErrors(found);
+        else setErrors({ form: getErrorMessage(e) });
+      },
     }),
   );
+
+  function showErrors(found: typeof errors) {
+    setErrors(found);
+    const first = (["name", "email", "password"] as const).find(
+      (f) => found[f],
+    );
+    if (first) requestAnimationFrame(() => focusElementById(ids[first]));
+  }
+
+  function onModeKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    const keys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault();
+    const nextMode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+    setMode(nextMode);
+    focusElementById(ids.mode(nextMode));
+  }
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -82,11 +128,18 @@ function AddTeacherForm({
     if (name.trim().length < 2) next.name = "Vul de naam van de docent in.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       next.email = "Vul een geldig e-mailadres in.";
-    if (mode === "manual" && password.length < ADMIN_MIN_PASSWORD_LENGTH) {
-      next.password = `Het wachtwoord moet minstens ${ADMIN_MIN_PASSWORD_LENGTH} tekens hebben.`;
+    if (mode === "manual") {
+      const policy = validateTeacherPassword(password, {
+        email: email.trim(),
+        name: name.trim(),
+      });
+      if (!policy.ok) next.password = policy.message;
     }
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      showErrors(next);
+      return;
+    }
+    setErrors({});
     create.mutate({
       name: name.trim(),
       email: email.trim(),
@@ -131,14 +184,9 @@ function AddTeacherForm({
       </DialogHeader>
 
       <div className="flex flex-col gap-4">
-        <FormField
-          label="Naam"
-          htmlFor="teacher-name"
-          required
-          error={errors.name}
-        >
+        <FormField label="Naam" htmlFor={ids.name} required error={errors.name}>
           <Input
-            id="teacher-name"
+            id={ids.name}
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
@@ -147,12 +195,12 @@ function AddTeacherForm({
         </FormField>
         <FormField
           label="E-mailadres"
-          htmlFor="teacher-email"
+          htmlFor={ids.email}
           required
           error={errors.email}
         >
           <Input
-            id="teacher-email"
+            id={ids.email}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -162,17 +210,20 @@ function AddTeacherForm({
         </FormField>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-sm font-medium">Wachtwoord</legend>
+          <legend id={ids.legend} className="mb-2 text-sm font-medium">
+            Wachtwoord
+          </legend>
           <div
             className="grid grid-cols-1 gap-2 sm:grid-cols-2"
             role="radiogroup"
+            aria-labelledby={ids.legend}
           >
             {(
               [
                 [
                   "generate",
                   "Tijdelijk wachtwoord",
-                  "Wordt na het opslaan één keer getoond.",
+                  "Wordt één keer getoond. De docent kiest bij de eerste keer inloggen een eigen wachtwoord.",
                 ],
                 [
                   "manual",
@@ -184,10 +235,13 @@ function AddTeacherForm({
               // biome-ignore lint/a11y/useSemanticElements: card-style radio
               <button
                 key={value}
+                id={ids.mode(value)}
                 type="button"
                 role="radio"
                 aria-checked={mode === value}
+                tabIndex={mode === value ? 0 : -1}
                 onClick={() => setMode(value)}
+                onKeyDown={onModeKeyDown}
                 className={cn(
                   "flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                   mode === value
@@ -203,21 +257,30 @@ function AddTeacherForm({
         </fieldset>
 
         {mode === "manual" ? (
-          <FormField
-            label="Wachtwoord"
-            htmlFor="teacher-password"
-            required
-            error={errors.password}
-          >
-            <Input
-              id="teacher-password"
-              type="password"
-              showPasswordToggle
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
+          <>
+            <FormField
+              label="Wachtwoord"
+              htmlFor={ids.password}
+              required
+              error={errors.password}
+              description={PASSWORD_HELP}
+            >
+              <Input
+                id={ids.password}
+                type="password"
+                showPasswordToggle
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                aria-describedby={ids.checklist}
+              />
+            </FormField>
+            <PasswordChecklist
+              id={ids.checklist}
+              password={password}
+              context={{ email: email.trim(), name: name.trim() }}
             />
-          </FormField>
+          </>
         ) : null}
 
         {errors.form ? (

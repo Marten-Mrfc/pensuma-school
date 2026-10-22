@@ -23,7 +23,7 @@ export interface WaffleChartProps {
   showLegend?: boolean
   colors?: string[]
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -60,7 +60,7 @@ export const WaffleChart = React.forwardRef<HTMLDivElement, WaffleChartProps>(
         className={cn('flex items-center justify-center gap-5', className)}
         ariaLabel={
           ariaLabel ||
-          `Waffle chart: ${data.map((d) => `${d.name} ${Math.round((d.value / total) * 100)}%`).join(', ')}`
+          `Wafeldiagram: ${data.map((d) => `${d.name} ${Math.round((d.value / total) * 100)}%`).join(', ')}`
         }
       >
         <svg viewBox={`0 0 ${size * 12} ${size * 12}`} className="aspect-square h-full max-h-full" role="presentation">

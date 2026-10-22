@@ -5,6 +5,7 @@
  */
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ROLES } from "@/lib/auth-shared";
+import { round1 } from "@/lib/grading/grade-scale";
 import {
   attemptCountsByAssignment,
   studentCountsByClass,
@@ -22,6 +23,7 @@ import {
   dutchGrade,
   effectiveAssignmentStatus,
 } from "@/server/services/assignment-status";
+import { targetedStudentIds } from "@/server/services/assignment-targets";
 
 export const dashboardRouter = createTRPCRouter({
   overview: adminProcedure.query(async ({ ctx }) => {
@@ -113,11 +115,15 @@ export const dashboardRouter = createTRPCRouter({
       })
       .slice(0, 12);
 
-    const [students, counts] = await Promise.all([
+    const [students, counts, targets] = await Promise.all([
       studentCountsByClass(ctx.db, [
         ...new Set(active.map((r) => r.assignment.classId)),
       ]),
       attemptCountsByAssignment(
+        ctx.db,
+        active.map((r) => r.assignment.id),
+      ),
+      targetedStudentIds(
         ctx.db,
         active.map((r) => r.assignment.id),
       ),
@@ -135,7 +141,10 @@ export const dashboardRouter = createTRPCRouter({
       timeLimitMinutes: r.assignment.timeLimitMinutes,
       accessCode: r.assignment.accessCode,
       counts: {
-        students: students.get(r.assignment.classId) ?? 0,
+        students:
+          targets.get(r.assignment.id)?.length ??
+          students.get(r.assignment.classId) ??
+          0,
         ...(counts.get(r.assignment.id) ?? {
           started: 0,
           inProgress: 0,
@@ -175,7 +184,7 @@ export const dashboardRouter = createTRPCRouter({
         gradingStatus: r.gradingStatus,
         grade:
           r.gradingStatus === "graded" && r.score != null && r.maxScore
-            ? dutchGrade(r.score, r.maxScore)
+            ? dutchGrade(r.score, r.maxScore, a?.assignment.settings ?? {})
             : null,
       };
     });
@@ -234,7 +243,7 @@ export const dashboardRouter = createTRPCRouter({
         const grades = [...latest.values()]
           .map((s) =>
             s.score != null && s.maxScore
-              ? dutchGrade(s.score, s.maxScore)
+              ? dutchGrade(s.score, s.maxScore, target.assignment.settings)
               : null,
           )
           .filter((g): g is number => g != null);
@@ -253,9 +262,7 @@ export const dashboardRouter = createTRPCRouter({
           closedAt: target.assignment.closesAt,
           submitted: latest.size,
           averageGrade: grades.length
-            ? Math.round(
-                (grades.reduce((s, g) => s + g, 0) / grades.length) * 10,
-              ) / 10
+            ? round1(grades.reduce((s, g) => s + g, 0) / grades.length)
             : null,
           passed: grades.filter((g) => g >= 5.5).length,
           distribution,

@@ -166,8 +166,17 @@ export function HighlightedCode({
           <CopyButton value={source} size="icon-xs" successMessage={null} />
         </div>
       ) : null}
-      <div className="overflow-x-auto">
-        <pre className="m-0 flex min-w-max py-3 font-mono text-[0.84rem] leading-6">
+      {/* Long lines scroll sideways: keyboard users can focus and arrow. */}
+      <section
+        aria-label={label === "Code" ? "Code" : `${label}-code`}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be focusable for keyboard scrolling
+        tabIndex={0}
+        className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      >
+        <pre
+          translate="no"
+          className="m-0 flex min-w-max py-3 font-mono text-[0.84rem] leading-6"
+        >
           {numbered ? (
             <span
               aria-hidden="true"
@@ -210,7 +219,7 @@ export function HighlightedCode({
                 ))}
           </code>
         </pre>
-      </div>
+      </section>
     </div>
   );
 }

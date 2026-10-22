@@ -26,7 +26,7 @@ export interface ProgressRingChartProps {
   centerLabel?: string
   colors?: string[]
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -59,7 +59,7 @@ export const ProgressRingChart = React.forwardRef<HTMLDivElement, ProgressRingCh
         className={cn('flex items-center justify-center', className)}
         ariaLabel={
           ariaLabel ||
-          `Progress ring chart: ${rings.map((r) => `${r.label ?? 'value'} ${Math.round(r.value)}%`).join(', ')}`
+          `Voortgangsringen: ${rings.map((r) => `${r.label ?? 'waarde'} ${Math.round(r.value)}%`).join(', ')}`
         }
       >
         <svg viewBox={`0 0 ${view} ${view}`} className="aspect-square h-full max-h-full" role="presentation">

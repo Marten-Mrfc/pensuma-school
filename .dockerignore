@@ -1,10 +1,23 @@
+# Version control, local builds and dependencies (installed in the image)
 .git
 .next
 .next-*
 node_modules
 public/pyodide
+
+# Secrets: set them in Dokploy, never bake them into the image
 .env
 .env.*
 !.env.example
-*.log
+
+# Tests, reports and documentation are not needed at runtime
+tests
+e2e
+playwright-report
+test-results
 coverage
+**/*.test.ts
+**/*.test.tsx
+docs
+
+*.log

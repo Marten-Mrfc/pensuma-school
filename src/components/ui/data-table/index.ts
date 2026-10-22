@@ -1,8 +1,7 @@
-export { DataTable, type DataTableProps, type DataTableHandle, type DataTableState } from './DataTable'
+export { DataTable, type DataTableHandle, type DataTableProps, type DataTableState } from './DataTable'
 export { DataTableColumnHeader, type DataTableColumnHeaderProps } from './DataTableColumnHeader'
-export { DataTableToolbar, type DataTableToolbarProps } from './DataTableToolbar'
-export { DataTableFilterSheet, type DataTableFilterSheetProps } from './DataTableFilterSheet'
 export { DataTableFilterPopover, type DataTableFilterPopoverProps } from './DataTableFilterPopover'
+export { DataTableFilterSheet, type DataTableFilterSheetProps } from './DataTableFilterSheet'
 export { DataTablePagination, type DataTablePaginationProps } from './DataTablePagination'
+export { DataTableToolbar, type DataTableToolbarProps } from './DataTableToolbar'
 export type { FilterDefinition, FilterOption } from './types'
-

@@ -20,7 +20,19 @@ export interface CodeEditorProps {
   autocomplete?: boolean;
   placeholder?: string;
   className?: string;
+  /** Accessible name when there is no visible label. Default "Code-editor". */
   "aria-label"?: string;
+  /** id of the visible label (e.g. the question heading); wins over aria-label. */
+  "aria-labelledby"?: string;
+  /** Extra description ids (help or error text); the keyboard hint is added. */
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+  /**
+   * How the visible hint says to leave the editor. `escape` (default):
+   * "Esc dan Tab". `ctrl-m`: "Ctrl+M dan Tab", for exams in fullscreen, where
+   * Escape would also exit fullscreen.
+   */
+  escapeHint?: "escape" | "ctrl-m";
 }
 
 const CodeEditorView = lazy(() =>
@@ -35,9 +47,7 @@ function CodeEditorSkeleton({
 }: Pick<CodeEditorProps, "minHeight" | "className">) {
   const height = typeof minHeight === "number" ? `${minHeight}px` : minHeight;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a live loading region, not form output
-    <div
-      role="status"
+    <output
       aria-label="Editor wordt geladen"
       className={cn(
         "flex overflow-hidden rounded-lg border border-input bg-[var(--code-bg)] shadow-xs",
@@ -55,7 +65,7 @@ function CodeEditorSkeleton({
           />
         ))}
       </div>
-    </div>
+    </output>
   );
 }
 
@@ -63,8 +73,8 @@ function CodeEditorSkeleton({
  * Python code editor (CodeMirror 6). Client-only: renders a skeleton on the
  * server and while the editor bundle loads.
  *
- * Keyboard: Tab indents (4 spaces), Shift+Tab dedents; Escape then Tab moves
- * focus out of the editor.
+ * Keyboard: Tab indents (4 spaces), Shift+Tab dedents; Escape then Tab (or
+ * Ctrl+M, then Tab) moves focus out of the editor.
  */
 export function CodeEditor(props: CodeEditorProps) {
   const mounted = useSyncExternalStore(

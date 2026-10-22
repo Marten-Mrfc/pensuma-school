@@ -18,17 +18,25 @@ import {
 } from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
 import { CodeQuestionEditor } from "./code-question-editor";
-import { EditorSection, FieldLabel, NumberInput } from "./fields";
+import {
+  EditorSection,
+  FieldLabel,
+  NumberInput,
+  PromptImageWarning,
+} from "./fields";
 import { IssueList } from "./issue-list";
 import { MultipleChoiceEditor } from "./multiple-choice-editor";
 import { OpenQuestionEditor } from "./open-question-editor";
 import { QUESTION_TYPE_ICONS, QUESTION_TYPE_TONE } from "./question-icons";
+import { TopicTagsField } from "./topic-tags-field";
 
 /** Editable fields of a question (what autosave sends). */
 export type QuestionDraft = {
   title: string;
   prompt: string;
   points: number;
+  /** Question bank topics (normalised). */
+  tags: string[];
   data: Record<string, unknown>;
 };
 
@@ -50,6 +58,8 @@ export interface QuestionEditorProps {
   actions?: ReactNode;
   /** Save status, shown in the header. */
   status?: ReactNode;
+  /** Topics used elsewhere, offered as suggestions. */
+  tagSuggestions?: string[];
 }
 
 export function QuestionEditor({
@@ -62,6 +72,7 @@ export function QuestionEditor({
   onSolutionChecked,
   actions,
   status,
+  tagSuggestions,
 }: QuestionEditorProps) {
   const id = useId();
   const TypeIcon = QUESTION_TYPE_ICONS[question.type];
@@ -159,7 +170,13 @@ export function QuestionEditor({
             }
             className={promptIssue ? "border-destructive/50" : undefined}
           />
+          <PromptImageWarning prompt={question.prompt} />
         </div>
+        <TopicTagsField
+          value={question.tags}
+          onChange={(tags) => onChange({ tags })}
+          extraSuggestions={tagSuggestions}
+        />
       </EditorSection>
 
       <IssueList issues={dataIssues} />
@@ -185,7 +202,8 @@ export function QuestionEditor({
         <OpenQuestionEditor
           data={question.data as OpenQuestionData}
           onChange={(data) => onChange({ data })}
-          issues={issues.filter((i) => i.target?.field === "modelAnswer")}
+          issues={issues}
+          points={question.points}
         />
       )}
     </div>

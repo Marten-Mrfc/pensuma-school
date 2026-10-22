@@ -1,14 +1,12 @@
 'use client'
 
-import * as React from 'react'
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
-import { Check, Minus, Loader2 } from 'lucide-react'
+import { Check, Loader2, Minus } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-export interface CheckboxProps extends Omit<
-  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>,
-  'checked' | 'defaultChecked'
-> {
+export interface CheckboxProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>, 'checked' | 'defaultChecked'> {
   /** The controlled checked state of the checkbox. */
   checked?: boolean | 'indeterminate'
   /** The default checked state when uncontrolled. */
@@ -156,7 +154,7 @@ const Checkbox = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive.Root
     const resolvedChecked: boolean | 'indeterminate' | undefined = isIndeterminate ? 'indeterminate' : checked
 
     const checkboxClasses = cn(
-      'peer border-input data-[state=checked]:text-primary-foreground data-[state=indeterminate]:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive shrink-0 rounded-[4px] border shadow-xs transition-colors duration-200 outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
+      'peer border-input data-[state=checked]:text-primary-foreground data-[state=indeterminate]:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive shrink-0 rounded-[4px] border shadow-xs transition-colors duration-200 outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
       sizeClasses[size],
       colorClasses[color] || colorClasses.primary,
       hasError &&
@@ -199,17 +197,14 @@ const Checkbox = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive.Root
               forceMount={isIndeterminate || hideIcon ? true : undefined}
               className="grid place-content-center text-current transition-none"
             >
-              {children ?? (
-                <>
-                  {loading ? (
-                    <Loader2 className={cn(iconSizes[size], 'animate-spin')} />
-                  ) : isIndeterminate ? (
-                    <Minus className={cn(iconSizes[size], 'checkbox-indicator-icon')} />
-                  ) : !hideIcon ? (
-                    <Check className={cn(iconSizes[size], 'checkbox-indicator-icon')} />
-                  ) : null}
-                </>
-              )}
+              {children ??
+                (loading ? (
+                  <Loader2 className={cn(iconSizes[size], 'motion-safe:animate-spin')} aria-hidden="true" />
+                ) : isIndeterminate ? (
+                  <Minus className={cn(iconSizes[size], 'checkbox-indicator-icon')} aria-hidden="true" />
+                ) : !hideIcon ? (
+                  <Check className={cn(iconSizes[size], 'checkbox-indicator-icon')} aria-hidden="true" />
+                ) : null)}
             </CheckboxPrimitive.Indicator>
           </CheckboxPrimitive.Root>
 
@@ -323,12 +318,22 @@ const CheckboxGroup = React.forwardRef<HTMLDivElement, CheckboxGroupProps>(
     )
 
     const actualOrientation = inline ? 'horizontal' : orientation
+    const groupId = React.useId()
+    const labelId = `${groupId}-label`
+    const hintId = `${groupId}-hint`
+    const errorId = `${groupId}-error`
+    const hasErrorText = !!(error || errorMessages)
+    const describedBy =
+      [hint && !error ? hintId : null, hasErrorText ? errorId : null].filter(Boolean).join(' ') || undefined
 
     return (
+      // biome-ignore lint/a11y/useSemanticElements: ARIA group named by its visible label; keeps the flex layout of the vendored component
       <div
         ref={ref}
         data-slot="checkbox-group"
         role="group"
+        aria-labelledby={label ? labelId : undefined}
+        aria-describedby={describedBy}
         data-orientation={actualOrientation}
         className={cn(
           'flex flex-col gap-2',
@@ -338,9 +343,17 @@ const CheckboxGroup = React.forwardRef<HTMLDivElement, CheckboxGroupProps>(
         )}
         {...props}
       >
-        {label && <label className="text-sm font-medium">{label}</label>}
+        {label && (
+          <span id={labelId} className="text-sm font-medium">
+            {label}
+          </span>
+        )}
 
-        {hint && !error && <p className="text-muted-foreground text-xs">{hint}</p>}
+        {hint && !error && (
+          <p id={hintId} className="text-muted-foreground text-xs">
+            {hint}
+          </p>
+        )}
 
         <div
           className={cn(
@@ -369,8 +382,8 @@ const CheckboxGroup = React.forwardRef<HTMLDivElement, CheckboxGroupProps>(
             : children}
         </div>
 
-        {(error || errorMessages) && (
-          <div className="flex flex-col gap-0.5">
+        {hasErrorText && (
+          <div id={errorId} className="flex flex-col gap-0.5">
             {typeof errorMessages === 'string' ? (
               <p className="text-destructive text-xs">{errorMessages}</p>
             ) : (
@@ -389,4 +402,3 @@ const CheckboxGroup = React.forwardRef<HTMLDivElement, CheckboxGroupProps>(
 CheckboxGroup.displayName = 'CheckboxGroup'
 
 export { Checkbox, CheckboxGroup }
-

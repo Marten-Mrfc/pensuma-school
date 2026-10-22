@@ -1,6 +1,5 @@
-import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { progressLinearVariants, type ProgressLinearVariants } from './progress-linear.variants'
+import { type ProgressLinearVariants, progressLinearVariants } from './progress-linear.variants'
 
 export interface ProgressLinearProps {
   className?: string
@@ -168,4 +167,3 @@ function ProgressLinear({
 }
 
 export { ProgressLinear }
-

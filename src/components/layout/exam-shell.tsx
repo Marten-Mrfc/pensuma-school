@@ -38,11 +38,21 @@ export function ExamShell({
   children,
 }: ExamShellProps) {
   return (
-    <div className={cn("flex h-dvh flex-col bg-background", className)}>
-      <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-card/85 px-3 backdrop-blur-md sm:h-16 sm:px-5">
-        <LogoMark className="size-7 sm:size-8" />
+    <div
+      className={cn(
+        // On very short viewports (400 % zoom: 320×256) the bars scroll away
+        // with the page instead of eating the little height there is.
+        "flex h-dvh min-h-dvh flex-col bg-background [@media(max-height:30rem)]:h-auto",
+        className,
+      )}
+    >
+      <header className="z-30 flex min-h-14 shrink-0 items-center gap-3 border-b bg-card/85 px-3 py-1.5 backdrop-blur-md sm:min-h-16 sm:px-5">
+        <LogoMark className="size-7 max-sm:hidden sm:size-8" />
         <div className="flex min-w-0 flex-col">
-          <h1 className="truncate text-sm leading-tight font-semibold sm:text-base">
+          <h1
+            title={typeof title === "string" ? title : undefined}
+            className="line-clamp-2 text-sm leading-tight font-semibold sm:truncate sm:text-base"
+          >
             {title}
           </h1>
           {subtitle ? (
@@ -56,19 +66,23 @@ export function ExamShell({
           {actions}
         </div>
       </header>
-      <div
+      <main
         id="inhoud"
+        tabIndex={-1}
         className={cn(
-          "min-h-0 flex-1",
+          "min-h-0 flex-1 [@media(max-height:30rem)]:overflow-visible",
           bodyMode === "scroll" ? "overflow-y-auto" : "overflow-hidden",
         )}
       >
         {children}
-      </div>
+      </main>
       {footer ? (
-        <div className="shrink-0 border-t bg-card/85 backdrop-blur-md">
+        <section
+          aria-label="Vraagnavigatie"
+          className="shrink-0 border-t bg-card/85 backdrop-blur-md"
+        >
           {footer}
-        </div>
+        </section>
       ) : null}
     </div>
   );

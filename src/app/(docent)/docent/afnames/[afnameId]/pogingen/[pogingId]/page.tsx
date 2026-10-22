@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { LoadingState } from "@/components/app/states";
 import { AttemptReview } from "@/components/docent/review/attempt-review";
 
-export const metadata: Metadata = { title: "Poging nakijken" };
+export const metadata: Metadata = { title: "Poging" };
 
 export default function AttemptPage({
   params,

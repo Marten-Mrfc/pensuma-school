@@ -1,3 +1,4 @@
+export { NativeSelect, type NativeSelectOption, type NativeSelectProps } from './NativeSelect'
 export {
   Select,
   SelectContent,
@@ -11,5 +12,3 @@ export {
   SelectTrigger,
   SelectValue,
 } from './select'
-export { NativeSelect, type NativeSelectProps, type NativeSelectOption } from './NativeSelect'
-

@@ -1,52 +1,54 @@
 'use client'
 
-import * as React from 'react'
+import {
+  BarChart as EChartsBarChart,
+  BoxplotChart as EChartsBoxplotChart,
+  CandlestickChart as EChartsCandlestickChart,
+  ChordChart as EChartsChordChart,
+  CustomChart as EChartsCustomChart,
+  EffectScatterChart as EChartsEffectScatter,
+  FunnelChart as EChartsFunnelChart,
+  GaugeChart as EChartsGaugeChart,
+  GraphChart as EChartsGraphChart,
+  HeatmapChart as EChartsHeatmap,
+  LineChart as EChartsLineChart,
+  MapChart as EChartsMapChart,
+  ParallelChart as EChartsParallelChart,
+  PictorialBarChart as EChartsPictorialBar,
+  PieChart as EChartsPieChart,
+  RadarChart as EChartsRadarChart,
+  SankeyChart as EChartsSankeyChart,
+  ScatterChart as EChartsScatterChart,
+  SunburstChart as EChartsSunburstChart,
+  TreeChart as EChartsTreeChart,
+  TreemapChart as EChartsTreemapChart,
+  ThemeRiverChart,
+} from 'echarts/charts'
+import {
+  AriaComponent,
+  CalendarComponent,
+  DataZoomComponent,
+  GraphicComponent,
+  GridComponent,
+  LegendComponent,
+  MarkAreaComponent,
+  MarkLineComponent,
+  MarkPointComponent,
+  ParallelComponent,
+  PolarComponent,
+  RadarComponent,
+  SingleAxisComponent,
+  TitleComponent,
+  TooltipComponent,
+  VisualMapComponent,
+} from 'echarts/components'
 import * as echartsCore from 'echarts/core'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import {
-  LineChart as EChartsLineChart,
-  BarChart as EChartsBarChart,
-  PieChart as EChartsPieChart,
-  ScatterChart as EChartsScatterChart,
-  EffectScatterChart as EChartsEffectScatter,
-  PictorialBarChart as EChartsPictorialBar,
-  RadarChart as EChartsRadarChart,
-  GaugeChart as EChartsGaugeChart,
-  HeatmapChart as EChartsHeatmap,
-  TreemapChart as EChartsTreemapChart,
-  FunnelChart as EChartsFunnelChart,
-  BoxplotChart as EChartsBoxplotChart,
-  CandlestickChart as EChartsCandlestickChart,
-  CustomChart as EChartsCustomChart,
-  ChordChart as EChartsChordChart,
-  MapChart as EChartsMapChart,
-  GraphChart as EChartsGraphChart,
-  ParallelChart as EChartsParallelChart,
-  SankeyChart as EChartsSankeyChart,
-  SunburstChart as EChartsSunburstChart,
-  ThemeRiverChart,
-  TreeChart as EChartsTreeChart,
-} from 'echarts/charts'
-import {
-  GridComponent,
-  PolarComponent,
-  TooltipComponent,
-  LegendComponent,
-  MarkLineComponent,
-  MarkAreaComponent,
-  MarkPointComponent,
-  GraphicComponent,
-  RadarComponent,
-  VisualMapComponent,
-  CalendarComponent,
-  DataZoomComponent,
-  ParallelComponent,
-  SingleAxisComponent,
-  TitleComponent,
-} from 'echarts/components'
 import ReactECharts from 'echarts-for-react/esm/core'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { withA11yOption } from './a11y-option'
 
 export function heightToStyle(height: number | string): string {
   return /^\d+$/.test(String(height)) ? `${height}px` : String(height)
@@ -55,20 +57,20 @@ export function heightToStyle(height: number | string): string {
 interface ChartFrameProps {
   height: number | string
   className?: string
-  /** Apply the accessible role/tabindex/focus-ring chrome. Some chart
-   *  wrappers ship a bare `w-full` frame -- pass `false` for those. */
+  /** Make the frame a tab stop with a focus ring. Default false: a static
+   *  chart image is not interactive, so it should not be a tab stop. */
   focusable?: boolean
-  /** Accessible name for role="img". Defaults to "Chart". */
+  /** Accessible name for role="img". Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
 /** Shared `<div>` wrapper around the ECharts canvas. */
 export const ChartFrame = React.forwardRef<HTMLDivElement, ChartFrameProps & { children: React.ReactNode }>(
-  ({ height, className, focusable = true, ariaLabel, children }, ref) => (
+  ({ height, className, focusable = false, ariaLabel, children }, ref) => (
     <div
       ref={ref}
       role="img"
-      aria-label={ariaLabel || 'Chart'}
+      aria-label={ariaLabel || 'Grafiek'}
       tabIndex={focusable ? 0 : undefined}
       style={{ height: heightToStyle(height) }}
       className={
@@ -83,12 +85,32 @@ export const ChartFrame = React.forwardRef<HTMLDivElement, ChartFrameProps & { c
 )
 ChartFrame.displayName = 'ChartFrame'
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
+function subscribeReducedMotion(onChange: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {}
+  const mql = window.matchMedia(REDUCED_MOTION_QUERY)
+  mql.addEventListener('change', onChange)
+  return () => mql.removeEventListener('change', onChange)
+}
+
+function getReducedMotion() {
+  return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(REDUCED_MOTION_QUERY).matches
+}
+
+/** `prefers-reduced-motion: reduce` (canvas animations ignore the CSS reduced-motion floor). */
+export function usePrefersReducedMotion(): boolean {
+  return React.useSyncExternalStore(subscribeReducedMotion, getReducedMotion, () => false)
+}
+
 /** ECharts canvas filling its parent frame. */
 export function EChart({ option }: { option: any }) {
+  const reducedMotion = usePrefersReducedMotion()
+  const merged = React.useMemo(() => withA11yOption(option, reducedMotion), [option, reducedMotion])
   return (
     <ReactECharts
       echarts={echartsCore as any}
-      option={option}
+      option={merged}
       notMerge
       lazyUpdate
       style={{ width: '100%', height: '100%' }}
@@ -97,10 +119,12 @@ export function EChart({ option }: { option: any }) {
 }
 
 export const echartsCoreModule = echartsCore
+export { withA11yOption }
 
 // Register every chart type the wrappers need once at module load.
 use([
   CanvasRenderer,
+  AriaComponent,
   EChartsLineChart,
   EChartsBarChart,
   EChartsPieChart,

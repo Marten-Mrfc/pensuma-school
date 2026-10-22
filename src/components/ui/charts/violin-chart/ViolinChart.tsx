@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // ViolinChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@ export interface ViolinChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -26,7 +26,7 @@ function kde(values: number[], grid: number[]): number[] {
   if (!n) return grid.map(() => 0)
   const mean = values.reduce((s, v) => s + v, 0) / n
   const sd = Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / n) || 1
-  const h = 1.06 * sd * Math.pow(n, -0.2) || sd
+  const h = 1.06 * sd * n ** -0.2 || sd
   return grid.map((x) => values.reduce((s, v) => s + Math.exp(-0.5 * ((x - v) / h) ** 2), 0) / (n * h))
 }
 

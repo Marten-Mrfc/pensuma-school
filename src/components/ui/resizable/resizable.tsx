@@ -1,9 +1,9 @@
 'use client'
 
-import * as React from 'react'
 import { GripVertical } from 'lucide-react'
+import type * as React from 'react'
 // Named exports (the package exposes these directly, not under a namespace).
-import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { cn } from '@/lib/utils'
 
 function ResizablePanelGroup({ className, ...props }: React.ComponentProps<typeof PanelGroup>) {
@@ -49,4 +49,3 @@ function ResizableHandle({
 }
 
 export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
-

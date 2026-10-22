@@ -1,6 +1,6 @@
 import * as React from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 export interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   title: string
@@ -36,4 +36,3 @@ const SectionCard = React.forwardRef<HTMLDivElement, SectionCardProps>(
 SectionCard.displayName = 'SectionCard'
 
 export { SectionCard }
-

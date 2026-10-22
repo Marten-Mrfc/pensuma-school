@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // StackedBarChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ export interface StackedBarChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -162,7 +162,7 @@ export const StackedBarChart = React.forwardRef<HTMLDivElement, StackedBarChartP
         series: mergedSeries,
         ...userRest,
       }
-    }, [data, xField, yFields, percent, option, theme])
+    }, [data, xField, yFields, percent, radius, stackGap, stackGapColor, option, theme])
 
     return (
       <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel}>

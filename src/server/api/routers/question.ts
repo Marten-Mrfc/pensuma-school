@@ -14,14 +14,16 @@ import {
   type CodeQuestionData,
   questionTypeSchema,
 } from "@/lib/questions/schema";
+import { normalizeTags } from "@/lib/questions/tags";
 import {
   buildQuestionDraft,
   isQuestionTemplateId,
-  refreshDataIds,
 } from "@/lib/questions/templates";
 import {
+  assertQuestionInputLimits,
   MAX_POINTS_PER_QUESTION,
   MAX_QUESTIONS_PER_TEST,
+  QUESTION_INPUT_LIMITS,
   type SolutionCheck,
   safeParseQuestionData,
   solutionFingerprint,
@@ -36,6 +38,7 @@ import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
 import { answers, questions } from "@/server/db/schema";
 import { gradeCode } from "@/server/grader";
+import { copyQuestionsToTest } from "@/server/services/portable-tests";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 type Executor = DB | Tx;
@@ -125,6 +128,22 @@ function copyTitle(title: string) {
   return `${title} (kopie)`.slice(0, 300);
 }
 
+/** Throw BAD_REQUEST with the first Dutch limit message, if any. */
+function enforceLimits(
+  type: Parameters<typeof assertQuestionInputLimits>[0],
+  data: unknown,
+  fields: { title?: string; prompt?: string },
+) {
+  const issues = assertQuestionInputLimits(type, data, fields);
+  if (issues.length > 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: issues[0] });
+  }
+}
+
+const tagsSchema = z
+  .array(z.string().max(100, "Een onderwerp is te lang."))
+  .max(50, "Te veel onderwerpen.");
+
 const pointsSchema = z
   .number()
   .min(0, "Het aantal punten mag niet negatief zijn.")
@@ -159,6 +178,10 @@ export const questionRouter = createTRPCRouter({
           message: "Dit sjabloon hoort bij een ander vraagtype.",
         });
       }
+      enforceLimits(draft.type, draft.data, {
+        title: draft.title,
+        prompt: draft.prompt,
+      });
       const created = await ctx.db.transaction(async (tx) => {
         await requireTest(tx, input.testId);
         await assertRoom(tx, input.testId);
@@ -189,22 +212,34 @@ export const questionRouter = createTRPCRouter({
         id: z.uuid(),
         title: z
           .string()
-          .max(300, "De titel mag hoogstens 300 tekens lang zijn.")
+          .max(
+            QUESTION_INPUT_LIMITS.title,
+            "De titel is te lang (maximaal 300 tekens).",
+          )
           .optional(),
         prompt: z
           .string()
-          .max(50_000, "De opdrachttekst is te lang.")
+          .max(
+            QUESTION_INPUT_LIMITS.prompt,
+            "De opdrachttekst is te lang (maximaal 20.000 tekens).",
+          )
           .optional(),
         points: pointsSchema.optional(),
+        tags: tagsSchema.optional(),
         data: z.record(z.string(), z.unknown()).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const question = await requireQuestion(ctx.db, input.id);
+      enforceLimits(question.type, input.data ?? {}, {
+        title: input.title,
+        prompt: input.prompt,
+      });
       const patch: Partial<typeof questions.$inferInsert> = {};
       if (input.title !== undefined) patch.title = input.title;
       if (input.prompt !== undefined) patch.prompt = input.prompt;
       if (input.points !== undefined) patch.points = input.points;
+      if (input.tags !== undefined) patch.tags = normalizeTags(input.tags);
       if (input.data !== undefined) {
         const parsed = safeParseQuestionData(question.type, input.data);
         if (!parsed.success) {
@@ -319,6 +354,8 @@ export const questionRouter = createTRPCRouter({
             prompt: original.prompt,
             points: original.points,
             data: original.data,
+            tags: original.tags,
+            sourceQuestionId: original.sourceQuestionId ?? original.id,
             solutionCheck: original.solutionCheck,
           })
           .returning();
@@ -330,37 +367,16 @@ export const questionRouter = createTRPCRouter({
       return { question: created, hasAttempts: attemptCount > 0 };
     }),
 
-  /** Copy a question to the end of another test. */
+  /**
+   * Copy a question to the end of another test (fresh data ids,
+   * `sourceQuestionId` = the root original).
+   */
   copyToTest: adminProcedure
     .input(z.object({ id: z.uuid(), targetTestId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const created = await ctx.db.transaction(async (tx) => {
-        const original = await requireQuestion(tx, input.id);
-        await requireTest(tx, input.targetTestId);
-        await assertRoom(tx, input.targetTestId);
-        const position = await nextPosition(tx, input.targetTestId);
-        const data = refreshDataIds(
-          original.type,
-          safeQuestionData(original.type, original.data),
-        );
-        const [row] = await tx
-          .insert(questions)
-          .values({
-            testId: input.targetTestId,
-            position,
-            type: original.type,
-            title:
-              input.targetTestId === original.testId
-                ? copyTitle(original.title)
-                : original.title,
-            prompt: original.prompt,
-            points: original.points,
-            data: data as Record<string, unknown>,
-            solutionCheck: original.solutionCheck,
-          })
-          .returning();
-        await touchTest(tx, input.targetTestId);
-        return row;
+      const [created] = await ctx.db.transaction(async (tx) => {
+        await requireQuestion(tx, input.id);
+        return copyQuestionsToTest(tx, [input.id], input.targetTestId);
       });
       const attemptCount = await countTestAttempts(ctx.db, input.targetTestId);
       return {

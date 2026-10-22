@@ -11,6 +11,7 @@ import {
   CircleCheck,
   FileUp,
   Loader2,
+  ShieldCheck,
   UserPlus,
   UsersRound,
   X,
@@ -81,6 +82,7 @@ export function ImportStudentsPanel({
   onCancel,
   onImported,
 }: ImportStudentsPanelProps) {
+  const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const inputId = useId();
@@ -294,6 +296,15 @@ export function ImportStudentsPanel({
             <span className="font-mono">Voornaam;Tussenvoegsel;Achternaam</span>
             ) wordt herkend.
           </p>
+          <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+            <ShieldCheck
+              className="mt-0.5 size-3.5 shrink-0"
+              aria-hidden="true"
+            />
+            Alleen leerlingnummer en naam worden opgeslagen. Andere kolommen
+            (zoals geboortedatum, e-mailadres of adres) worden genegeerd en niet
+            bewaard.
+          </p>
         </div>
 
         {hasInput ? (
@@ -370,11 +381,11 @@ export function ImportStudentsPanel({
 
             {counts.renamable > 0 ? (
               <label
-                htmlFor="import-update-names"
+                htmlFor={`${uid}-import-update-names`}
                 className="flex cursor-pointer items-start gap-2.5 rounded-lg border bg-muted/30 p-3 text-sm"
               >
                 <Checkbox
-                  id="import-update-names"
+                  id={`${uid}-import-update-names`}
                   checked={updateNames}
                   onCheckedChange={(v) => setUpdateNames(v === true)}
                   className="mt-0.5"

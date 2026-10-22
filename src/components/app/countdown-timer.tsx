@@ -1,7 +1,13 @@
 "use client";
 
 import { AlarmClock, Timer } from "lucide-react";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useAnnounce } from "@/components/a11y/live-announcer";
+import {
+  INITIAL_TIMER_STATE,
+  nextTimerAnnouncements,
+  type TimerAnnouncementState,
+} from "@/lib/a11y/timer-announcements";
 import { cn } from "@/lib/utils";
 
 export interface CountdownTimerProps {
@@ -14,6 +20,17 @@ export interface CountdownTimerProps {
   serverOffsetMs?: number;
   /** Called once when the countdown reaches zero. */
   onExpire?: () => void;
+  /**
+   * Screen-reader announcements at 10, 5 and 1 minute, at the end and when
+   * extra time is given. Default true; turn off for a second timer on the
+   * same page so nothing is read twice.
+   */
+  announce?: boolean;
+  /**
+   * Show only an icon ("Timer verborgen"), e.g. when the student switched
+   * the timer off in the display preferences. Announcements continue.
+   */
+  hidden?: boolean;
   className?: string;
 }
 
@@ -47,8 +64,11 @@ export function CountdownTimer({
   deadline,
   serverOffsetMs = 0,
   onExpire,
+  announce: announceEnabled = true,
+  hidden = false,
   className,
 }: CountdownTimerProps) {
+  const announce = useAnnounce();
   const deadlineMs = new Date(deadline).getTime();
   // null until mounted: the server cannot know the client's clock.
   const [now, setNow] = useState<number | null>(null);
@@ -86,6 +106,27 @@ export function CountdownTimer({
     if (expired) fireExpire();
   }, [expired]);
 
+  // Each threshold is announced once per deadline; see timer-announcements.ts.
+  const announcementState = useRef<TimerAnnouncementState>(INITIAL_TIMER_STATE);
+  const speak = useEffectEvent((ms: number) => {
+    const result = nextTimerAnnouncements(
+      announcementState.current,
+      deadlineMs,
+      ms,
+    );
+    announcementState.current = result.state;
+    if (!announceEnabled) return;
+    for (const message of result.messages) {
+      announce(message.text, {
+        politeness: message.politeness,
+        dedupeKey: message.dedupeKey,
+      });
+    }
+  });
+  useEffect(() => {
+    if (remainingMs !== null) speak(remainingMs);
+  }, [remainingMs]);
+
   const totalSeconds =
     remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const tone =
@@ -97,19 +138,23 @@ export function CountdownTimer({
           ? "warning"
           : "normal";
 
-  // Only changes at the thresholds, so screen readers hear it at the right moments.
-  const announcement =
-    remainingMs === null
-      ? ""
-      : expired
-        ? "De tijd is om."
-        : remainingMs <= DANGER_MS
-          ? "Let op: nog minder dan 1 minuut."
-          : remainingMs <= WARNING_MS
-            ? "Let op: nog minder dan 5 minuten."
-            : "";
-
   const Icon = tone === "normal" ? Timer : AlarmClock;
+
+  if (hidden) {
+    // Neutral on purpose: no colour change that gives the time away.
+    return (
+      <div
+        data-hidden=""
+        className={cn(
+          "inline-flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-xs",
+          className,
+        )}
+      >
+        <Timer className="size-4 shrink-0" aria-hidden="true" />
+        <span className="sr-only">Timer verborgen</span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -133,15 +178,13 @@ export function CountdownTimer({
       <Icon
         className={cn(
           "size-4 shrink-0",
-          tone === "danger" && "motion-safe:animate-pulse",
+          tone === "danger" &&
+            "motion-safe:animate-pulse motion-safe:[animation-iteration-count:3]",
         )}
         aria-hidden="true"
       />
       <span aria-hidden="true">
         {totalSeconds === null ? "--:--" : format(totalSeconds)}
-      </span>
-      <span className="sr-only" aria-live="assertive">
-        {announcement}
       </span>
     </div>
   );

@@ -3,6 +3,7 @@ import { type ReactNode, Suspense } from "react";
 import { CurrentUserProvider } from "@/components/app/current-user";
 import { LoadingState } from "@/components/app/states";
 import { UserMenu } from "@/components/app/user-menu";
+import { PasswordChangeGate } from "@/components/docent/account/password-change-gate";
 import { DocentShell } from "@/components/layout/docent-shell";
 import { toShellUser } from "@/components/layout/to-shell-user";
 import { UserMenuSkeleton } from "@/components/layout/user-menu-skeleton";
@@ -17,7 +18,9 @@ export const metadata: Metadata = {
  * session is only read inside <Suspense> boundaries:
  *  - <DocentUserMenu> streams the account menu into the sidebar footer;
  *  - <DocentGate> verifies the teacher before rendering the page, and
- *    provides the user to client components via useCurrentUser().
+ *    provides the user to client components via useCurrentUser(). It also
+ *    mounts the PasswordChangeGate: a teacher with a temporary password
+ *    must choose their own before anything else works.
  * requireAdmin() is request-deduped, so the session is read once.
  */
 export default function DocentLayout({ children }: { children: ReactNode }) {
@@ -52,6 +55,11 @@ async function DocentGate({ children }: { children: ReactNode }) {
   return (
     <CurrentUserProvider user={toShellUser(user)}>
       {children}
+      <PasswordChangeGate
+        initialRequired={user.passwordChangeRequired}
+        email={user.email}
+        name={user.name}
+      />
     </CurrentUserProvider>
   );
 }

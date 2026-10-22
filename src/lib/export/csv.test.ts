@@ -79,6 +79,24 @@ describe("escapeCsvField", () => {
     expect(escapeCsvField("-2,5")).toBe("-2,5");
     expect(escapeCsvField("-3")).toBe("-3");
   });
+
+  test("neutralises full-width, indented and control-character formulas", () => {
+    expect(escapeCsvField("＝SUM(A1)")).toBe("'＝SUM(A1)");
+    expect(escapeCsvField("＋1")).toBe("'＋1");
+    expect(escapeCsvField("－1")).toBe("'－1");
+    expect(escapeCsvField("＠cmd")).toBe("'＠cmd");
+    expect(escapeCsvField(" =1+1")).toBe("' =1+1");
+    expect(escapeCsvField("\t=1")).toBe("'\t=1");
+    // A carriage return still forces quotes.
+    expect(escapeCsvField("\r=1")).toBe(`"'\r=1"`);
+    expect(escapeCsvField("@cmd")).toBe("'@cmd");
+  });
+
+  test("keeps plain numbers unchanged", () => {
+    expect(escapeCsvField("-2,5")).toBe("-2,5");
+    expect(escapeCsvField("+31")).toBe("+31");
+    expect(escapeCsvField("3.5")).toBe("3.5");
+  });
 });
 
 describe("cellToText", () => {

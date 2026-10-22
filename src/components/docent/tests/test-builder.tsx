@@ -23,12 +23,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
+import { QuestionBankDialog } from "@/components/docent/bank/question-bank-dialog";
 import { IssueDot } from "@/components/docent/questions/issue-list";
 import {
   type QuestionDraft,
@@ -47,6 +48,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import type { QuestionType } from "@/lib/questions/schema";
 import type { QuestionTemplate } from "@/lib/questions/templates";
 import {
@@ -140,6 +142,7 @@ function MissingTest() {
 /* -------------------------------------------------------------------------- */
 
 function Builder({ test }: { test: BuilderTest }) {
+  const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -165,7 +168,10 @@ function Builder({ test }: { test: BuilderTest }) {
   const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null);
   const [copyQuestionId, setCopyQuestionId] = useState<string | null>(null);
   const [deleteTestOpen, setDeleteTestOpen] = useState(false);
+  const [bankOpen, setBankOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const bankTags = useQuery(trpc.bank.tags.queryOptions());
+  const tagSuggestions = (bankTags.data ?? []).map((t) => t.tag);
 
   /* ------------------------------ Mutations ------------------------------ */
 
@@ -255,6 +261,7 @@ function Builder({ test }: { test: BuilderTest }) {
         title: v.title,
         prompt: v.prompt,
         points: v.points,
+        tags: v.tags,
         data: v.data,
       });
       patchCache((old) => ({
@@ -266,6 +273,7 @@ function Builder({ test }: { test: BuilderTest }) {
                 title: res.question.title,
                 prompt: res.question.prompt,
                 points: res.question.points,
+                tags: res.question.tags,
                 data: res.question.data,
                 solutionCheck: res.question.solutionCheck,
                 updatedAt: res.question.updatedAt,
@@ -304,6 +312,10 @@ function Builder({ test }: { test: BuilderTest }) {
     })),
   });
   const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
+  useDocumentTitle([
+    `${settings.title.trim() || "Naamloze toets"} bewerken`,
+    "Toetsen",
+  ]);
   // A selected question may be missing for a moment (just added and the
   // cache not yet re-rendered) or for good (deleted): fall back without
   // overwriting the choice, so it reappears as soon as the data arrives.
@@ -433,6 +445,7 @@ function Builder({ test }: { test: BuilderTest }) {
       title: question.title,
       prompt: question.prompt,
       points: question.points,
+      tags: question.tags,
       data: question.data,
       ...patch,
     });
@@ -664,11 +677,14 @@ function Builder({ test }: { test: BuilderTest }) {
         <div className="flex flex-col gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-              <label htmlFor="toets-titel" className="sr-only">
+              <h1 className="sr-only">
+                {settings.title.trim() || "Naamloze toets"} bewerken
+              </h1>
+              <label htmlFor={`${uid}-toets-titel`} className="sr-only">
                 Titel van de toets
               </label>
               <textarea
-                id="toets-titel"
+                id={`${uid}-toets-titel`}
                 rows={1}
                 value={settings.title}
                 onChange={(e) =>
@@ -886,6 +902,7 @@ function Builder({ test }: { test: BuilderTest }) {
               onMove={(id, d) => void moveQuestion(id, d)}
               onReorder={(ids) => void reorder(ids)}
               onAdd={(t) => void addQuestion(t)}
+              onOpenBank={() => setBankOpen(true)}
               adding={createQuestion.isPending}
               settingsTitle={settings.title}
               settingsHasIssue={settingsHasIssue}
@@ -959,6 +976,7 @@ function Builder({ test }: { test: BuilderTest }) {
                 title: selectedQuestion.title,
                 prompt: selectedQuestion.prompt,
                 points: selectedQuestion.points,
+                tags: selectedQuestion.tags,
                 data: selectedQuestion.data,
                 solutionCheck:
                   selectedQuestion.solutionCheck as SolutionCheck | null,
@@ -972,11 +990,12 @@ function Builder({ test }: { test: BuilderTest }) {
                 onSolutionChecked(selectedQuestion.id, check)
               }
               status={saveIndicator}
+              tagSuggestions={tagSuggestions}
               actions={
                 <>
                   <Button variant="ghost" size="sm" onClick={openPreview}>
                     <Eye aria-hidden="true" />
-                    <span className="hidden sm:inline">Voorbeeld</span>
+                    <span className="sr-only sm:not-sr-only">Voorbeeld</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -987,7 +1006,7 @@ function Builder({ test }: { test: BuilderTest }) {
                     }
                   >
                     <Copy aria-hidden="true" />
-                    <span className="hidden sm:inline">Dupliceren</span>
+                    <span className="sr-only sm:not-sr-only">Dupliceren</span>
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1127,6 +1146,26 @@ function Builder({ test }: { test: BuilderTest }) {
         onConfirm={
           test.hasAttempts ? () => changeStatus("archived") : confirmDeleteTest
         }
+      />
+
+      <QuestionBankDialog
+        open={bankOpen}
+        onOpenChange={setBankOpen}
+        testId={test.id}
+        questionCount={questions.length}
+        beforeAdd={() => flush()}
+        onAdded={(ids) => {
+          if (ids[0]) {
+            setSelection({ kind: "question", id: ids[0] });
+            const params = new URLSearchParams(window.location.search);
+            params.set("vraag", ids[0]);
+            window.history.replaceState(
+              null,
+              "",
+              `${window.location.pathname}?${params.toString()}`,
+            );
+          }
+        }}
       />
 
       <CopyToTestDialog

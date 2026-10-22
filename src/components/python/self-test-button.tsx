@@ -2,6 +2,7 @@
 
 import { FlaskConical, RotateCcw } from "lucide-react";
 import { useState } from "react";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -19,6 +20,7 @@ import type {
   CodeTest,
 } from "@/lib/questions/schema";
 import { cn } from "@/lib/utils";
+import { selfTestAnnouncement } from "./announcements";
 import { TestResultsList } from "./test-results-list";
 
 export type SelfTestButtonProps = {
@@ -50,6 +52,7 @@ export function SelfTestButton({
   className,
 }: SelfTestButtonProps) {
   const runner = usePythonRunner();
+  const announce = useAnnounce();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<CodeGradingResult | null>(null);
@@ -67,6 +70,12 @@ export function SelfTestButton({
         timeLimitMs,
       });
       setResult(r);
+      announce(
+        selfTestAnnouncement(
+          r.tests.filter((t) => t.passed).length,
+          r.tests.length,
+        ),
+      );
       onResult?.(r);
     } finally {
       setRunning(false);
@@ -90,7 +99,12 @@ export function SelfTestButton({
         className={className}
       >
         {running ? (
-          <Spinner size="sm" className="text-current" />
+          <Spinner
+            size="sm"
+            className="text-current"
+            role="presentation"
+            aria-hidden="true"
+          />
         ) : (
           <FlaskConical aria-hidden="true" />
         )}
@@ -118,18 +132,14 @@ export function SelfTestButton({
                 Deze opdracht heeft geen voorbeeldtests.
               </p>
             ) : running || !result ? (
-              // biome-ignore lint/a11y/useSemanticElements: a live loading region, not form output
-              <div
-                role="status"
-                className="text-muted-foreground flex items-center gap-2 py-8 text-sm"
-              >
-                <Spinner size="sm" />
+              <output className="text-muted-foreground flex items-center gap-2 py-8 text-sm">
+                <Spinner size="sm" role="presentation" aria-hidden="true" />
                 {runner.status === "loading"
-                  ? "Python wordt geladen…"
+                  ? "Python wordt geladen… dit duurt alleen de eerste keer even."
                   : "Je code wordt getest…"}
-              </div>
+              </output>
             ) : (
-              <TestResultsList result={result} />
+              <TestResultsList result={result} headingLevel={3} />
             )}
           </div>
           {!nothingToTest ? (

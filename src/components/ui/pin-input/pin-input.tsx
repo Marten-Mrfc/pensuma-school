@@ -1,8 +1,8 @@
 'use client'
 
-import * as React from 'react'
 import { OTPInput, OTPInputContext } from 'input-otp'
 import { Minus } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 type PinInputStatus = 'error' | 'warning' | 'success' | 'default'
@@ -73,10 +73,8 @@ function ensurePinInputStyles() {
   document.head.appendChild(style)
 }
 
-export interface PinInputProps extends Omit<
-  React.ComponentPropsWithoutRef<typeof OTPInput>,
-  'render' | 'children' | 'maxLength' | 'size'
-> {
+export interface PinInputProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof OTPInput>, 'render' | 'children' | 'maxLength' | 'size'> {
   /** Number of slots. Maps to input-otp's `maxLength`. */
   maxLength?: number
   /** Render the typed characters as dots instead of plain text. */
@@ -153,6 +151,7 @@ const PinInput = React.forwardRef<React.ElementRef<typeof OTPInput>, PinInputPro
           )}
           className={cn('disabled:cursor-not-allowed', className)}
           {...props}
+          aria-invalid={props['aria-invalid'] ?? (status === 'error' ? true : undefined)}
         >
           {children}
         </OTPInput>
@@ -182,9 +181,9 @@ const sizeClassMap: Record<PinInputSize, string> = {
 }
 
 const statusClassMap: Record<PinInputStatus, string> = {
-  error: 'border-destructive focus-within:border-destructive focus-within:ring-destructive/40 text-destructive',
-  warning: 'border-warning focus-within:border-warning focus-within:ring-warning/40 text-warning',
-  success: 'border-success focus-within:border-success focus-within:ring-success/40 text-success',
+  error: 'border-destructive focus-within:border-destructive focus-within:ring-destructive/40 text-destructive-ink',
+  warning: 'border-warning focus-within:border-warning focus-within:ring-warning/40 text-warning-ink',
+  success: 'border-success focus-within:border-success focus-within:ring-success/40 text-success-ink',
   default: '',
 }
 
@@ -231,9 +230,9 @@ const PinInputSlot = React.forwardRef<HTMLDivElement, PinInputSlotProps>(
         className={cn(
           'border-input bg-background text-foreground relative -ml-px flex items-center justify-center border text-center shadow-xs outline-none first:ml-0 first:rounded-l-md last:rounded-r-md',
           'transition-[border-color,box-shadow,color,transform] duration-150 ease-out',
-          'focus-within:border-ring focus-within:ring-ring/40 focus-within:relative focus-within:z-10 focus-within:ring-2',
+          'focus-within:border-ring focus-within:ring-ring focus-within:relative focus-within:z-10 focus-within:ring-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          isActive && 'border-ring ring-ring/40 z-10 ring-2',
+          isActive && 'border-ring ring-ring z-10 ring-2',
           isPopping && 'pin-slot-pop',
           sizeClassMap[ui.size],
           statusClassMap[ui.status],
@@ -266,7 +265,7 @@ PinInputSlot.displayName = 'PinInputSlot'
 
 const PinInputSeparator = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<'div'>>(
   ({ children, ...props }, ref) => (
-    <div ref={ref} data-uipkge="" data-slot="pin-input-separator" role="separator" {...props}>
+    <div ref={ref} data-uipkge="" data-slot="pin-input-separator" aria-hidden="true" {...props}>
       {children ?? <Minus aria-hidden="true" />}
     </div>
   ),
@@ -274,4 +273,3 @@ const PinInputSeparator = React.forwardRef<HTMLDivElement, React.ComponentPropsW
 PinInputSeparator.displayName = 'PinInputSeparator'
 
 export { PinInput, PinInputGroup, PinInputSlot, PinInputSeparator }
-

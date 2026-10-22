@@ -8,10 +8,13 @@ import {
   assignments,
   classes,
   classMembers,
+  loginThrottle,
   session,
   studentPins,
   user,
+  userActivity,
 } from "@/server/db/schema";
+import { studentThrottleKeys } from "@/server/security/login-throttle";
 import { effectiveAssignmentStatus } from "@/server/services/assignment-status";
 
 /** Klassen (classes) and their members. Teachers only. */
@@ -41,6 +44,68 @@ const descriptionSchema = optionalText(
   500,
   "De omschrijving mag maximaal 500 tekens hebben.",
 );
+
+/* ---------------------- Shared with the student router --------------------- */
+
+/**
+ * Last sign-in: user_activity (kept when sessions are pruned), else the
+ * newest stored session (session times are stored as UTC without zone).
+ */
+export const lastLoginAtSql = sql<Date | null>`coalesce(
+    (select ua.last_sign_in_at from ${userActivity} ua where ua.user_id = ${user}.id),
+    (select max(ls.created_at) at time zone 'UTC' from ${session} ls where ls.user_id = ${user}.id)
+  )`.mapWith(userActivity.lastSignInAt);
+
+export type LoginLock = {
+  /** Set while the account is locked (too many wrong PINs). */
+  loginLockedUntil: Date | null;
+  /** Failed sign-ins counted since the last success or reset. */
+  recentFailures: number;
+};
+
+/**
+ * Current login lockouts for these student numbers (one query). Students
+ * without throttle rows are missing from the map.
+ */
+export async function loginLocksFor(
+  db: DB,
+  studentNumbers: string[],
+): Promise<Map<string, LoginLock>> {
+  const keyToNumber = new Map<string, string>();
+  for (const nr of studentNumbers) {
+    if (!nr) continue;
+    for (const key of studentThrottleKeys(nr)) keyToNumber.set(key, nr);
+  }
+  const out = new Map<string, LoginLock>();
+  if (keyToNumber.size === 0) return out;
+  const rows = await db
+    .select({
+      key: loginThrottle.key,
+      failures: loginThrottle.failures,
+      lockedUntil: loginThrottle.lockedUntil,
+      // Compared in SQL: the column has no time zone and is set with now().
+      active: sql<boolean>`coalesce(${loginThrottle.lockedUntil} > now(), false)`,
+    })
+    .from(loginThrottle)
+    .where(inArray(loginThrottle.key, [...keyToNumber.keys()]));
+  for (const row of rows) {
+    const nr = keyToNumber.get(row.key);
+    if (!nr) continue;
+    const lock = out.get(nr) ?? { loginLockedUntil: null, recentFailures: 0 };
+    lock.recentFailures = Math.max(lock.recentFailures, row.failures);
+    if (
+      row.active &&
+      row.lockedUntil &&
+      (!lock.loginLockedUntil || row.lockedUntil > lock.loginLockedUntil)
+    ) {
+      lock.loginLockedUntil = row.lockedUntil;
+    }
+    out.set(nr, lock);
+  }
+  return out;
+}
+
+/* --------------------------------- Helpers -------------------------------- */
 
 /** Load a class or throw NOT_FOUND. */
 export async function getClassOrThrow(db: DB, id: string) {
@@ -172,10 +237,7 @@ export const classRouter = createTRPCRouter({
             createdAt: user.createdAt,
             addedAt: classMembers.createdAt,
             hasPin: sql<boolean>`${studentPins.userId} is not null`,
-            lastLoginAt:
-              sql<Date | null>`(select max(ls.created_at) from ${session} ls where ls.user_id = ${user}.id)`.mapWith(
-                session.createdAt,
-              ),
+            lastLoginAt: lastLoginAtSql,
           })
           .from(classMembers)
           .innerJoin(user, eq(user.id, classMembers.userId))
@@ -196,18 +258,25 @@ export const classRouter = createTRPCRouter({
       const openAssignmentCount = assignmentRows.filter(
         (a) => effectiveAssignmentStatus(a, now) === "open",
       ).length;
+      const students = members.filter((m) => m.role === ROLES.student);
+      const locks = await loginLocksFor(
+        ctx.db,
+        students.map((m) => m.username ?? ""),
+      );
 
       return {
         ...klas,
         assignmentCount: assignmentRows.length,
         openAssignmentCount,
-        members: members
-          .filter((m) => m.role === ROLES.student)
-          .map(({ role: _role, username, banned, ...m }) => ({
-            ...m,
-            studentNumber: username ?? "",
-            banned: banned ?? false,
-          })),
+        members: students.map(({ role: _role, username, banned, ...m }) => ({
+          ...m,
+          studentNumber: username ?? "",
+          banned: banned ?? false,
+          ...(locks.get(username ?? "") ?? {
+            loginLockedUntil: null,
+            recentFailures: 0,
+          }),
+        })),
       };
     }),
 
@@ -297,7 +366,7 @@ export const classRouter = createTRPCRouter({
       z.object({
         classId: classIdSchema,
         userIds: z
-          .array(z.string().min(1))
+          .array(z.string().min(1).max(64))
           .min(1, "Kies minstens één leerling.")
           .max(1000),
       }),
@@ -328,7 +397,9 @@ export const classRouter = createTRPCRouter({
 
   /** Remove a student from a class (the account itself stays). */
   removeMember: adminProcedure
-    .input(z.object({ classId: classIdSchema, userId: z.string().min(1) }))
+    .input(
+      z.object({ classId: classIdSchema, userId: z.string().min(1).max(64) }),
+    )
     .mutation(async ({ ctx, input }) => {
       const removed = await ctx.db
         .delete(classMembers)

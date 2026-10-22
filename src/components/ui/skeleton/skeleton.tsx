@@ -34,6 +34,7 @@ const shimmerCss = `
 `
 
 function ShimmerStyle() {
+  // biome-ignore lint/security/noDangerouslySetInnerHtml: static keyframes CSS, no user input
   return <style dangerouslySetInnerHTML={{ __html: shimmerCss }} />
 }
 

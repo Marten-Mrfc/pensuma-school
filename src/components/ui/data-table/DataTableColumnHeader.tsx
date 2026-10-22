@@ -1,5 +1,7 @@
 'use client'
 
+import type { Column } from '@tanstack/react-table'
+import { ArrowUp, ArrowUpDown, Check, Filter, FilterX } from 'lucide-react'
 /**
  * Sortable / hideable header cell for TanStack DataTable columns. Use it from
  * a column definition like:
@@ -22,16 +24,14 @@
  * column has an active filter.
  */
 import * as React from 'react'
-import type { Column } from '@tanstack/react-table'
-import { ArrowUp, ArrowUpDown, Check, Filter, FilterX } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { isoToDate, dateToIso } from './date-utils'
+import { cn } from '@/lib/utils'
+import { dateToIso, isoToDate } from './date-utils'
 
 interface FilterOption {
   value: string
@@ -85,11 +85,11 @@ export function DataTableColumnHeader<TData, TValue>({
   // Text-input bound separately so we can apply on blur / Enter rather than
   // thrashing the column filter on every keystroke.
   const [textDraft, setTextDraft] = React.useState('')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seed the draft only when the popover opens, not on every filter change
   React.useEffect(() => {
     if (open && filter?.type === 'text') {
       setTextDraft((filterValue as string) ?? '')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   function applyText() {
@@ -160,19 +160,23 @@ export function DataTableColumnHeader<TData, TValue>({
         <button
           type="button"
           className="group text-muted-foreground hover:text-foreground hover:bg-muted/60 -mx-2 inline-flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium transition-colors duration-150"
-          aria-label={`Sort by ${label}`}
+          aria-label={`Sorteren op ${label}`}
           onClick={next}
         >
           <span>{label}</span>
           {column.getIsSorted() ? (
             <ArrowUp
+              aria-hidden="true"
               className={cn(
                 'text-foreground size-3.5 transition-transform duration-200 ease-in-out',
                 column.getIsSorted() === 'desc' ? 'rotate-180' : 'rotate-0',
               )}
             />
           ) : (
-            <ArrowUpDown className="size-3.5 opacity-40 transition-opacity duration-150 group-hover:opacity-70" />
+            <ArrowUpDown
+              aria-hidden="true"
+              className="size-3.5 opacity-40 transition-opacity duration-150 group-hover:opacity-70"
+            />
           )}
         </button>
       ) : (
@@ -192,7 +196,7 @@ export function DataTableColumnHeader<TData, TValue>({
               )}
               aria-label={`Filter ${label}`}
             >
-              <Filter className="size-3.5" />
+              <Filter className="size-3.5" aria-hidden="true" />
               {isFilterActive && (
                 <span aria-hidden className="bg-primary absolute -top-0.5 -right-0.5 size-1.5 rounded-full" />
               )}
@@ -207,8 +211,8 @@ export function DataTableColumnHeader<TData, TValue>({
                   className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
                   onClick={clearFilter}
                 >
-                  <FilterX className="size-3" />
-                  Clear
+                  <FilterX className="size-3" aria-hidden="true" />
+                  Wissen
                 </button>
               )}
             </div>
@@ -218,7 +222,8 @@ export function DataTableColumnHeader<TData, TValue>({
               <div className="space-y-2 p-3">
                 <Input
                   value={textDraft}
-                  placeholder={`Search ${filter.label.toLowerCase()}…`}
+                  placeholder={`Zoek ${filter.label.toLowerCase()}…`}
+                  aria-label={`Filter ${filter.label}`}
                   className="h-8"
                   onChange={(e) => setTextDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -238,10 +243,10 @@ export function DataTableColumnHeader<TData, TValue>({
                       setOpen(false)
                     }}
                   >
-                    Apply
+                    Toepassen
                   </Button>
                   <Button size="sm" variant="outline" className="h-8" onClick={clearText}>
-                    Clear
+                    Wissen
                   </Button>
                 </div>
               </div>
@@ -250,9 +255,9 @@ export function DataTableColumnHeader<TData, TValue>({
             {/* SELECT / MULTISELECT */}
             {(filter.type === 'select' || filter.type === 'multiselect') && (
               <Command className="max-h-[280px]">
-                <CommandInput placeholder={`Search ${filter.label.toLowerCase()}…`} className="h-8" />
+                <CommandInput placeholder={`Zoek ${filter.label.toLowerCase()}…`} className="h-8" />
                 <CommandList>
-                  <CommandEmpty>No matches.</CommandEmpty>
+                  <CommandEmpty>Geen resultaten.</CommandEmpty>
                   <CommandGroup>
                     {(filter.options ?? []).map((opt) => {
                       const o = resolveOption(opt)
@@ -273,10 +278,11 @@ export function DataTableColumnHeader<TData, TValue>({
                                   : 'opacity-50',
                               )}
                             >
-                              <Check className="size-3" />
+                              <Check className="size-3" aria-hidden="true" />
                             </div>
                           ) : (
                             <Check
+                              aria-hidden="true"
                               className={cn('mr-2 size-4', filterValue === o.value ? 'opacity-100' : 'opacity-0')}
                             />
                           )}
@@ -295,10 +301,10 @@ export function DataTableColumnHeader<TData, TValue>({
                 <RangeCalendar selected={dateModel} onSelect={onDateSelect} />
                 <div className="flex gap-2 px-1 pt-2">
                   <Button size="sm" className="h-8 flex-1" onClick={() => setOpen(false)}>
-                    Apply
+                    Toepassen
                   </Button>
                   <Button size="sm" variant="outline" className="h-8" onClick={clearFilter}>
-                    Clear
+                    Wissen
                   </Button>
                 </div>
               </div>
@@ -309,7 +315,7 @@ export function DataTableColumnHeader<TData, TValue>({
               <div className="border-border text-muted-foreground border-t px-3 py-2 text-xs">
                 {filter.type === 'multiselect' ? (
                   <span>
-                    {selectedLabels().length} selected:{' '}
+                    {selectedLabels().length} geselecteerd:{' '}
                     <span className="text-foreground">{selectedLabels().join(', ')}</span>
                   </span>
                 ) : (
@@ -325,4 +331,3 @@ export function DataTableColumnHeader<TData, TValue>({
     </div>
   )
 }
-

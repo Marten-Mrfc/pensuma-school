@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // RangeBarChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ export interface RangeBarChartProps {
   height?: number | string
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -108,7 +108,7 @@ export const RangeBarChart = React.forwardRef<HTMLDivElement, RangeBarChartProps
     }, [data, horizontal, option, theme])
 
     return (
-      <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel || 'Range bar chart'}>
+      <ChartFrame ref={ref} height={height} className={className} ariaLabel={ariaLabel || 'Bereikstaafdiagram'}>
         <EChart option={mergedOption} />
       </ChartFrame>
     )

@@ -29,7 +29,7 @@ export interface SmoothFunnelProps {
   /** Optional fallback palette when `color` is omitted on a stage. */
   colors?: string[]
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 
@@ -108,7 +108,6 @@ export const SmoothFunnel = React.forwardRef<HTMLDivElement, SmoothFunnelProps>(
         ref={ref}
         data-uipkge=""
         data-slot="smooth-funnel"
-        tabIndex={0}
         style={{ height: heightToStyle(height) }}
         className={cn('focus-visible:ring-ring w-full focus-visible:ring-2 focus-visible:outline-none', className)}
       >
@@ -117,7 +116,7 @@ export const SmoothFunnel = React.forwardRef<HTMLDivElement, SmoothFunnelProps>(
           className="block h-full w-full"
           preserveAspectRatio="none"
           role="img"
-          aria-label={ariaLabel || 'Chart'}
+          aria-label={ariaLabel || 'Grafiek'}
         >
           {segments.map((seg, i) => (
             <g key={i}>

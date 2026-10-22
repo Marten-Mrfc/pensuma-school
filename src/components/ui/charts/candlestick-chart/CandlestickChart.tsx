@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import ReactECharts from 'echarts-for-react/esm/core'
 import { ChartFrame, EChart } from '../shared'
-import { useChartTheme, mergeOptionBlock } from '../useChartTheme'
+import { mergeOptionBlock, useChartTheme } from '../useChartTheme'
 
 // CandlestickChart
 // ─────────────────────────────────────────────────────────────────────────
@@ -23,7 +22,7 @@ export interface CandlestickChartProps {
   zoom?: boolean
   option?: any
   className?: string
-  /** Accessible name announced for the chart image. Defaults to "Chart". */
+  /** Accessible name announced for the chart image. Defaults to "Grafiek". */
   ariaLabel?: string
 }
 

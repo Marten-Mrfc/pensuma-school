@@ -6,40 +6,14 @@
  *
  * Environment (see .env.example):
  *   SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD / SEED_ADMIN_NAME  first teacher
+ *     (in production SEED_ADMIN_PASSWORD must meet the teacher password
+ *     policy; development defaults to "welkom-docent")
  *   SEED_DEMO=false                                            skip demo class/test
  *
  * Idempotent: existing accounts / demo data are left alone.
  */
-import { eq } from "drizzle-orm";
-import { db } from "@/server/db";
-import { user } from "@/server/db/schema";
 import { loadDemoData } from "@/server/demo";
-import { createAdminAccount } from "@/server/services/accounts";
-
-async function seedAdmin() {
-  const email = (
-    process.env.SEED_ADMIN_EMAIL ?? "docent@pensuma.local"
-  ).toLowerCase();
-  const password =
-    process.env.SEED_ADMIN_PASSWORD ??
-    (process.env.NODE_ENV === "production" ? "" : "welkom-docent");
-  const name = process.env.SEED_ADMIN_NAME ?? "Docent";
-  const [existing] = await db.select().from(user).where(eq(user.email, email));
-  if (existing) {
-    console.log(`✓ Docent ${email} bestaat al`);
-    return existing.id;
-  }
-  if (password.length < 10) {
-    throw new Error(
-      "Zet SEED_ADMIN_PASSWORD (minstens 10 tekens) om een docentaccount aan te maken.",
-    );
-  }
-  const created = await createAdminAccount({ name, email, password });
-  console.log(
-    `✓ Docent aangemaakt: ${email} / ${process.env.SEED_ADMIN_PASSWORD ? "(wachtwoord uit SEED_ADMIN_PASSWORD)" : password}`,
-  );
-  return created.id;
-}
+import { seedAdmin } from "./seed-admin";
 
 async function main() {
   const adminId = await seedAdmin();
@@ -58,6 +32,6 @@ async function main() {
 main()
   .then(() => process.exit(0))
   .catch((err) => {
-    console.error(err);
+    console.error(err instanceof Error ? err.message : err);
     process.exit(1);
   });

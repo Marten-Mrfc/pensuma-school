@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlarmClockPlus,
+  Clock,
   Eye,
   Loader2,
   MonitorX,
@@ -37,10 +38,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { RelativeTime } from "@/components/ui/relative-time";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { computeGrade, type GradingScale } from "@/lib/grading/grade-scale";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { formatGrade, formatNumber, formatRemaining } from "./format";
+import { useDialogReturnFocus } from "./use-dialog-return-focus";
 
 type Monitor = RouterOutputs["assignment"]["monitor"];
 type StudentRow = Monitor["students"][number];
@@ -54,18 +62,28 @@ function rowState(row: StudentRow) {
   return row.attempt.status;
 }
 
+/** Help text for the focus-loss column. */
+export const FOCUS_LOSS_HELP =
+  "Voorleessoftware, dicteerfuncties en vergrotingsprogramma's kunnen dit ook veroorzaken.";
+
 export function MonitorTable({
   assignmentId,
   data,
   now,
   serverOffsetMs,
+  scale,
+  logFocusEvents = true,
 }: {
   assignmentId: string;
   data: Monitor;
   /** Local clock, ticking every second. */
   now: number;
   serverOffsetMs: number;
+  /** The afname's grading scale (from assignment.get settings). */
+  scale?: GradingScale;
+  logFocusEvents?: boolean;
 }) {
+  const headingId = useId();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<
@@ -110,12 +128,12 @@ export function MonitorTable({
   ];
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="monitor-students">
+    <section className="flex flex-col gap-3" aria-labelledby={headingId}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h2 id="monitor-students" className="sr-only">
+        <h2 id={headingId} className="sr-only">
           Leerlingen
         </h2>
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <div className="flex flex-wrap gap-1.5">
           {filters.map((f) => (
             <button
               key={f.value}
@@ -134,6 +152,12 @@ export function MonitorTable({
               </span>
             </button>
           ))}
+          {data.summary.withAccommodation > 0 ? (
+            <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-info/10 px-3 text-sm font-medium whitespace-nowrap text-info-ink">
+              <Clock className="size-3.5" aria-hidden="true" />
+              {data.summary.withAccommodation} met verlengde tijd
+            </span>
+          ) : null}
         </div>
         <div className="md:w-64">
           <Input
@@ -217,7 +241,7 @@ export function MonitorTable({
                       <LastSeenCell row={row} serverNow={serverNow} />
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <ScoreCell row={row} />
+                      <ScoreCell row={row} scale={scale} />
                     </td>
                     <td className="px-2 py-3 text-right">
                       <RowActions
@@ -266,7 +290,7 @@ export function MonitorTable({
                       </div>
                       <div className="flex flex-col gap-0.5 text-right">
                         <span className="text-muted-foreground">Score</span>
-                        <ScoreCell row={row} />
+                        <ScoreCell row={row} scale={scale} />
                       </div>
                     </div>
                   </>
@@ -274,6 +298,18 @@ export function MonitorTable({
               </li>
             ))}
           </ul>
+          {logFocusEvents ? (
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+              <MonitorX
+                className="mt-0.5 size-3.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span>
+                Vensterwissels: het aantal keer dat een leerling het
+                toetsvenster verliet. {FOCUS_LOSS_HELP}
+              </span>
+            </p>
+          ) : null}
         </>
       )}
 
@@ -283,7 +319,12 @@ export function MonitorTable({
       />
       <ReopenAttemptDialog
         row={dialog?.kind === "reopen" ? dialog.row : null}
-        defaultMinutes={data.assignment.timeLimitMinutes ?? 15}
+        defaultMinutes={
+          (data.assignment.timeLimitMinutes ?? 15) +
+          (dialog?.kind === "reopen"
+            ? (dialog.row.attempt?.accommodationMinutes ?? 0)
+            : 0)
+        }
         assignmentClosed={data.assignment.effectiveStatus === "closed"}
         onClose={() => setDialog(null)}
       />
@@ -312,8 +353,13 @@ function StudentCell({ row }: { row: StudentRow }) {
         {initials(row.student.name)}
       </span>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate font-medium text-foreground">
-          {row.student.name}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span className="truncate font-medium text-foreground">
+            {row.student.name}
+          </span>
+          {row.extraTimePercent > 0 ? (
+            <ExtraTimeBadge percent={row.extraTimePercent} />
+          ) : null}
         </span>
         <span className="text-xs text-muted-foreground tabular-nums">
           {row.student.studentNumber ?? "–"}
@@ -324,6 +370,24 @@ function StudentCell({ row }: { row: StudentRow }) {
         </span>
       </div>
     </div>
+  );
+}
+
+/** "+25%" with a clock; the tooltip explains it is a facility. */
+function ExtraTimeBadge({ percent }: { percent: number }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-5 shrink-0 cursor-default items-center gap-0.5 rounded-full bg-info/10 px-1.5 text-[11px] font-semibold text-info-ink tabular-nums outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          <Clock className="size-3" aria-hidden="true" />+{percent}%
+          <span className="sr-only"> verlengde tijd (faciliteit)</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Verlengde tijd (faciliteit)</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -421,7 +485,7 @@ function RemainingCell({
   if (!a.deadlineAt)
     return <span className="text-xs text-muted-foreground">Geen limiet</span>;
   const left = new Date(a.deadlineAt).getTime() - serverNow;
-  return (
+  const content = (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 font-mono text-sm font-medium tabular-nums",
@@ -433,12 +497,32 @@ function RemainingCell({
       )}
     >
       {left <= 0 ? "Tijd om" : formatRemaining(left)}
+      {a.accommodationMinutes > 0 ? (
+        <Clock className="size-3.5 text-info-ink" aria-hidden="true" />
+      ) : null}
       {a.extraMinutes > 0 ? (
         <span className="rounded bg-info/10 px-1 font-sans text-[10px] font-semibold text-info-ink">
           +{a.extraMinutes}
+          <span className="sr-only"> minuten extra gegeven</span>
         </span>
       ) : null}
     </span>
+  );
+  if (a.accommodationMinutes <= 0) return content;
+  const help = `Inclusief ${a.accommodationMinutes} min verlengde tijd`;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="cursor-default rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          {content}
+          <span className="sr-only"> ({help})</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{help}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -448,7 +532,9 @@ function FocusCell({ row }: { row: StudentRow }) {
     return <span className="text-xs text-muted-foreground">–</span>;
   if (n === 0)
     return (
-      <span className="text-xs text-muted-foreground tabular-nums">0</span>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        0<span className="sr-only"> keer venster verlaten</span>
+      </span>
     );
   return (
     <span
@@ -458,10 +544,11 @@ function FocusCell({ row }: { row: StudentRow }) {
           ? "bg-destructive/10 text-destructive-ink ring-destructive/25"
           : "bg-warning/12 text-warning-ink ring-warning/30",
       )}
-      title={`${n} keer het venster of tabblad verlaten`}
+      title={`${n} keer venster verlaten. ${FOCUS_LOSS_HELP}`}
     >
       <MonitorX className="size-3.5" aria-hidden="true" />
       {n}
+      <span className="sr-only"> keer venster verlaten</span>
     </span>
   );
 }
@@ -494,7 +581,7 @@ function LastSeenCell({
   );
 }
 
-function ScoreCell({ row }: { row: StudentRow }) {
+function ScoreCell({ row, scale }: { row: StudentRow; scale?: GradingScale }) {
   const a = row.attempt;
   if (!a || a.status !== "submitted")
     return <span className="text-xs text-muted-foreground">–</span>;
@@ -511,7 +598,7 @@ function ScoreCell({ row }: { row: StudentRow }) {
   }
   const grade =
     a.score != null && a.maxScore
-      ? 1 + 9 * Math.max(0, Math.min(1, a.score / a.maxScore))
+      ? computeGrade(a.score, a.maxScore, scale)
       : null;
   return (
     <span className="inline-flex flex-col items-end leading-tight">
@@ -527,7 +614,7 @@ function ScoreCell({ row }: { row: StudentRow }) {
         </span>
       ) : grade != null ? (
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          cijfer {formatGrade(Math.round(grade * 10) / 10)}
+          cijfer {formatGrade(grade)}
         </span>
       ) : null}
     </span>
@@ -695,9 +782,10 @@ function MinutesDialog({
   const [value, setValue] = useState(String(defaultMinutes));
   const minutes = Number.parseInt(value, 10);
   const valid = Number.isFinite(minutes) && minutes >= 1 && minutes <= 600;
+  const returnFocus = useDialogReturnFocus();
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !pending && onClose()}>
-      <DialogContent className="gap-5 sm:max-w-md">
+      <DialogContent className="gap-5 sm:max-w-md" {...returnFocus}>
         <div className="flex flex-col gap-1.5">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -860,6 +948,12 @@ function ReopenAttemptDialog({
         onClose();
       }}
     >
+      {row?.attempt && row.attempt.accommodationMinutes > 0 ? (
+        <p className="rounded-md bg-info/10 px-3 py-2 text-sm text-info-ink">
+          Deze leerling heeft verlengde tijd. De voorgestelde tijd is inclusief{" "}
+          {row.attempt.accommodationMinutes} minuten verlengde tijd.
+        </p>
+      ) : null}
       {assignmentClosed ? (
         <p className="rounded-md bg-info/10 px-3 py-2 text-sm text-info-ink">
           De afname is gesloten, maar deze leerling kan toch verder tot de

@@ -1,122 +1,56 @@
-import { randomInt } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
-import { z } from "zod";
-import { ADMIN_MIN_PASSWORD_LENGTH, ROLES } from "@/lib/auth-shared";
+import { ZodRealError, z } from "zod";
+import { ADMIN_MAX_PASSWORD_LENGTH, ROLES } from "@/lib/auth-shared";
+import { validateTeacherPassword } from "@/lib/security/password-policy";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
+import { auth } from "@/server/auth";
 import type { DB } from "@/server/db";
-import { session, user } from "@/server/db/schema";
+import { account, session, user, userActivity } from "@/server/db/schema";
+import { generateTemporaryPassword } from "@/server/security/temporary-password";
 import {
   createAdminAccount,
   setAccountPassword,
 } from "@/server/services/accounts";
+import { auditFromCtx } from "@/server/services/audit";
 
 /** Docent (teacher) accounts. Teachers only. */
 
-/** Short, unambiguous Dutch words for readable temporary passwords. */
-const WORDS = [
-  "appel",
-  "banaan",
-  "beker",
-  "berg",
-  "bloem",
-  "boom",
-  "brug",
-  "bus",
-  "das",
-  "deur",
-  "dijk",
-  "duin",
-  "eend",
-  "fiets",
-  "fluit",
-  "gans",
-  "gitaar",
-  "haven",
-  "hek",
-  "hond",
-  "huis",
-  "jas",
-  "kaas",
-  "kade",
-  "kam",
-  "kast",
-  "kat",
-  "kerk",
-  "klok",
-  "koe",
-  "kom",
-  "kraan",
-  "kroon",
-  "lamp",
-  "leeuw",
-  "maan",
-  "mand",
-  "meer",
-  "mol",
-  "muur",
-  "nest",
-  "noot",
-  "oven",
-  "paard",
-  "pan",
-  "pen",
-  "peer",
-  "plant",
-  "pomp",
-  "raam",
-  "regen",
-  "ring",
-  "rots",
-  "schip",
-  "sjaal",
-  "slak",
-  "sleutel",
-  "sok",
-  "spin",
-  "stad",
-  "stoel",
-  "storm",
-  "strand",
-  "tafel",
-  "tak",
-  "tent",
-  "tijger",
-  "toren",
-  "trein",
-  "tuin",
-  "uil",
-  "vaas",
-  "veer",
-  "vis",
-  "vlag",
-  "vos",
-  "vuur",
-  "wagen",
-  "wiel",
-  "wolk",
-  "zaag",
-  "zand",
-  "zebra",
-  "zee",
-  "zeil",
-  "zon",
-  "zwaan",
-];
+const userIdSchema = z
+  .string()
+  .min(1, "Ongeldige docent.")
+  .max(64, "Ongeldige docent.");
 
-/** e.g. "tafel-wolk-trein-47" (≥ ADMIN_MIN_PASSWORD_LENGTH, easy to read aloud). */
-export function generateTemporaryPassword(): string {
-  for (;;) {
-    const words = Array.from(
-      { length: 3 },
-      () => WORDS[randomInt(WORDS.length)],
-    );
-    const password = `${words.join("-")}-${randomInt(10, 100)}`;
-    if (password.length >= ADMIN_MIN_PASSWORD_LENGTH) return password;
-  }
+const nameSchema = z
+  .string()
+  .trim()
+  .min(2, "Vul de naam van de docent in.")
+  .max(100, "De naam is te lang.");
+
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(254, "Dit e-mailadres is te lang.")
+  .pipe(z.email("Vul een geldig e-mailadres in."));
+
+const WRONG_CURRENT_PASSWORD = "Je huidige wachtwoord klopt niet.";
+
+/** Serialises teacher removals (pg_advisory_xact_lock). */
+const STAFF_REMOVE_LOCK = "pensuma:staff-remove";
+
+/** BAD_REQUEST whose zodError points at one field (shown under it). */
+function fieldError(field: string, message: string) {
+  return new TRPCError({
+    code: "BAD_REQUEST",
+    message,
+    cause: new ZodRealError([
+      { code: "custom", path: [field], message, input: undefined },
+    ]),
+  });
 }
 
-const userIdSchema = z.string().min(1, "Ongeldige docent.");
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function getTeacherOrThrow(db: DB, id: string) {
   const [row] = await db
@@ -132,8 +66,9 @@ async function getTeacherOrThrow(db: DB, id: string) {
   return row;
 }
 
+/** Last sign-in: user_activity, else the newest session (older installs). */
 const lastLoginAt =
-  sql<Date | null>`(select max(ls.created_at) from ${session} ls where ls.user_id = ${user}.id)`.mapWith(
+  sql<Date | null>`coalesce(${userActivity.lastSignInAt}, (select max(ls.created_at) from ${session} ls where ls.user_id = ${user}.id))`.mapWith(
     session.createdAt,
   );
 
@@ -146,65 +81,74 @@ export const staffRouter = createTRPCRouter({
         name: user.name,
         email: user.email,
         createdAt: user.createdAt,
+        passwordChangeRequired: user.passwordChangeRequired,
         lastLoginAt,
       })
       .from(user)
+      .leftJoin(userActivity, eq(userActivity.userId, user.id))
       .where(eq(user.role, ROLES.admin))
       .orderBy(asc(user.name));
     return rows.map((r) => ({ ...r, isMe: r.id === ctx.user.id }));
   }),
 
-  /** The signed-in teacher's own profile. */
-  me: adminProcedure.query(async ({ ctx }) => {
-    const [row] = await ctx.db
-      .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        createdAt: user.createdAt,
-      })
-      .from(user)
-      .where(eq(user.id, ctx.user.id));
-    if (!row)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Je account bestaat niet (meer).",
-      });
-    const [{ sessions }] = await ctx.db
-      .select({ sessions: sql<number>`count(*)::int` })
-      .from(session)
-      .where(
-        and(eq(session.userId, ctx.user.id), sql`${session.expiresAt} > now()`),
-      );
-    return { ...row, activeSessions: sessions };
-  }),
+  /** The signed-in teacher's own profile (also with a temporary password). */
+  me: adminProcedure
+    .meta({ allowWithPendingPasswordChange: true })
+    .query(async ({ ctx }) => {
+      const [row] = await ctx.db
+        .select({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          createdAt: user.createdAt,
+          passwordChangeRequired: user.passwordChangeRequired,
+        })
+        .from(user)
+        .where(eq(user.id, ctx.user.id));
+      if (!row)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Je account bestaat niet (meer).",
+        });
+      const [{ sessions }] = await ctx.db
+        .select({ sessions: sql<number>`count(*)::int` })
+        .from(session)
+        .where(
+          and(
+            eq(session.userId, ctx.user.id),
+            sql`${session.expiresAt} > now()`,
+          ),
+        );
+      return { ...row, activeSessions: sessions };
+    }),
 
   /**
    * Add a teacher. Without a password a readable temporary one is generated
-   * and returned once (`temporaryPassword`).
+   * and returned once (`temporaryPassword`); the teacher must replace it at
+   * the first sign-in.
    */
   create: adminProcedure
     .input(
-      z.object({
-        name: z
-          .string()
-          .trim()
-          .min(2, "Vul de naam van de docent in.")
-          .max(100, "De naam is te lang."),
-        email: z
-          .string()
-          .trim()
-          .toLowerCase()
-          .pipe(z.email("Vul een geldig e-mailadres in.")),
-        password: z
-          .string()
-          .min(
-            ADMIN_MIN_PASSWORD_LENGTH,
-            `Het wachtwoord moet minstens ${ADMIN_MIN_PASSWORD_LENGTH} tekens hebben.`,
-          )
-          .max(128, "Het wachtwoord is te lang.")
-          .optional(),
-      }),
+      z
+        .object({
+          name: nameSchema,
+          email: emailSchema,
+          password: z.string().max(1000).optional(),
+        })
+        .superRefine((value, refine) => {
+          if (value.password === undefined) return;
+          const result = validateTeacherPassword(value.password, {
+            email: value.email,
+            name: value.name,
+          });
+          if (!result.ok) {
+            refine.addIssue({
+              code: "custom",
+              path: ["password"],
+              message: result.message,
+            });
+          }
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       const [existing] = await ctx.db
@@ -225,6 +169,19 @@ export const staffRouter = createTRPCRouter({
         email: input.email,
         password: input.password ?? (temporaryPassword as string),
       });
+      if (temporaryPassword) {
+        await ctx.db
+          .update(user)
+          .set({ passwordChangeRequired: true })
+          .where(eq(user.id, created.id));
+      }
+      await auditFromCtx(ctx, {
+        action: "staff.created",
+        subjectType: "staff",
+        subjectId: created.id,
+        subjectLabel: created.email,
+        details: { passwordChangeRequired: !!temporaryPassword },
+      });
       return {
         user: { id: created.id, name: created.name, email: created.email },
         temporaryPassword,
@@ -244,6 +201,16 @@ export const staffRouter = createTRPCRouter({
       const teacher = await getTeacherOrThrow(ctx.db, input.id);
       const password = generateTemporaryPassword();
       await setAccountPassword(teacher.id, password);
+      await ctx.db
+        .update(user)
+        .set({ passwordChangeRequired: true })
+        .where(eq(user.id, teacher.id));
+      await auditFromCtx(ctx, {
+        action: "staff.password_reset",
+        subjectType: "staff",
+        subjectId: teacher.id,
+        subjectLabel: teacher.email,
+      });
       return {
         id: teacher.id,
         name: teacher.name,
@@ -251,6 +218,106 @@ export const staffRouter = createTRPCRouter({
         password,
       };
     }),
+
+  /**
+   * Change your own password. Works with a pending temporary password (it
+   * is how the teacher gets out of that state). Signs out every other
+   * session of this teacher.
+   */
+  changeMyPassword: adminProcedure
+    .meta({ allowWithPendingPasswordChange: true })
+    .input(
+      z.object({
+        currentPassword: z
+          .string()
+          .min(1, "Vul je huidige wachtwoord in.")
+          .max(ADMIN_MAX_PASSWORD_LENGTH, WRONG_CURRENT_PASSWORD),
+        newPassword: z.string().max(1000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const authContext = await auth.$context;
+      const [credential] = await ctx.db
+        .select({ id: account.id, password: account.password })
+        .from(account)
+        .where(
+          and(
+            eq(account.userId, ctx.user.id),
+            eq(account.providerId, "credential"),
+          ),
+        )
+        .limit(1);
+      const valid = credential?.password
+        ? await authContext.password.verify({
+            hash: credential.password,
+            password: input.currentPassword,
+          })
+        : false;
+      if (!credential || !valid) {
+        // Slows down guessing with a stolen session.
+        await sleep(400);
+        throw fieldError("currentPassword", WRONG_CURRENT_PASSWORD);
+      }
+      if (input.newPassword === input.currentPassword) {
+        throw fieldError(
+          "newPassword",
+          "Kies een ander wachtwoord dan je huidige.",
+        );
+      }
+      const policy = validateTeacherPassword(input.newPassword, {
+        email: ctx.user.email,
+        name: ctx.user.name,
+      });
+      if (!policy.ok) throw fieldError("newPassword", policy.message);
+
+      const hash = await authContext.password.hash(input.newPassword);
+      const currentSessionId = ctx.session.session.id;
+      const signedOut = await ctx.db.transaction(async (tx) => {
+        await tx
+          .update(account)
+          .set({ password: hash })
+          .where(eq(account.id, credential.id));
+        await tx
+          .update(user)
+          .set({ passwordChangeRequired: false })
+          .where(eq(user.id, ctx.user.id));
+        const removed = await tx
+          .delete(session)
+          .where(
+            and(
+              eq(session.userId, ctx.user.id),
+              ne(session.id, currentSessionId),
+            ),
+          )
+          .returning({ id: session.id });
+        await auditFromCtx(
+          ctx,
+          {
+            action: "auth.password_changed",
+            subjectType: "staff",
+            subjectId: ctx.user.id,
+            details: { otherSessionsCount: removed.length },
+          },
+          tx,
+        );
+        return removed.length;
+      });
+      return { ok: true as const, otherSessionsSignedOut: signedOut };
+    }),
+
+  /** Sign out all your other sessions (this one stays signed in). */
+  signOutOtherSessions: adminProcedure.mutation(async ({ ctx }) => {
+    const removed = await ctx.db
+      .delete(session)
+      .where(
+        and(
+          eq(session.userId, ctx.user.id),
+          ne(session.id, ctx.session.session.id),
+        ),
+      )
+      .returning({ id: session.id });
+    return { signedOut: removed.length };
+  }),
 
   /** Remove a teacher account (not yourself; at least one teacher remains). */
   remove: adminProcedure
@@ -262,18 +329,35 @@ export const staffRouter = createTRPCRouter({
           message: "Je kunt je eigen account niet verwijderen.",
         });
       }
-      await getTeacherOrThrow(ctx.db, input.id);
-      const [{ others }] = await ctx.db
-        .select({ others: sql<number>`count(*)::int` })
-        .from(user)
-        .where(and(eq(user.role, ROLES.admin), ne(user.id, input.id)));
-      if (others < 1) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Er moet minstens één docent overblijven.",
-        });
-      }
-      await ctx.db.delete(user).where(eq(user.id, input.id));
+      const teacher = await getTeacherOrThrow(ctx.db, input.id);
+      await ctx.db.transaction(async (tx) => {
+        // Two teachers removing each other at the same moment must not
+        // leave nobody: count and delete under one lock.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${STAFF_REMOVE_LOCK}))`,
+        );
+        const [{ others }] = await tx
+          .select({ others: sql<number>`count(*)::int` })
+          .from(user)
+          .where(and(eq(user.role, ROLES.admin), ne(user.id, input.id)));
+        if (others < 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Er moet minstens één docent overblijven.",
+          });
+        }
+        await tx.delete(user).where(eq(user.id, input.id));
+        await auditFromCtx(
+          ctx,
+          {
+            action: "staff.removed",
+            subjectType: "staff",
+            subjectId: teacher.id,
+            subjectLabel: teacher.email,
+          },
+          tx,
+        );
+      });
       return { id: input.id };
     }),
 

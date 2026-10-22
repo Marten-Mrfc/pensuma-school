@@ -33,8 +33,8 @@ export function TemporaryPasswordView({
       </div>
       <p className="flex items-start gap-2 text-xs leading-relaxed text-warning-ink">
         <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-        Dit wachtwoord wordt maar één keer getoond. Vraag de docent om het na
-        het inloggen te wijzigen via Mijn account.
+        Dit wachtwoord wordt maar één keer getoond. Na het inloggen kiest de
+        docent meteen een eigen wachtwoord.
       </p>
     </div>
   );

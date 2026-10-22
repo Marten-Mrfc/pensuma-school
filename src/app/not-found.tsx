@@ -12,7 +12,11 @@ export default function NotFound() {
   return (
     <div className="flex min-h-dvh flex-col">
       <PublicHeader />
-      <main className="relative flex flex-1 items-center justify-center px-5 py-20 sm:px-8">
+      <main
+        id="inhoud"
+        tabIndex={-1}
+        className="relative flex flex-1 items-center justify-center px-5 py-20 sm:px-8"
+      >
         <div
           aria-hidden="true"
           className="bg-graph-paper absolute inset-0 -z-10 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]"

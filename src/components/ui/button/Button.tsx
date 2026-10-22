@@ -1,7 +1,7 @@
-import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { buttonVariants, type ButtonVariants } from './button.variants'
+import { type ButtonVariants, buttonVariants } from './button.variants'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, ButtonVariants {
   /** Render the child element as the button (merging props/styles) instead of

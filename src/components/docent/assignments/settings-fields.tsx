@@ -5,11 +5,13 @@ import {
   Expand,
   Eye,
   FlaskConical,
+  Lightbulb,
   type LucideIcon,
   MonitorSmartphone,
   Play,
   Repeat,
   Shuffle,
+  Sparkles,
 } from "lucide-react";
 import { useId } from "react";
 import { Input } from "@/components/ui/input";
@@ -18,9 +20,15 @@ import { Switch } from "@/components/ui/switch";
 import {
   type AssignmentSettings,
   SHOW_RESULTS_LABELS,
+  SHOW_SOLUTIONS_LABELS,
   type ShowResults,
+  type ShowSolutions,
 } from "@/lib/questions/schema";
 import { cn } from "@/lib/utils";
+import type { AssignmentMode } from "./defaults";
+import { FocusLoggingHint } from "./focus-logging-hint";
+import { GradingScaleFields } from "./grading-scale-fields";
+import { Notice } from "./notice";
 
 const SHOW_RESULTS_HELP: Record<ShowResults, string> = {
   immediately:
@@ -30,19 +38,25 @@ const SHOW_RESULTS_HELP: Record<ShowResults, string> = {
   never: "Leerlingen zien nooit een score (alleen dat ze hebben ingeleverd).",
 };
 
+/** Shown instead of the help/solution settings in exam mode. */
+export const EXAM_HELP_OFF =
+  "In toetsmodus zijn hints, codetips en oplossingen altijd uit.";
+
 type BooleanKey = {
   [K in keyof AssignmentSettings]: AssignmentSettings[K] extends boolean
     ? K
     : never;
 }[keyof AssignmentSettings];
 
-const SWITCHES: {
+type SwitchDef = {
   key: BooleanKey;
   label: string;
   help: string;
   icon: LucideIcon;
-  group: "work" | "exam";
-}[] = [
+  group: "work" | "help" | "exam";
+};
+
+const SWITCHES: SwitchDef[] = [
   {
     key: "shuffleQuestions",
     label: "Vragen husselen",
@@ -63,6 +77,20 @@ const SWITCHES: {
     help: "Leerlingen mogen de zichtbare testgevallen zelf draaien voordat ze inleveren.",
     icon: FlaskConical,
     group: "work",
+  },
+  {
+    key: "allowHints",
+    label: "Hints toestaan",
+    help: "Leerlingen kunnen de hints bij programmeervragen bekijken. Een hint kan punten kosten; dat stel je per hint in.",
+    icon: Lightbulb,
+    group: "help",
+  },
+  {
+    key: "codeTips",
+    label: "Tips over veelgemaakte fouten",
+    help: "Leerlingen zien een seintje bij bijvoorbeeld print in plaats van return, of een verkeerd gespelde functienaam. Er wordt nooit iets voorgezegd.",
+    icon: Sparkles,
+    group: "help",
   },
   {
     key: "requireFullscreen",
@@ -87,23 +115,45 @@ const SWITCHES: {
   },
 ];
 
+const GROUP_LABELS: Record<SwitchDef["group"], string> = {
+  work: "Werken aan de toets",
+  help: "Hulp en oplossingen",
+  exam: "Toezicht",
+};
+
+/** True when exam results are visible right away while students may retry. */
+export function showsResultsBetweenAttempts(
+  mode: AssignmentMode | undefined,
+  settings: Pick<AssignmentSettings, "showResults" | "maxAttempts">,
+): boolean {
+  return (
+    mode === "exam" &&
+    settings.showResults === "immediately" &&
+    settings.maxAttempts > 1
+  );
+}
+
 export function AssignmentSettingsFields({
   value,
   onChange,
   disabled,
   compact,
+  mode,
 }: {
   value: AssignmentSettings;
   onChange: (next: AssignmentSettings) => void;
   disabled?: boolean;
   /** Single column (for the settings sheet). */
   compact?: boolean;
+  /** Exam mode switches hints, code tips and solutions off. */
+  mode?: AssignmentMode;
 }) {
   const id = useId();
   const set = <K extends keyof AssignmentSettings>(
     key: K,
     v: AssignmentSettings[K],
   ) => onChange({ ...value, [key]: v });
+  const exam = mode === "exam";
 
   return (
     <div className="flex flex-col gap-6">
@@ -120,6 +170,7 @@ export function AssignmentSettingsFields({
             id={`${id}-results`}
             value={value.showResults}
             disabled={disabled}
+            aria-describedby={`${id}-results-help`}
             onChange={(e) => set("showResults", e.target.value as ShowResults)}
             options={(Object.keys(SHOW_RESULTS_LABELS) as ShowResults[]).map(
               (k) => ({
@@ -128,7 +179,10 @@ export function AssignmentSettingsFields({
               }),
             )}
           />
-          <p className="text-xs text-muted-foreground">
+          <p
+            id={`${id}-results-help`}
+            className="text-xs text-muted-foreground"
+          >
             {SHOW_RESULTS_HELP[value.showResults]}
           </p>
         </div>
@@ -150,6 +204,7 @@ export function AssignmentSettingsFields({
             min={1}
             max={100}
             disabled={disabled}
+            aria-describedby={`${id}-attempts-help`}
             value={value.maxAttempts}
             onChange={(e) => {
               const n = Number.parseInt(e.target.value, 10);
@@ -159,7 +214,10 @@ export function AssignmentSettingsFields({
               );
             }}
           />
-          <p className="text-xs text-muted-foreground">
+          <p
+            id={`${id}-attempts-help`}
+            className="text-xs text-muted-foreground"
+          >
             {value.maxAttempts === 1
               ? "Iedere leerling maakt de toets één keer."
               : `Leerlingen mogen het ${value.maxAttempts} keer proberen; de laatste ingeleverde poging telt.`}
@@ -167,54 +225,134 @@ export function AssignmentSettingsFields({
         </div>
       </div>
 
-      {(["work", "exam"] as const).map((group) => (
+      {showsResultsBetweenAttempts(mode, value) ? (
+        <Notice tone="warning">
+          Let op: met ‘direct na inleveren’ en meer dan één poging zien
+          leerlingen hun resultaat (en bij meerkeuzevragen de juiste antwoorden
+          pas na hun laatste poging).
+        </Notice>
+      ) : null}
+
+      {(["work", "help", "exam"] as const).map((group) => (
         <fieldset key={group} className="flex flex-col gap-2">
           <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            {group === "work" ? "Werken aan de toets" : "Toezicht"}
+            {GROUP_LABELS[group]}
           </legend>
-          <div className={cn("grid gap-2", !compact && "md:grid-cols-2")}>
-            {SWITCHES.filter((s) => s.group === group).map((s) => {
-              const Icon = s.icon;
-              const switchId = `${id}-${s.key}`;
-              return (
-                <label
+          {group === "help" && exam ? (
+            <Notice tone="info" icon={Lightbulb}>
+              {EXAM_HELP_OFF}
+            </Notice>
+          ) : (
+            <div className={cn("grid gap-2", !compact && "md:grid-cols-2")}>
+              {SWITCHES.filter((s) => s.group === group).map((s) => (
+                <SettingSwitch
                   key={s.key}
-                  htmlFor={switchId}
-                  className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-lg border bg-background/50 p-3 transition-colors hover:bg-accent/40",
-                    value[s.key] && "border-primary/30 bg-primary/[0.04]",
-                    disabled && "cursor-not-allowed opacity-60",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mt-0.5 grid size-8 shrink-0 place-items-center rounded-md",
-                      value[s.key]
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground",
-                    )}
+                  def={s}
+                  id={`${id}-${s.key}`}
+                  checked={value[s.key]}
+                  disabled={disabled}
+                  onChange={(checked) => set(s.key, checked)}
+                />
+              ))}
+              {group === "help" ? (
+                <div className="flex flex-col gap-2 rounded-lg border bg-background/50 p-3">
+                  <label
+                    htmlFor={`${id}-solutions`}
+                    className="text-sm font-medium"
                   >
-                    <Icon className="size-4" aria-hidden="true" />
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-sm font-medium">{s.label}</span>
-                    <span className="text-xs leading-relaxed text-muted-foreground">
-                      {s.help}
-                    </span>
-                  </span>
-                  <Switch
-                    id={switchId}
-                    checked={value[s.key]}
+                    Modeloplossing tonen
+                  </label>
+                  <NativeSelect
+                    id={`${id}-solutions`}
+                    value={value.showSolutions}
                     disabled={disabled}
-                    onCheckedChange={(checked) => set(s.key, checked)}
-                    className="mt-1"
+                    aria-describedby={`${id}-solutions-help`}
+                    onChange={(e) =>
+                      set("showSolutions", e.target.value as ShowSolutions)
+                    }
+                    options={(
+                      Object.keys(SHOW_SOLUTIONS_LABELS) as ShowSolutions[]
+                    ).map((k) => ({
+                      value: k,
+                      label: SHOW_SOLUTIONS_LABELS[k],
+                    }))}
                   />
-                </label>
-              );
-            })}
-          </div>
+                  <p
+                    id={`${id}-solutions-help`}
+                    className="text-xs leading-relaxed text-muted-foreground"
+                  >
+                    Let op: wordt dezelfde toets later nog bij een andere klas
+                    afgenomen, kies dan ‘Nooit’ of ‘Na sluiten’.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
+          {group === "exam" && value.logFocusEvents ? (
+            <FocusLoggingHint id={`${id}-focus-hint`} />
+          ) : null}
         </fieldset>
       ))}
+
+      <GradingScaleFields
+        value={value.grading}
+        disabled={disabled}
+        onChange={(grading) => onChange({ ...value, grading })}
+      />
     </div>
+  );
+}
+
+function SettingSwitch({
+  def,
+  id,
+  checked,
+  disabled,
+  onChange,
+}: {
+  def: SwitchDef;
+  id: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const Icon = def.icon;
+  return (
+    <label
+      htmlFor={id}
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-lg border bg-background/50 p-3 transition-colors hover:bg-accent/40",
+        checked && "border-primary/30 bg-primary/[0.04]",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      <span
+        className={cn(
+          "mt-0.5 grid size-8 shrink-0 place-items-center rounded-md",
+          checked
+            ? "bg-primary/10 text-primary"
+            : "bg-muted text-muted-foreground",
+        )}
+      >
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-sm font-medium">{def.label}</span>
+        <span
+          id={`${id}-help`}
+          className="text-xs leading-relaxed text-muted-foreground"
+        >
+          {def.help}
+        </span>
+      </span>
+      <Switch
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        aria-describedby={`${id}-help`}
+        onCheckedChange={onChange}
+        className="mt-1"
+      />
+    </label>
   );
 }

@@ -1,15 +1,15 @@
 'use client'
 
-import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { PanelLeft } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import { sidebarMenuButtonVariants } from './sidebar.variants'
 
 /* ------------------------------------------------------------------ */
@@ -22,6 +22,13 @@ const SIDEBAR_WIDTH = '16rem'
 const SIDEBAR_WIDTH_MOBILE = '18rem'
 const SIDEBAR_WIDTH_ICON = '3rem'
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
+
+const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), .cm-content'
+
+/** True when the key event comes from a text field or editor. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(EDITABLE_SELECTOR) !== null
+}
 
 /* ------------------------------------------------------------------ */
 /* Context (React equivalent of reka-ui's provide/inject)              */
@@ -98,7 +105,8 @@ const SidebarProvider = React.forwardRef<HTMLDivElement, SidebarProviderProps>(
         else setInternalOpen(value)
 
         // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is missing in Safari; functional UI-state cookie
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; SameSite=Lax`
       },
       [onOpenChange],
     )
@@ -110,6 +118,9 @@ const SidebarProvider = React.forwardRef<HTMLDivElement, SidebarProviderProps>(
 
     React.useEffect(() => {
       const handler = (event: KeyboardEvent) => {
+        // Editors (MarkdownEditor bold, CodeMirror) own Ctrl/Cmd+B: never
+        // collapse the sidebar while typing or when a handler already ran.
+        if (event.defaultPrevented || isEditableTarget(event.target)) return
         if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
           event.preventDefault()
           toggleSidebar()
@@ -199,8 +210,8 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
             }
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>Sidebar</SheetTitle>
-              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+              <SheetTitle>Menu</SheetTitle>
+              <SheetDescription>Navigatie van Pensuma</SheetDescription>
             </SheetHeader>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
@@ -281,7 +292,7 @@ const SidebarTrigger = React.forwardRef<React.ElementRef<typeof Button>, React.C
         {...props}
       >
         <PanelLeft />
-        <span className="sr-only">Toggle Sidebar</span>
+        <span className="sr-only">Zijbalk in- of uitklappen</span>
       </Button>
     )
   },
@@ -303,9 +314,9 @@ const SidebarRail = React.forwardRef<HTMLButtonElement, React.ComponentProps<'bu
         data-sidebar="rail"
         data-uipkge=""
         data-slot="sidebar-rail"
-        aria-label="Toggle Sidebar"
+        aria-label="Zijbalk in- of uitklappen"
         tabIndex={-1}
-        title="Toggle Sidebar"
+        title="Zijbalk in- of uitklappen"
         className={cn(
           'hover:after:bg-sidebar-border focus-visible:ring-ring absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-colors duration-200 ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] focus-visible:ring-2 focus-visible:outline-none sm:flex',
           'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
@@ -479,7 +490,7 @@ const SidebarGroupAction = React.forwardRef<HTMLButtonElement, React.ComponentPr
         data-sidebar="group-action"
         className={cn(
           'text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
-          'after:absolute after:-inset-2 md:after:hidden',
+          'after:absolute after:-inset-2',
           'group-data-[collapsible=icon]:hidden',
           className,
         )}
@@ -595,7 +606,7 @@ const SidebarMenuAction = React.forwardRef<
       data-sidebar="menu-action"
       className={cn(
         'text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground peer-hover/menu-button:text-sidebar-accent-foreground absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
-        'after:absolute after:-inset-2 md:after:hidden',
+        'after:absolute after:-inset-2',
         'peer-data-[size=sm]/menu-button:top-1',
         'peer-data-[size=default]/menu-button:top-1.5',
         'peer-data-[size=lg]/menu-button:top-2.5',
@@ -743,4 +754,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-

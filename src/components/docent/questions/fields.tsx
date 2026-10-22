@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleHelp } from "lucide-react";
+import { CircleHelp, ImageOff } from "lucide-react";
 import type React from "react";
 import {
   type ReactNode,
@@ -16,6 +16,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import {
+  EXTERNAL_IMAGE_WARNING,
+  hasExternalImage,
+} from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
@@ -277,11 +281,14 @@ export function HelpPopover({
 /** Small label row: text + optional help/extra on the right. */
 export function FieldLabel({
   htmlFor,
+  id,
   children,
   extra,
   className,
 }: {
   htmlFor?: string;
+  /** For widgets labelled with aria-labelledby (e.g. the code editor). */
+  id?: string;
   children: ReactNode;
   extra?: ReactNode;
   className?: string;
@@ -294,6 +301,7 @@ export function FieldLabel({
       )}
     >
       <label
+        id={id}
         htmlFor={htmlFor}
         className="flex items-center gap-1.5 text-sm leading-none font-medium"
       >
@@ -352,5 +360,23 @@ export function AutoTextarea({
       )}
       {...props}
     />
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         Prompt: external image warning                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Shown under the prompt editor when the markdown links an image on another
+ * server: students never load those (privacy), so it would be missing.
+ */
+export function PromptImageWarning({ prompt }: { prompt: string }) {
+  if (!hasExternalImage(prompt)) return null;
+  return (
+    <p className="flex items-start gap-2 rounded-md bg-warning/10 px-2.5 py-1.5 text-[0.8rem] leading-snug text-warning-ink">
+      <ImageOff className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+      <span>{EXTERNAL_IMAGE_WARNING}</span>
+    </p>
   );
 }

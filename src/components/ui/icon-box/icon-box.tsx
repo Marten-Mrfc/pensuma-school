@@ -2,7 +2,16 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export type IconBoxVariant =
-  'primary' | 'muted' | 'outline' | 'solid' | 'subtle' | 'destructive' | 'success' | 'warning' | 'ghost' | 'custom'
+  | 'primary'
+  | 'muted'
+  | 'outline'
+  | 'solid'
+  | 'subtle'
+  | 'destructive'
+  | 'success'
+  | 'warning'
+  | 'ghost'
+  | 'custom'
 
 export type IconBoxSize = '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 export type IconBoxShape = 'rounded' | 'circle' | 'square'
@@ -25,8 +34,8 @@ const variantClasses: Record<IconBoxVariant, string> = {
   solid: 'bg-foreground text-background shadow-xs',
   subtle: 'bg-accent text-accent-foreground',
   destructive: 'bg-destructive/10 text-destructive',
-  success: 'bg-success/15 text-success',
-  warning: 'bg-warning/15 text-warning',
+  success: 'bg-success/15 text-success-ink',
+  warning: 'bg-warning/15 text-warning-ink',
   ghost: 'text-muted-foreground hover:bg-accent hover:text-foreground',
   custom: '',
 }
@@ -97,4 +106,3 @@ const IconBox = React.forwardRef<HTMLDivElement, IconBoxProps>(
 IconBox.displayName = 'IconBox'
 
 export { IconBox }
-
