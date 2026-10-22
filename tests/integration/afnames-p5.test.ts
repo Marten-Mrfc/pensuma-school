@@ -13,6 +13,7 @@ import {
   attempts,
   auditLog,
   questionNeutralizations,
+  tests,
 } from "@/server/db/schema";
 import { callerFor } from "../support/caller";
 import { drainGrading, resetDatabase } from "../support/db";
@@ -331,6 +332,22 @@ describe("create, duplicate and select students", () => {
       .from(assignments)
       .where(eq(assignments.id, kept.items[0].id));
     expect(copy2.opensAt?.getTime()).toBe(source.opensAt?.getTime());
+  });
+
+  test("duplicate needs a published test, like create", async () => {
+    const w = await world();
+    const source = await createAssignment({
+      testId: w.toets.id,
+      classId: w.klas.id,
+    });
+    await db
+      .update(tests)
+      .set({ status: "draft" })
+      .where(eq(tests.id, w.toets.id));
+    const t = callerFor(w.teacher);
+    await expect(
+      t.assignment.duplicate({ id: source.id, classIds: [w.other.id] }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
 

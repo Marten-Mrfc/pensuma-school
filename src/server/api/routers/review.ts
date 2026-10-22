@@ -262,7 +262,11 @@ export async function computeResults(db: DB, assignmentId: string) {
     return {
       questionId: q.id,
       averageScore: n ? round2(sum / n) : null,
-      averagePercentage: n && q.points ? sum / n / q.points : null,
+      // A dropped question ("vervallen") has no meaningful average.
+      averagePercentage:
+        n && q.points && neutralized[q.id] !== "drop"
+          ? sum / n / q.points
+          : null,
       fullMarksPercentage: n ? full / n : null,
       answered,
       needsReview,

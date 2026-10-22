@@ -1021,6 +1021,27 @@ export const assignmentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const source = await getAssignmentOrThrow(ctx.db, input.id);
+      // Same rules as create: only a published test with questions.
+      const [test] = await ctx.db
+        .select({ status: tests.status })
+        .from(tests)
+        .where(eq(tests.id, source.testId));
+      if (test?.status !== "published") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Je kunt alleen een gepubliceerde toets inplannen. Publiceer de toets eerst.",
+        });
+      }
+      if (
+        !(await testTotals(ctx.db, [source.testId])).get(source.testId)
+          ?.questionCount
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Deze toets heeft nog geen vragen.",
+        });
+      }
       const classIds = [...new Set(input.classIds)];
       const klassen = await classesOrThrow(ctx.db, classIds);
       const now = new Date();

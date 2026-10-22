@@ -155,6 +155,7 @@ export const analysisRouter = createTRPCRouter({
         const rir = stats?.rir ?? null;
         // Answers that still wait for the teacher count as 0 points for now.
         const pendingReview = reviewById.get(q.id) ?? 0;
+        const neutralized = results.neutralized[q.id] ?? null;
         return {
           questionId: q.id,
           number,
@@ -167,8 +168,9 @@ export const analysisRouter = createTRPCRouter({
           rir,
           excluded: stats?.excluded ?? true,
           pendingReview,
-          flags: pendingReview ? [] : itemFlags({ p, rir }),
-          neutralized: results.neutralized[q.id] ?? null,
+          // A neutralised question no longer says anything about the test.
+          flags: pendingReview || neutralized ? [] : itemFlags({ p, rir }),
+          neutralized,
         };
       });
 
