@@ -343,7 +343,6 @@ function Builder({ test }: { test: BuilderTest }) {
     }
   }
 
-
   function selectRelative(delta: -1 | 1) {
     if (questions.length === 0) return;
     if (selection.kind === "settings") {
@@ -668,15 +667,24 @@ function Builder({ test }: { test: BuilderTest }) {
               <label htmlFor="toets-titel" className="sr-only">
                 Titel van de toets
               </label>
-              <input
+              <textarea
                 id="toets-titel"
+                rows={1}
                 value={settings.title}
-                onChange={(e) => editSettings({ title: e.target.value })}
+                onChange={(e) =>
+                  editSettings({ title: e.target.value.replace(/\n/g, " ") })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
                 onBlur={() => void flush(TEST_KEY)}
                 maxLength={200}
                 placeholder="Titel van de toets"
                 className={cn(
-                  "-ml-2 max-w-full min-w-48 rounded-md border [field-sizing:content] border-transparent bg-transparent px-2 py-0.5 font-display text-2xl leading-tight font-bold tracking-tight text-foreground transition-colors outline-none placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:text-[1.75rem]",
+                  "-ml-2 max-w-full min-w-48 resize-none overflow-hidden rounded-md border text-balance [field-sizing:content] border-transparent bg-transparent px-2 py-0.5 font-display text-2xl leading-tight font-bold tracking-tight text-foreground transition-colors outline-none placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:text-[1.75rem]",
                   !settings.title.trim() && "border-destructive/50",
                 )}
               />

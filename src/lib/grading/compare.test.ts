@@ -152,6 +152,14 @@ describe("flexible", () => {
     expect(cmp("a\nb", "a\n\nb", "flexible").passed).toBe(true);
   });
 
+  test("feedback points at the most similar line", () => {
+    expect(
+      cmp("Wat leuk!\nHallo Mike", "Hallo Mark", "flexible").feedback,
+    ).toBe(
+      "Regel 2: verwacht `Hallo Mark`, maar je programma printte `Hallo Mike`.",
+    );
+  });
+
   test("helpful feedback", () => {
     expect(cmp("Hallo Mike", "Hallo Mark", "flexible").feedback).toBe(
       "Regel 1: verwacht `Hallo Mark`, maar je programma printte `Hallo Mike`.",

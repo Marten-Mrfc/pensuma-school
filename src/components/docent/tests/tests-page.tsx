@@ -416,21 +416,30 @@ function TestCard({ test }: { test: TestRow }) {
               label="open vragen"
             />
           </span>
+          {test.assignmentCount > 0 ? (
+            <span className="text-xs text-muted-foreground">
+              {test.assignmentCount}{" "}
+              {test.assignmentCount === 1 ? "afname" : "afnames"}
+            </span>
+          ) : null}
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
-        <span className="min-w-0 truncate text-xs text-muted-foreground">
-          {test.assignmentCount > 0
-            ? `${test.assignmentCount} ${test.assignmentCount === 1 ? "afname" : "afnames"} · `
-            : ""}
+        <span
+          className="min-w-0 truncate text-xs text-muted-foreground"
+          title={
+            test.createdByName
+              ? `Gemaakt door ${test.createdByName}`
+              : undefined
+          }
+        >
           bewerkt{" "}
           <RelativeTime
             date={test.updatedAt}
             locale="nl-NL"
             formatStyle="short"
           />
-          {test.createdByName ? ` · ${test.createdByName}` : ""}
         </span>
         {test.status === "published" ? (
           <Button

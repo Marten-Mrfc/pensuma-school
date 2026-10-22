@@ -70,23 +70,13 @@ function run(id, request, interactive) {
     post({ t: "fatal", id, message: "Python is not loaded" });
     return;
   }
-  // Batch segments: one message per ~50 ms or 4 KB; always flushed before input().
-  let buffer = [];
-  let bufferSize = 0;
-  let lastFlush = performance.now();
-  const flush = () => {
-    if (buffer.length === 0) return;
-    post({ t: "segments", id, segments: buffer });
-    buffer = [];
-    bufferSize = 0;
-    lastFlush = performance.now();
-  };
+  // Every write is posted immediately: the worker may be terminated at any
+  // moment (time limit, Stoppen), and output printed before an endless loop
+  // must not be lost. Output is capped by the harness (64 KB), and the main
+  // thread coalesces UI updates per animation frame.
+  const flush = () => {};
   const emit = (kind, text) => {
-    const last = buffer[buffer.length - 1];
-    if (last && last.kind === kind) last.text += text;
-    else buffer.push({ kind, text });
-    bufferSize += text.length;
-    if (bufferSize > 4096 || performance.now() - lastFlush > 50) flush();
+    post({ t: "segments", id, segments: [{ kind, text }] });
   };
   const ctrl = inputCtrl;
   const data = inputData;

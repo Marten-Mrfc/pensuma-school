@@ -332,13 +332,19 @@ function compareFlexible(
     };
   }
   if (missing >= 0) {
-    // Show the output line that was probably meant: the first unmatched,
-    // non-prompt line after the last match.
+    // Show the output line that was probably meant: the unmatched, non-prompt
+    // line after the last match that shares the most words with the expected
+    // line (the first one when none overlap).
     let candidate = -1;
+    let best = -1;
     for (let k = j; k < A; k++) {
-      if (!matched[k] && !tolerable[k]) {
+      if (matched[k] || tolerable[k]) continue;
+      const overlap = eTok[missing].filter((t) =>
+        aTok[k].some((a) => tokenEqual(a, t)),
+      ).length;
+      if (overlap > best) {
+        best = overlap;
         candidate = k;
-        break;
       }
     }
     if (candidate >= 0) {

@@ -78,7 +78,9 @@ describe("validateQuestion: common fields", () => {
       data: { tests: [{ id: "t1", kind: "io", weight: 0 }] },
     });
     expect(issues[0].code).toBe("question.invalid_data");
-    expect(issues[0].message).toContain("test 1, gewicht: moet groter dan 0 zijn");
+    expect(issues[0].message).toContain(
+      "test 1, gewicht: moet groter dan 0 zijn",
+    );
   });
 
   test("an empty function call gets the specific message (lenient parse)", () => {

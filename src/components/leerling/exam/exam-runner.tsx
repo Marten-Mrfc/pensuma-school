@@ -689,9 +689,9 @@ function ExamRunner({
               Kies een vraag om ernaartoe te gaan.
             </SheetDescription>
           </SheetHeader>
-          <div className="mx-auto w-full max-w-sm">{navigator}</div>
+          <div className="mx-auto w-full max-w-xs">{navigator}</div>
           {monitoringNote ? (
-            <div className="mx-auto mt-4 w-full max-w-sm">{monitoringNote}</div>
+            <div className="mx-auto mt-4 w-full max-w-xs">{monitoringNote}</div>
           ) : null}
         </SheetContent>
       </Sheet>

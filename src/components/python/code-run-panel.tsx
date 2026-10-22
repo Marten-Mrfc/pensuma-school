@@ -1,7 +1,13 @@
 "use client";
 
 import { Info, Keyboard, Play, Square } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,6 +29,8 @@ export type CodeRunPanelProps = {
   /** Max height of the console output. */
   consoleMaxHeight?: string;
 };
+
+const subscribeNever = () => () => {};
 
 function appendSegment(
   list: TranscriptSegment[],
@@ -62,16 +70,38 @@ export function CodeRunPanel({
   const [stdin, setStdin] = useState(defaultStdin);
   const [useStdinBox, setUseStdinBox] = useState(defaultStdin !== "");
   const resolveInput = useRef<((value: string | null) => void) | null>(null);
+  // Output arrives per print(); render at most once per animation frame.
+  const pending = useRef<TranscriptSegment[]>([]);
+  const frame = useRef<number | null>(null);
+  const flushPending = () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    const batch = pending.current;
+    pending.current = [];
+    if (batch.length) setSegments((prev) => batch.reduce(appendSegment, prev));
+  };
+  const queueSegment = (s: TranscriptSegment) => {
+    pending.current.push(s);
+    frame.current ??= requestAnimationFrame(flushPending);
+  };
   const stdinId = useId();
   const switchId = useId();
 
+  // Only decide about the fallback after hydration (the server can't know
+  // whether this browser is cross-origin isolated), so nothing flashes.
+  const isClient = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
   const interactive = runner.interactive;
-  const showStdin = !interactive || useStdinBox;
+  const showStdin = useStdinBox || (isClient && !interactive);
 
   // Unblock a pending input() when the panel unmounts.
   useEffect(
     () => () => {
       resolveInput.current?.(null);
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
     },
     [],
   );
@@ -86,19 +116,21 @@ export function CodeRunPanel({
         code,
         stdin: showStdin ? stdin : "",
         timeLimitMs,
-        onSegment: (s) => setSegments((prev) => appendSegment(prev, s)),
+        onSegment: queueSegment,
         onInput:
           interactive && !useStdinBox
             ? (prompt) =>
                 new Promise<string | null>((resolve) => {
-                  void prompt; // already shown as a segment
+                  flushPending(); // show everything printed before the prompt
                   resolveInput.current = resolve;
                   setInputPrompt(prompt);
                 })
             : undefined,
       });
-      // Non-interactive runs: show the full transcript (incl. prompts and the
-      // stdin lines that were used), exactly like the server sees it.
+      // Show the full transcript (incl. prompts and the stdin lines that were
+      // used), exactly like the server sees it.
+      pending.current = [];
+      flushPending();
       if (r.segments) setSegments(r.segments);
       setResult(r);
       onRun?.(r);
@@ -156,12 +188,12 @@ export function CodeRunPanel({
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center gap-2">
         {running ? (
-          <Button type="button" variant="outline" onClick={stop}>
+          <Button key="stop" type="button" variant="outline" onClick={stop}>
             <Square className="fill-current" aria-hidden="true" />
             Stoppen
           </Button>
         ) : (
-          <Button type="button" onClick={start} disabled={disabled}>
+          <Button key="run" type="button" onClick={start} disabled={disabled}>
             <Play className="fill-current" aria-hidden="true" />
             Uitvoeren
           </Button>
