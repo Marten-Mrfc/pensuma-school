@@ -44,7 +44,9 @@ export function CopyButton({
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(false), 1600);
     } catch {
-      toast.error("Kopiëren lukte niet. Selecteer de tekst en kopieer handmatig.");
+      toast.error(
+        "Kopiëren lukte niet. Selecteer de tekst en kopieer handmatig.",
+      );
     }
   }
 

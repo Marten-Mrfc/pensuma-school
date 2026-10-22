@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { HighlighterCore, LanguageRegistration, ThemedToken } from "shiki/core";
+import type {
+  HighlighterCore,
+  LanguageRegistration,
+  ThemedToken,
+} from "shiki/core";
 import { cn } from "@/lib/utils";
 import { CopyButton } from "./copy-button";
 
@@ -43,7 +47,9 @@ const LANG_LABELS: Record<string, string> = {
   bash: "Terminal",
 };
 
-export function normalizeLanguage(lang: string | undefined | null): string | null {
+export function normalizeLanguage(
+  lang: string | undefined | null,
+): string | null {
   if (!lang) return null;
   const key = lang.toLowerCase();
   const resolved = LANG_ALIASES[key] ?? key;
@@ -56,8 +62,13 @@ const loadedLangs = new Set<string>();
 async function getHighlighter(lang: string): Promise<HighlighterCore> {
   if (!highlighterPromise) {
     highlighterPromise = (async () => {
-      const [{ createHighlighterCore, createCssVariablesTheme }, { createJavaScriptRegexEngine }] =
-        await Promise.all([import("shiki/core"), import("shiki/engine/javascript")]);
+      const [
+        { createHighlighterCore, createCssVariablesTheme },
+        { createJavaScriptRegexEngine },
+      ] = await Promise.all([
+        import("shiki/core"),
+        import("shiki/engine/javascript"),
+      ]);
       return createHighlighterCore({
         themes: [
           createCssVariablesTheme({
@@ -108,9 +119,10 @@ export function HighlightedCode({
 }: HighlightedCodeProps) {
   const lang = normalizeLanguage(language);
   const source = code.replace(/\n$/, "");
-  const [result, setResult] = useState<{ key: string; tokens: ThemedToken[][] } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    key: string;
+    tokens: ThemedToken[][];
+  } | null>(null);
   const key = `${lang}::${source}`;
 
   useEffect(() => {
@@ -119,7 +131,10 @@ export function HighlightedCode({
     getHighlighter(lang)
       .then((highlighter) => {
         if (cancelled) return;
-        const { tokens } = highlighter.codeToTokens(source, { lang, theme: "pensuma" });
+        const { tokens } = highlighter.codeToTokens(source, {
+          lang,
+          theme: "pensuma",
+        });
         setResult({ key: `${lang}::${source}`, tokens });
       })
       .catch(() => {
@@ -176,8 +191,10 @@ export function HighlightedCode({
                         style={{
                           color: token.color,
                           // Shiki FontStyle bit flags: 1 = italic, 2 = bold.
-                          fontStyle: (token.fontStyle ?? 0) & 1 ? "italic" : undefined,
-                          fontWeight: (token.fontStyle ?? 0) & 2 ? 600 : undefined,
+                          fontStyle:
+                            (token.fontStyle ?? 0) & 1 ? "italic" : undefined,
+                          fontWeight:
+                            (token.fontStyle ?? 0) & 2 ? 600 : undefined,
                         }}
                       >
                         {token.content}

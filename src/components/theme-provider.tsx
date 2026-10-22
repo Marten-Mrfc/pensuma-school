@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import type * as React from "react";
 
 /**
  * Wrap your root layout's <body> with this. next-themes injects a
@@ -24,10 +24,13 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes'
  * the swap — the same thing the Vue registry's useTheme does by hand. Pass
  * `disableTransitionOnChange={false}` if you deliberately want the crossfade.
  */
-export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
+export function ThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof NextThemesProvider>) {
   return (
     <NextThemesProvider disableTransitionOnChange {...props}>
       {children}
     </NextThemesProvider>
-  )
+  );
 }

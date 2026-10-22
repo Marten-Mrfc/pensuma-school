@@ -52,8 +52,6 @@ export function formatFixedNl(
   return text.replace(".", ",");
 }
 
-const pad = (n: number) => n.toString().padStart(2, "0");
-
 /**
  * Local date-time as "dd-mm-jjjj uu:mm" (Dutch notation, Excel friendly).
  * Uses Europe/Amsterdam unless another IANA time zone is given.

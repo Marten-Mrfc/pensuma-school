@@ -1,8 +1,18 @@
 "use client";
 
 import { Bold, Code, FileCode2, Italic, List, ListOrdered } from "lucide-react";
-import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  type KeyboardEvent,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./markdown";
 
@@ -17,19 +27,57 @@ export interface MarkdownEditorProps {
   "aria-label"?: string;
 }
 
-type Edit = { before: string; after: string; placeholder: string; block?: boolean };
+type Edit = {
+  before: string;
+  after: string;
+  placeholder: string;
+  block?: boolean;
+};
 
-const ACTIONS: { key: string; label: string; shortcut?: string; icon: typeof Bold; edit: Edit }[] = [
-  { key: "bold", label: "Vet", shortcut: "Ctrl+B", icon: Bold, edit: { before: "**", after: "**", placeholder: "vet" } },
-  { key: "italic", label: "Cursief", shortcut: "Ctrl+I", icon: Italic, edit: { before: "_", after: "_", placeholder: "cursief" } },
-  { key: "code", label: "Code in de tekst", icon: Code, edit: { before: "`", after: "`", placeholder: "print()" } },
+const ACTIONS: {
+  key: string;
+  label: string;
+  shortcut?: string;
+  icon: typeof Bold;
+  edit: Edit;
+}[] = [
+  {
+    key: "bold",
+    label: "Vet",
+    shortcut: "Ctrl+B",
+    icon: Bold,
+    edit: { before: "**", after: "**", placeholder: "vet" },
+  },
+  {
+    key: "italic",
+    label: "Cursief",
+    shortcut: "Ctrl+I",
+    icon: Italic,
+    edit: { before: "_", after: "_", placeholder: "cursief" },
+  },
+  {
+    key: "code",
+    label: "Code in de tekst",
+    icon: Code,
+    edit: { before: "`", after: "`", placeholder: "print()" },
+  },
   {
     key: "codeblock",
     label: "Python-codeblok",
     icon: FileCode2,
-    edit: { before: "```python\n", after: "\n```", placeholder: 'print("Hallo")', block: true },
+    edit: {
+      before: "```python\n",
+      after: "\n```",
+      placeholder: 'print("Hallo")',
+      block: true,
+    },
   },
-  { key: "list", label: "Opsomming", icon: List, edit: { before: "- ", after: "", placeholder: "punt", block: true } },
+  {
+    key: "list",
+    label: "Opsomming",
+    icon: List,
+    edit: { before: "- ", after: "", placeholder: "punt", block: true },
+  },
   {
     key: "ordered",
     label: "Genummerde lijst",
@@ -76,8 +124,10 @@ export function MarkdownEditor({
     const end = el.selectionEnd;
     const selected = value.slice(start, end) || edit.placeholder;
     let before = edit.before;
-    if (edit.block && start > 0 && value[start - 1] !== "\n") before = `\n${before}`;
-    const next = value.slice(0, start) + before + selected + edit.after + value.slice(end);
+    if (edit.block && start > 0 && value[start - 1] !== "\n")
+      before = `\n${before}`;
+    const next =
+      value.slice(0, start) + before + selected + edit.after + value.slice(end);
     const selStart = start + before.length;
     pendingSelection.current = [selStart, selStart + selected.length];
     onChange(next);
@@ -101,7 +151,11 @@ export function MarkdownEditor({
       )}
     >
       <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-1.5 py-1">
-        <div role="tablist" aria-label="Weergave" className="flex items-center gap-0.5">
+        <div
+          role="tablist"
+          aria-label="Weergave"
+          className="flex items-center gap-0.5"
+        >
           {(
             [
               ["edit", "Bewerken"],
@@ -113,7 +167,9 @@ export function MarkdownEditor({
               type="button"
               role="tab"
               aria-selected={tab === key}
-              aria-controls={`${textareaId}-${key}`}
+              aria-controls={
+                key === "edit" ? textareaId : `${textareaId}-preview`
+              }
               onClick={() => setTab(key)}
               className={cn(
                 "h-7 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
@@ -125,7 +181,11 @@ export function MarkdownEditor({
           ))}
         </div>
         {tab === "edit" ? (
-          <div className="flex items-center gap-0.5" role="toolbar" aria-label="Opmaak">
+          <div
+            className="flex items-center gap-0.5"
+            role="toolbar"
+            aria-label="Opmaak"
+          >
             {ACTIONS.map(({ key, label, shortcut, icon: Icon, edit }) => (
               <Tooltip key={key}>
                 <TooltipTrigger asChild>
@@ -141,7 +201,9 @@ export function MarkdownEditor({
                 </TooltipTrigger>
                 <TooltipContent>
                   {label}
-                  {shortcut ? <span className="ml-1.5 opacity-60">{shortcut}</span> : null}
+                  {shortcut ? (
+                    <span className="ml-1.5 opacity-60">{shortcut}</span>
+                  ) : null}
                 </TooltipContent>
               </Tooltip>
             ))}
@@ -153,7 +215,6 @@ export function MarkdownEditor({
         <textarea
           ref={ref}
           id={textareaId}
-          role="tabpanel"
           aria-label={ariaLabel}
           value={value}
           rows={minRows}
@@ -174,13 +235,17 @@ export function MarkdownEditor({
           {value.trim() ? (
             <Markdown>{value}</Markdown>
           ) : (
-            <p className="py-2 text-sm text-muted-foreground italic">Nog niets om te laten zien.</p>
+            <p className="py-2 text-sm text-muted-foreground italic">
+              Nog niets om te laten zien.
+            </p>
           )}
         </div>
       )}
       <div className="border-t bg-muted/30 px-3.5 py-1.5 text-[0.7rem] text-muted-foreground">
-        Markdown: <code className="font-mono">**vet**</code>, <code className="font-mono">_cursief_</code>,{" "}
-        <code className="font-mono">`code`</code> en <code className="font-mono">```python</code>-blokken.
+        Markdown: <code className="font-mono">**vet**</code>,{" "}
+        <code className="font-mono">_cursief_</code>,{" "}
+        <code className="font-mono">`code`</code> en{" "}
+        <code className="font-mono">```python</code>-blokken.
       </div>
     </div>
   );

@@ -100,7 +100,11 @@ export function Logo({
   }
 
   return (
-    <Link href={href} className={classes} aria-label="Pensuma, naar de startpagina">
+    <Link
+      href={href}
+      className={classes}
+      aria-label="Pensuma, naar de startpagina"
+    >
       {content}
     </Link>
   );

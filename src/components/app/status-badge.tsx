@@ -1,8 +1,19 @@
 import { cn } from "@/lib/utils";
 
-export type StatusKind = "test" | "assignment" | "attempt" | "answer" | "grading";
+export type StatusKind =
+  | "test"
+  | "assignment"
+  | "attempt"
+  | "answer"
+  | "grading";
 
-type Tone = "neutral" | "muted" | "success" | "warning" | "info" | "destructive";
+type Tone =
+  | "neutral"
+  | "muted"
+  | "success"
+  | "warning"
+  | "info"
+  | "destructive";
 
 const STATUS_MAP: Record<
   StatusKind,
@@ -89,7 +100,12 @@ export function StatusBadge({ kind, status, className }: StatusBadgeProps) {
             )}
           />
         ) : null}
-        <span className={cn("relative inline-flex size-1.5 rounded-full", DOT_CLASS[entry.tone])} />
+        <span
+          className={cn(
+            "relative inline-flex size-1.5 rounded-full",
+            DOT_CLASS[entry.tone],
+          )}
+        />
       </span>
       {entry.label}
     </span>

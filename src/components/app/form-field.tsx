@@ -36,13 +36,18 @@ export function FormField({
   className,
   children,
 }: FormFieldProps) {
-  const descriptionId = htmlFor && description ? `${htmlFor}-description` : undefined;
+  const descriptionId =
+    htmlFor && description ? `${htmlFor}-description` : undefined;
   const errorId = htmlFor && error ? `${htmlFor}-error` : undefined;
 
   let control = children;
   if (htmlFor && isValidElement(children)) {
     const child = children as ReactElement<A11yProps>;
-    const describedBy = [child.props["aria-describedby"], descriptionId, errorId]
+    const describedBy = [
+      child.props["aria-describedby"],
+      descriptionId,
+      errorId,
+    ]
       .filter(Boolean)
       .join(" ");
     control = cloneElement(child, {
@@ -52,7 +57,10 @@ export function FormField({
   }
 
   return (
-    <div className={cn("flex flex-col gap-2", className)} data-invalid={error ? "" : undefined}>
+    <div
+      className={cn("flex flex-col gap-2", className)}
+      data-invalid={error ? "" : undefined}
+    >
       <label
         htmlFor={htmlFor}
         className="flex items-center gap-1 text-sm leading-none font-medium text-foreground"
@@ -66,12 +74,19 @@ export function FormField({
       </label>
       {control}
       {description && !error ? (
-        <p id={descriptionId} className="text-xs leading-relaxed text-muted-foreground">
+        <p
+          id={descriptionId}
+          className="text-xs leading-relaxed text-muted-foreground"
+        >
           {description}
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="text-xs leading-relaxed font-medium text-destructive">
+        <p
+          id={errorId}
+          role="alert"
+          className="text-xs leading-relaxed font-medium text-destructive"
+        >
           {error}
         </p>
       ) : null}

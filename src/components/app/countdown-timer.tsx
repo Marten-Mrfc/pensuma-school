@@ -86,7 +86,8 @@ export function CountdownTimer({
     if (expired) fireExpire();
   }, [expired]);
 
-  const totalSeconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
+  const totalSeconds =
+    remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const tone =
     remainingMs === null
       ? "normal"
@@ -114,20 +115,25 @@ export function CountdownTimer({
     <div
       role="timer"
       aria-label={
-        totalSeconds === null ? "Resterende tijd" : `Resterende tijd: ${spokenRemaining(totalSeconds)}`
+        totalSeconds === null
+          ? "Resterende tijd"
+          : `Resterende tijd: ${spokenRemaining(totalSeconds)}`
       }
       data-tone={tone}
       className={cn(
         "inline-flex h-9 items-center gap-2 rounded-full border px-3 font-mono text-sm font-medium tabular-nums shadow-xs transition-colors",
         tone === "normal" && "border-border bg-card text-foreground",
-        tone === "warning" && "border-warning/40 bg-warning/12 text-warning-ink",
+        tone === "warning" &&
+          "border-warning/40 bg-warning/12 text-warning-ink",
         tone === "danger" &&
           "border-destructive/40 bg-destructive/10 text-destructive-ink motion-safe:animate-pulse",
         className,
       )}
     >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
-      <span aria-hidden="true">{totalSeconds === null ? "--:--" : format(totalSeconds)}</span>
+      <span aria-hidden="true">
+        {totalSeconds === null ? "--:--" : format(totalSeconds)}
+      </span>
       <span className="sr-only" aria-live="assertive">
         {announcement}
       </span>

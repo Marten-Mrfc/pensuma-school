@@ -99,13 +99,17 @@ export function ConfirmDialog({
             <Icon className="size-5" aria-hidden="true" />
           </span>
           <div className="flex min-w-0 flex-col gap-1.5 pt-1">
-            <DialogTitle className="text-base leading-snug font-semibold">{title}</DialogTitle>
+            <DialogTitle className="text-base leading-snug font-semibold">
+              {title}
+            </DialogTitle>
             {description ? (
               <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
                 {description}
               </DialogDescription>
             ) : (
-              <DialogDescription className="sr-only">Bevestig deze actie.</DialogDescription>
+              <DialogDescription className="sr-only">
+                Bevestig deze actie.
+              </DialogDescription>
             )}
           </div>
         </div>
@@ -122,7 +126,11 @@ export function ConfirmDialog({
         ) : null}
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" disabled={pending} onClick={() => setOpen(false)}>
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => setOpen(false)}
+          >
             {cancelLabel}
           </Button>
           <Button
@@ -131,7 +139,12 @@ export function ConfirmDialog({
             aria-busy={pending}
             onClick={handleConfirm}
           >
-            {pending ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : null}
+            {pending ? (
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+            ) : null}
             {confirmLabel ?? (destructive ? "Verwijderen" : "Bevestigen")}
           </Button>
         </div>

@@ -10,6 +10,13 @@ import type {
   PythonError,
 } from "@/lib/questions/schema";
 
+/** One piece of a terminal transcript (for coloured display). */
+export type TranscriptSegment = {
+  /** stdout/stderr: printed text; prompt: `input()` prompt; input: the consumed line (with "\n"). */
+  kind: "stdout" | "stderr" | "prompt" | "input";
+  text: string;
+};
+
 export type RunInput = {
   code: string;
   /** Lines fed to `input()`, separated by "\n". */
@@ -29,6 +36,10 @@ export type RunResult = {
   error: PythonError | null;
   timedOut: boolean;
   durationMs: number;
+  /** The same transcript split into typed segments (additive, optional). */
+  segments?: TranscriptSegment[];
+  /** True when the output cap was hit and the program was stopped. */
+  truncated?: boolean;
 };
 
 export type GradeInput = {
@@ -50,6 +61,13 @@ export type PythonRunnerStatus =
 /** Shape returned by the `usePythonRunner()` hook (browser). */
 export type PythonRunner = {
   status: PythonRunnerStatus;
+  /**
+   * True when interactive `input()` is available (the page is
+   * cross-origin isolated, so SharedArrayBuffer + Atomics.wait work).
+   */
+  interactive: boolean;
+  /** Dutch error message when Pyodide failed to load. */
+  loadError: string | null;
   /** Start downloading Pyodide ahead of time. */
   preload: () => void;
   /**
@@ -61,6 +79,8 @@ export type PythonRunner = {
     input: RunInput & {
       onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
       onInput?: (prompt: string) => Promise<string>;
+      /** Every transcript segment as it happens (stdout, stderr, prompt, input). */
+      onSegment?: (segment: TranscriptSegment) => void;
     },
   ) => Promise<RunResult>;
   /** Run tests/checks locally (same semantics as the server grader). */

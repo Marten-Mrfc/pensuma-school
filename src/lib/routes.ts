@@ -13,6 +13,9 @@ export const routes = {
     class: (classId: string) => `/docent/klassen/${classId}`,
     /** Printable login cards (outside the shell). */
     classLoginCards: (classId: string) => `/print/klassen/${classId}/inlogkaarten`,
+    /** Printable login cards for specific students (any class). */
+    studentLoginCards: (userIds: string[]) =>
+      `/print/leerlingen/inlogkaarten?ids=${userIds.map(encodeURIComponent).join(",")}`,
     students: "/docent/leerlingen",
     student: (userId: string) => `/docent/leerlingen/${userId}`,
     staff: "/docent/docenten",

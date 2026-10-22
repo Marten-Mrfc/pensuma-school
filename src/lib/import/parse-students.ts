@@ -116,7 +116,14 @@ const HEADER_ALIASES: Record<Exclude<Column, "ignore">, string[]> = {
     "studentname",
     "displayname",
   ],
-  first: ["voornaam", "roepnaam", "voornamen", "firstname", "givenname", "first"],
+  first: [
+    "voornaam",
+    "roepnaam",
+    "voornamen",
+    "firstname",
+    "givenname",
+    "first",
+  ],
   infix: [
     "tussenvoegsel",
     "tussenvoegsels",
@@ -128,7 +135,14 @@ const HEADER_ALIASES: Record<Exclude<Column, "ignore">, string[]> = {
     "prefix",
     "middlename",
   ],
-  last: ["achternaam", "familienaam", "lastname", "surname", "last", "achternm"],
+  last: [
+    "achternaam",
+    "familienaam",
+    "lastname",
+    "surname",
+    "last",
+    "achternm",
+  ],
 };
 
 const ALIAS_LOOKUP = new Map<string, Column>(
@@ -165,9 +179,14 @@ function detectHeader(cells: string[]): HeaderMap | null {
     }
   });
   // A header must not contain a student number itself.
-  if (cells.some((c) => STUDENT_NUMBER_REGEX.test(normalizeStudentNumber(c)))) return null;
+  if (cells.some((c) => STUDENT_NUMBER_REGEX.test(normalizeStudentNumber(c))))
+    return null;
   if (recognised === 0 || found.number === undefined) return null;
-  if (found.name === undefined && found.first === undefined && found.last === undefined) {
+  if (
+    found.name === undefined &&
+    found.first === undefined &&
+    found.last === undefined
+  ) {
     return null;
   }
   return {
@@ -200,7 +219,11 @@ function countOutsideQuotes(line: string, ch: string): number {
 
 function detectSeparator(lines: string[]): ImportSeparator {
   const sample = lines.slice(0, 50);
-  const order: Exclude<ImportSeparator, "space">[] = ["tab", "semicolon", "comma"];
+  const order: Exclude<ImportSeparator, "space">[] = [
+    "tab",
+    "semicolon",
+    "comma",
+  ];
   for (const sep of order) {
     const ch = SEPARATOR_CHARS[sep];
     const withSep = sample.filter((l) => countOutsideQuotes(l, ch) > 0).length;
@@ -236,31 +259,42 @@ function fromSpaceLine(line: string): RowCandidate {
     return { studentNumber: last, name: combineName(...tokens.slice(0, -1)) };
   }
   return {
-    error: "Geen leerlingnummer gevonden. Zet het nummer vóór de naam, bijvoorbeeld: 17053 Jan Jansen.",
+    error:
+      "Geen leerlingnummer gevonden. Zet het nummer vóór de naam, bijvoorbeeld: 17053 Jan Jansen.",
   };
 }
 
 function fromCellsWithoutHeader(cells: string[]): RowCandidate {
-  const filled = cells.map((c, i) => ({ c: normalizeCell(c), i })).filter((x) => x.c);
+  const filled = cells
+    .map((c, i) => ({ c: normalizeCell(c), i }))
+    .filter((x) => x.c);
   if (filled.length === 0) return { error: "Lege regel." };
   if (filled.length === 1) return fromSpaceLine(filled[0].c);
-  const numberCell = filled.find((x) => /^\d+$/.test(normalizeStudentNumber(x.c)));
+  const numberCell = filled.find((x) =>
+    /^\d+$/.test(normalizeStudentNumber(x.c)),
+  );
   if (!numberCell) {
     return { error: "Geen leerlingnummer gevonden in deze regel." };
   }
-  const name = combineName(...filled.filter((x) => x.i !== numberCell.i).map((x) => x.c));
+  const name = combineName(
+    ...filled.filter((x) => x.i !== numberCell.i).map((x) => x.c),
+  );
   return { studentNumber: normalizeStudentNumber(numberCell.c), name };
 }
 
 function fromCellsWithHeader(cells: string[], h: HeaderMap): RowCandidate {
-  const at = (i: number | undefined) => (i === undefined ? "" : normalizeCell(cells[i] ?? ""));
+  const at = (i: number | undefined) =>
+    i === undefined ? "" : normalizeCell(cells[i] ?? "");
   const studentNumber = normalizeStudentNumber(at(h.number));
   let name = at(h.name);
   if (!name) name = combineName(at(h.first), at(h.infix), at(h.last));
   return { studentNumber, name };
 }
 
-function validate(candidate: { studentNumber: string; name: string }): string | null {
+function validate(candidate: {
+  studentNumber: string;
+  name: string;
+}): string | null {
   const { studentNumber, name } = candidate;
   if (!studentNumber) return "Leerlingnummer ontbreekt.";
   if (!STUDENT_NUMBER_REGEX.test(studentNumber)) {
@@ -304,7 +338,8 @@ export function parseStudentList(text: string): ParseStudentsResult {
   } else {
     // "leerlingnummer naam" as a space-separated header.
     const tokens = normalizeCell(lines[0].raw).split(" ").map(headerKey);
-    if (tokens.length >= 2 && tokens.every((t) => ALIAS_LOOKUP.has(t))) start = 1;
+    if (tokens.length >= 2 && tokens.every((t) => ALIAS_LOOKUP.has(t)))
+      start = 1;
   }
   if (header) {
     result.headerDetected = true;
@@ -329,7 +364,9 @@ export function parseStudentList(text: string): ParseStudentsResult {
     if (separator === "space") candidate = fromSpaceLine(raw);
     else {
       const cells = splitLine(raw, separator);
-      candidate = header ? fromCellsWithHeader(cells, header) : fromCellsWithoutHeader(cells);
+      candidate = header
+        ? fromCellsWithHeader(cells, header)
+        : fromCellsWithoutHeader(cells);
       // "17053 Jansen, Jan" mis-detected as CSV: retry as a plain line.
       if (!header && "error" in candidate) {
         const plain = fromSpaceLine(raw.replace(/\t/g, " "));

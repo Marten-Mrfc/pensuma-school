@@ -93,7 +93,10 @@ export function ThemeToggle({ variant = "icon", className }: ThemeToggleProps) {
           variant="ghost"
           size="icon-sm"
           aria-label={label}
-          className={cn("text-muted-foreground hover:text-foreground", className)}
+          className={cn(
+            "text-muted-foreground hover:text-foreground",
+            className,
+          )}
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >
           <Sun className="hidden size-4 dark:block" aria-hidden="true" />

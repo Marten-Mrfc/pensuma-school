@@ -68,7 +68,9 @@ export function StatCard({
         className={cn("absolute inset-y-0 left-0 w-[3px]", TONE_BAR[tone])}
       />
       <div className="flex items-start justify-between gap-3">
-        <span className="text-sm font-medium text-muted-foreground">{label}</span>
+        <span className="text-sm font-medium text-muted-foreground">
+          {label}
+        </span>
         {iconNode ? (
           <span
             className={cn(
@@ -83,7 +85,9 @@ export function StatCard({
       <div className="font-display text-3xl leading-none font-bold tracking-tight tabular-nums">
         {value}
       </div>
-      {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+      {hint ? (
+        <div className="text-xs text-muted-foreground">{hint}</div>
+      ) : null}
     </div>
   );
 }

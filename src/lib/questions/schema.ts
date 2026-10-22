@@ -20,11 +20,19 @@ import { z } from "zod";
  *
  * - flexible: case/whitespace-insensitive; every expected line must appear,
  *   in order, inside the output lines (extra text such as labels is allowed).
+ *   Details (see src/lib/grading/compare.ts): only words and numbers count
+ *   (punctuation is ignored, case too unless `ignoreCase` is false); numbers
+ *   compare by value ("108.50" = "108.5"); matching respects token
+ *   boundaries ("5" never matches inside "15"); extra output lines are only
+ *   allowed when they look like a prompt/heading (end with ":" or "?").
  * - exact: lines must match exactly (trailing whitespace and trailing empty
  *   lines are ignored; `ignoreCase` still applies).
- * - contains: every expected line must appear somewhere in the output.
- * - numbers: only the numbers are compared, in order, with `tolerance`.
- * - regex: `expectedOutput` is a regular expression tested on the output.
+ * - contains: every expected line must appear somewhere in the output
+ *   (as whole words/numbers, any order).
+ * - numbers: only the numbers are compared, in order, with `tolerance`
+ *   ("108,50", "1e3" and "-5" are understood).
+ * - regex: `expectedOutput` is a (JavaScript) regular expression searched in
+ *   the output (multiline; case-insensitive when `ignoreCase`).
  */
 export const outputMatchModeSchema = z.enum([
   "flexible",
@@ -252,6 +260,8 @@ export const testResultSchema = z.object({
   stdin: z.string().optional(),
   /** io: expected output; function: `call` → `expected` description. */
   expected: z.string().optional(),
+  /** function tests: the evaluated call, e.g. `gemiddelde([1, 2, 3])` (expected then holds the repr of the expected value). */
+  call: z.string().optional(),
   /** io: clean stdout; function: repr of the returned value. */
   actual: z.string().optional(),
   /** Everything printed, for display (function tests). */

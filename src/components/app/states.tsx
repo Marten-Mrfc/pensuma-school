@@ -26,6 +26,7 @@ export function LoadingState({
 }: LoadingStateProps) {
   if (variant === "inline") {
     return (
+      // biome-ignore lint/a11y/useSemanticElements: a live loading region, not form output
       <div
         role="status"
         className={cn("flex items-center gap-3 py-3", className)}
@@ -53,6 +54,7 @@ export function LoadingState({
   );
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: a live loading region, not form output
     <div
       role="status"
       aria-busy="true"
@@ -165,7 +167,6 @@ export function EmptyBlock({
 
   return (
     <div
-      role="status"
       className={cn(
         "flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card/50 px-6 py-12 text-center",
         className,
@@ -184,7 +185,9 @@ export function EmptyBlock({
           </p>
         ) : null}
       </div>
-      {action ? <div className="mt-2 flex flex-wrap justify-center gap-2">{action}</div> : null}
+      {action ? (
+        <div className="mt-2 flex flex-wrap justify-center gap-2">{action}</div>
+      ) : null}
     </div>
   );
 }
