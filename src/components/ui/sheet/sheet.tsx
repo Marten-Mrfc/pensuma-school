@@ -3,6 +3,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import * as React from 'react'
+import { FocusReturningContent, type FocusReturningContentProps } from '@/components/ui/dialog/return-focus'
 import { cn } from '@/lib/utils'
 
 const Sheet = DialogPrimitive.Root
@@ -36,7 +37,7 @@ const SheetOverlay = React.forwardRef<
 ))
 SheetOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+interface SheetContentProps extends FocusReturningContentProps {
   side?: 'top' | 'right' | 'bottom' | 'left'
 }
 
@@ -44,7 +45,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Co
   ({ side = 'right', className, children, ...props }, ref) => (
     <DialogPrimitive.Portal>
       <SheetOverlay />
-      <DialogPrimitive.Content
+      <FocusReturningContent
         ref={ref}
         data-uipkge=""
         data-slot="sheet-content"
@@ -68,7 +69,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Co
           <X className="size-4" aria-hidden="true" />
           <span className="sr-only">Sluiten</span>
         </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
+      </FocusReturningContent>
     </DialogPrimitive.Portal>
   ),
 )

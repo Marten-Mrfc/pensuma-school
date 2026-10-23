@@ -39,15 +39,18 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import {
+  type RovingRadioItemProps,
+  useRovingRadioGroup,
+} from "../a11y/roving-radio";
+import {
   type AssignmentFormState,
   buildCreatePayload,
   type CodeMode,
   classesSummary,
   createdToast,
-  defaultRetakeTitle,
   effectiveStudentIds,
+  initialFormState,
   type Preset,
-  parseIdList,
   presetDefaults,
   presetMode,
   type StartMode,
@@ -56,16 +59,20 @@ import {
 } from "./assignment-form-payload";
 import { ClassMultiSelect } from "./class-multi-select";
 import { normalizeAccessCode } from "./defaults";
+import { Field, fieldDescribedBy } from "./field";
 import {
   formatMinutes,
   formatMoment,
   fromDateTimeLocal,
   toDateTimeLocal,
 } from "./format";
+import { Notice } from "./notice";
 import { AssignmentSettingsFields } from "./settings-fields";
 import { StudentPicker } from "./student-picker";
 
 const DURATIONS = [15, 30, 45, 50, 60, 90];
+const START_MODES: StartMode[] = ["now", "scheduled", "manual"];
+const CODE_MODES: CodeMode[] = ["generate", "none", "custom"];
 
 const PRESET_INFO: Record<
   Preset,
@@ -104,6 +111,11 @@ const PRESET_INFO: Record<
   },
 };
 
+const PRESETS = Object.keys(PRESET_INFO) as Preset[];
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function AssignmentForm() {
   const trpc = useTRPC();
   const options = useQuery(trpc.assignment.formOptions.queryOptions());
@@ -117,54 +129,6 @@ export function AssignmentForm() {
 }
 
 type Options = RouterOutputs["assignment"]["formOptions"];
-
-/** Initial state from the query string (?toets, ?klas, ?leerlingen, ?herkansing). */
-function initialState(
-  options: Options,
-  params: URLSearchParams,
-): AssignmentFormState {
-  const preTest = params.get("toets");
-  const preClass = params.get("klas");
-  const retakeOfId = params.get("herkansing");
-  const studentIds = parseIdList(params.get("leerlingen"));
-  const testId = options.tests.some((t) => t.id === preTest)
-    ? (preTest as string)
-    : options.tests.length === 1
-      ? options.tests[0].id
-      : "";
-  const classIds = options.classes.some((c) => c.id === preClass)
-    ? [preClass as string]
-    : options.classes.length === 1
-      ? [options.classes[0].id]
-      : [];
-  const testTitle = options.tests.find((t) => t.id === testId)?.title;
-  const targeted =
-    (studentIds.length > 0 || !!retakeOfId) && classIds.length === 1;
-  const title =
-    testTitle && retakeOfId
-      ? defaultRetakeTitle("herkansing", testTitle)
-      : testTitle && studentIds.length
-        ? defaultRetakeTitle("inhaaltoets", testTitle)
-        : "";
-  const preset: Preset = "exam";
-  return {
-    testId,
-    classIds,
-    studentIds: targeted ? studentIds : null,
-    retakeOfId: retakeOfId || null,
-    title,
-    preset,
-    settings: presetDefaults(preset).settings,
-    startMode: "now",
-    opensAt: "",
-    closesEnabled: false,
-    closesAt: "",
-    timeLimit: "",
-    codeMode: presetDefaults(preset).codeMode,
-    customCode: "",
-    accessCodePerClass: false,
-  };
-}
 
 function AssignmentFormInner({ options }: { options: Options }) {
   const trpc = useTRPC();
@@ -183,9 +147,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
     code: `${id}-code`,
   };
 
-  const [state, setState] = useState<AssignmentFormState>(() =>
-    initialState(options, new URLSearchParams(searchParams.toString())),
+  const [initial] = useState(() =>
+    initialFormState(options, new URLSearchParams(searchParams.toString())),
   );
+  const [state, setState] = useState<AssignmentFormState>(initial.state);
+  const { unavailableTestId, unavailableClassId } = initial;
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorFocusKey, setErrorFocusKey] = useState(0);
   const set = <K extends keyof AssignmentFormState>(
@@ -241,6 +207,40 @@ function AssignmentFormInner({ options }: { options: Options }) {
       closesEnabled: d.closesEnabled ?? s.closesEnabled,
     }));
   };
+
+  const chooseStart = (next: StartMode) => {
+    if (next !== "scheduled") {
+      set("startMode", next);
+      return;
+    }
+    setState((s) => {
+      if (s.opensAt) return { ...s, startMode: "scheduled" };
+      const d = new Date(Date.now() + 60 * 60_000);
+      d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
+      return {
+        ...s,
+        startMode: "scheduled",
+        opensAt: toDateTimeLocal(d),
+      };
+    });
+  };
+
+  // Card-style radio groups: arrow keys, Home/End and one Tab stop.
+  const presetRadios = useRovingRadioGroup({
+    count: PRESETS.length,
+    checkedIndex: PRESETS.indexOf(state.preset),
+    onSelect: (index) => choosePreset(PRESETS[index]),
+  });
+  const startRadios = useRovingRadioGroup({
+    count: START_MODES.length,
+    checkedIndex: START_MODES.indexOf(state.startMode),
+    onSelect: (index) => chooseStart(START_MODES[index]),
+  });
+  const codeRadios = useRovingRadioGroup({
+    count: CODE_MODES.length,
+    checkedIndex: CODE_MODES.indexOf(state.codeMode),
+    onSelect: (index) => set("codeMode", CODE_MODES[index]),
+  });
 
   const limitMinutes = state.timeLimit.trim()
     ? Number.parseInt(state.timeLimit, 10)
@@ -315,6 +315,27 @@ function AssignmentFormInner({ options }: { options: Options }) {
         <div className="flex min-w-0 flex-col gap-6">
           <Section step={1} title="Toets en klassen" icon={School}>
             <div className="flex flex-col gap-5">
+              {unavailableTestId ? (
+                <Notice
+                  tone="warning"
+                  title="De toets van deze link kun je nu niet inplannen"
+                >
+                  <p id={`${ids.test}-unavailable`}>
+                    Hij is gearchiveerd, staat op concept of bestaat niet meer.
+                    Alleen gepubliceerde toetsen kun je inplannen. Publiceer de
+                    toets opnieuw en laad deze pagina daarna opnieuw, of kies
+                    hieronder bewust een andere toets.
+                  </p>
+                  {UUID_RE.test(unavailableTestId) ? (
+                    <Link
+                      href={routes.docent.test(unavailableTestId)}
+                      className="mt-1 inline-block font-medium underline underline-offset-4"
+                    >
+                      Toets openen
+                    </Link>
+                  ) : null}
+                </Notice>
+              ) : null}
               <Field
                 label="Toets"
                 htmlFor={ids.test}
@@ -326,6 +347,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   value={state.testId}
                   onChange={(e) => set("testId", e.target.value)}
                   aria-invalid={!!errors.test}
+                  aria-describedby={fieldDescribedBy(ids.test, {
+                    hint: true,
+                    error: !!errors.test,
+                    extra: [unavailableTestId && `${ids.test}-unavailable`],
+                  })}
                 >
                   <option value="" disabled>
                     Kies een toets…
@@ -338,6 +364,12 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 </NativeSelect>
               </Field>
 
+              {unavailableClassId ? (
+                <Notice tone="warning">
+                  De klas van deze link is gearchiveerd of bestaat niet meer.
+                  Kies hieronder een klas.
+                </Notice>
+              ) : null}
               <ClassMultiSelect
                 fieldsetId={ids.class}
                 classes={options.classes}
@@ -409,6 +441,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   maxLength={150}
                   placeholder={test?.title ?? "Naam van de toets"}
                   onChange={(e) => set("title", e.target.value)}
+                  aria-describedby={fieldDescribedBy(ids.title, { hint: true })}
                 />
               </Field>
             </div>
@@ -420,18 +453,19 @@ function AssignmentFormInner({ options }: { options: Options }) {
               aria-label="Modus"
               className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"
             >
-              {(Object.keys(PRESET_INFO) as Preset[]).map((p) => {
+              {PRESETS.map((p, index) => {
                 const info = PRESET_INFO[p];
                 const Icon = info.icon;
                 const active = state.preset === p;
                 return (
-                  // biome-ignore lint/a11y/useSemanticElements: card-style radio
+                  // biome-ignore lint/a11y/useSemanticElements: card-style radio (arrow keys and one Tab stop via useRovingRadioGroup)
                   <button
                     key={p}
                     type="button"
                     role="radio"
                     aria-checked={active}
                     onClick={() => choosePreset(p)}
+                    {...presetRadios.itemProps(index)}
                     className={cn(
                       "relative flex flex-col gap-3 rounded-xl border bg-background p-4 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring",
                       p === "selfstudy" && "md:col-span-2 2xl:col-span-1",
@@ -499,32 +533,24 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 >
                   <ChoiceButton
                     active={state.startMode === "now"}
-                    onClick={() => set("startMode", "now" as StartMode)}
+                    onClick={() => chooseStart("now")}
+                    radio={startRadios.itemProps(0)}
                     icon={Play}
                     title="Nu openen"
                     description="Leerlingen kunnen meteen beginnen."
                   />
                   <ChoiceButton
                     active={state.startMode === "scheduled"}
-                    onClick={() => {
-                      setState((s) => {
-                        if (s.opensAt) return { ...s, startMode: "scheduled" };
-                        const d = new Date(Date.now() + 60 * 60_000);
-                        d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
-                        return {
-                          ...s,
-                          startMode: "scheduled",
-                          opensAt: toDateTimeLocal(d),
-                        };
-                      });
-                    }}
+                    onClick={() => chooseStart("scheduled")}
+                    radio={startRadios.itemProps(1)}
                     icon={CalendarClock}
                     title="Op een tijdstip"
                     description="Gaat vanzelf open."
                   />
                   <ChoiceButton
                     active={state.startMode === "manual"}
-                    onClick={() => set("startMode", "manual" as StartMode)}
+                    onClick={() => chooseStart("manual")}
+                    radio={startRadios.itemProps(2)}
                     icon={Hand}
                     title="Zelf openen"
                     description="Jij klikt straks op ‘Openen’."
@@ -543,6 +569,9 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       value={state.opensAt}
                       onChange={(e) => set("opensAt", e.target.value)}
                       aria-invalid={!!errors.opensAt}
+                      aria-describedby={fieldDescribedBy(ids.opensAt, {
+                        error: !!errors.opensAt,
+                      })}
                     />
                   </Field>
                 ) : null}
@@ -592,6 +621,10 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       value={state.closesAt}
                       onChange={(e) => set("closesAt", e.target.value)}
                       aria-invalid={!!errors.closesAt}
+                      aria-describedby={fieldDescribedBy(ids.closesAt, {
+                        hint: true,
+                        error: !!errors.closesAt,
+                      })}
                     />
                   </Field>
                 ) : (
@@ -619,6 +652,10 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       value={state.timeLimit}
                       onChange={(e) => set("timeLimit", e.target.value)}
                       aria-invalid={!!errors.timeLimit}
+                      aria-describedby={fieldDescribedBy(ids.timeLimit, {
+                        hint: true,
+                        error: !!errors.timeLimit,
+                      })}
                     />
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -651,19 +688,22 @@ function AssignmentFormInner({ options }: { options: Options }) {
             >
               <ChoiceButton
                 active={state.codeMode === "generate"}
-                onClick={() => set("codeMode", "generate" as CodeMode)}
+                onClick={() => set("codeMode", "generate")}
+                radio={codeRadios.itemProps(0)}
                 title="Code maken"
                 description="Een willekeurige code van 6 tekens."
               />
               <ChoiceButton
                 active={state.codeMode === "none"}
-                onClick={() => set("codeMode", "none" as CodeMode)}
+                onClick={() => set("codeMode", "none")}
+                radio={codeRadios.itemProps(1)}
                 title="Geen code"
                 description="Iedereen in de klas kan starten."
               />
               <ChoiceButton
                 active={state.codeMode === "custom"}
-                onClick={() => set("codeMode", "custom" as CodeMode)}
+                onClick={() => set("codeMode", "custom")}
+                radio={codeRadios.itemProps(2)}
                 title="Zelf kiezen"
                 description="Bijvoorbeeld een woord."
               />
@@ -684,6 +724,9 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   className="font-mono tracking-widest uppercase"
                   onChange={(e) => set("customCode", e.target.value)}
                   aria-invalid={!!errors.code}
+                  aria-describedby={fieldDescribedBy(ids.code, {
+                    error: !!errors.code,
+                  })}
                 />
               </Field>
             ) : null}
@@ -869,56 +912,30 @@ function Section({
   );
 }
 
-function Field({
-  label,
-  htmlFor,
-  error,
-  hint,
-  className,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  error?: string;
-  hint?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={htmlFor} className="text-sm font-medium">
-        {label}
-      </label>
-      {children}
-      {error ? (
-        <p className="text-xs font-medium text-destructive">{error}</p>
-      ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
-      ) : null}
-    </div>
-  );
-}
-
 function ChoiceButton({
   active,
   onClick,
+  radio,
   icon: Icon,
   title,
   description,
 }: {
   active: boolean;
   onClick: () => void;
+  /** Roving tabindex and arrow keys of the group (useRovingRadioGroup). */
+  radio: RovingRadioItemProps;
   icon?: LucideIcon;
   title: string;
   description: string;
 }) {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: card-style radio
+    // biome-ignore lint/a11y/useSemanticElements: card-style radio (arrow keys and one Tab stop via useRovingRadioGroup)
     <button
       type="button"
       role="radio"
       aria-checked={active}
       onClick={onClick}
+      {...radio}
       className={cn(
         "flex items-start gap-2.5 rounded-lg border bg-background p-3 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring",
         active && "border-primary bg-primary/[0.04] ring-1 ring-primary",

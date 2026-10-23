@@ -8,17 +8,22 @@ import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
-import { formatGrade, formatMoment, formatNumber } from "./format";
+import {
+  formatGrade,
+  formatMoment,
+  formatNumber,
+  hiddenResultLabel,
+} from "./format";
 import { ModeBadge } from "./mode-badge";
 
 type Row = RouterOutputs["portal"]["myResults"][number];
 
-function ScoreCell({ row }: { row: Row }) {
+export function ScoreCell({ row }: { row: Row }) {
   if (!row.visible) {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
         <EyeOff className="size-4" aria-hidden="true" />
-        Resultaat volgt
+        {hiddenResultLabel(row)}
       </span>
     );
   }

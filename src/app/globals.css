@@ -325,6 +325,14 @@ a[data-slot="card"]:hover,
     0 2px 4px -2px rgba(0, 0, 0, 0.2);
 }
 
+/* Toasts ("Meldingen") stay hoverable (pauses the timer) and closable while
+   a dialog or sheet is open: Radix sets pointer-events: none on <body> then,
+   which the toaster would otherwise inherit (WCAG 2.2.1). DialogContent and
+   SheetContent don't treat a click on a toast as a click outside. */
+[data-sonner-toaster] {
+  pointer-events: auto;
+}
+
 /* Subtle background texture */
 body::before {
   content: "";

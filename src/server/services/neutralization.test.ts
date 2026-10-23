@@ -75,6 +75,34 @@ describe("restoredManualScore (undoing 'vraag laten vervallen')", () => {
     ).toBeUndefined();
   });
 
+  test("reviewed again while the question did not count: nothing of that review comes back", () => {
+    // Saved again (possibly changed) and "reviewed" while max was 0: the
+    // score given then meant nothing, and the saved one may be for an older
+    // answer → reviewed again.
+    for (const manualScore of [null, 0]) {
+      expect(
+        restoredManualScore(
+          { manualScore, maxScore: 0, reviewedAt: later, savedAt: after },
+          1.5,
+          drop,
+        ),
+      ).toBeNull();
+    }
+  });
+
+  test("the snapshot time decides, not the first neutralisation", () => {
+    // Reviewed at 11:00 (after the first neutralisation at 10:00); the
+    // switch to "drop" at 11:30 took a new snapshot that holds that review.
+    const switchedAt = new Date("2026-10-20T11:30:00Z");
+    expect(
+      restoredManualScore(
+        { manualScore: null, maxScore: 0, reviewedAt: after, savedAt: after },
+        1,
+        { mode: "drop", createdAt: switchedAt },
+      ),
+    ).toBe(1);
+  });
+
   test("same answer reviewed while it gave full points", () => {
     // A deliberately different score stays…
     expect(

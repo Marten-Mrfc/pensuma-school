@@ -11,19 +11,22 @@ import {
   FileQuestion,
   Hourglass,
   KeyRound,
+  ListChecks,
   PartyPopper,
   PlayCircle,
   RotateCcw,
   SquareTerminal,
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useCurrentUser } from "@/components/app/current-user";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { claimLocalData, pruneAttemptBackups } from "@/lib/local-data";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { finishedEmptyCopy, inProgressAttemptIds } from "./dashboard-logic";
 import {
   formatGrade,
   formatLongDate,
@@ -31,6 +34,7 @@ import {
   formatMoment,
   formatNumber,
   formatTimeLeft,
+  hiddenResultLabel,
   pluralize,
 } from "./format";
 import { ModeBadge } from "./mode-badge";
@@ -88,7 +92,9 @@ function ScorePill({ item }: { item: DashboardItem }) {
   if (!last) return null;
   if (!last.resultsVisible) {
     return (
-      <span className="text-sm text-muted-foreground">Resultaat volgt</span>
+      <span className="text-sm text-muted-foreground">
+        {hiddenResultLabel(last)}
+      </span>
     );
   }
   if (last.gradingStatus === "pending" || last.score == null) {
@@ -298,7 +304,7 @@ function FinishedRow({ item }: { item: DashboardItem }) {
             </span>
           ) : (
             <span className="text-sm text-muted-foreground">
-              {last.resultsVisible ? "Wordt nagekeken…" : "Resultaat volgt"}
+              {last.resultsVisible ? "Wordt nagekeken…" : hiddenResultLabel(last)}
             </span>
           )
         ) : null}
@@ -329,12 +335,52 @@ function FinishedRow({ item }: { item: DashboardItem }) {
   );
 }
 
+/** Empty "Afgerond" section (see finishedEmptyCopy). */
+export function FinishedEmpty({ open }: { open: readonly DashboardItem[] }) {
+  const copy = finishedEmptyCopy(open);
+  return (
+    <EmptyBlock
+      icon={Award}
+      title={copy.title}
+      description={copy.description}
+      action={
+        copy.linkToResults ? (
+          <Button asChild variant="outline">
+            <Link href={routes.leerling.results}>
+              <ListChecks aria-hidden="true" />
+              Naar Resultaten
+            </Link>
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+}
+
 export function StudentDashboard() {
   const user = useCurrentUser();
   const trpc = useTRPC();
   const query = useQuery(
     trpc.portal.dashboard.queryOptions(undefined, { refetchInterval: 30_000 }),
   );
+
+  // Shared school computers: drop another student's local data, and the
+  // answer backups of attempts that are no longer running (handed in,
+  // deleted). Only with data fetched since this page opened: cached data
+  // could miss an attempt started a moment ago.
+  useEffect(() => {
+    claimLocalData(user.id);
+  }, [user.id]);
+  const fresh = query.isFetchedAfterMount ? query.data : undefined;
+  const keepKey = fresh
+    ? inProgressAttemptIds([fresh.open, fresh.upcoming, fresh.finished])
+        .sort()
+        .join(",")
+    : null;
+  useEffect(() => {
+    if (keepKey == null) return;
+    pruneAttemptBackups(keepKey ? keepKey.split(",") : []);
+  }, [keepKey]);
 
   const greeting = (
     <header className="flex flex-col gap-1.5">
@@ -426,11 +472,7 @@ export function StudentDashboard() {
             ))}
           </ul>
         ) : (
-          <EmptyBlock
-            icon={Award}
-            title="Nog niets afgerond"
-            description="Toetsen die je hebt ingeleverd verschijnen hier, met je resultaat zodra dat beschikbaar is."
-          />
+          <FinishedEmpty open={open} />
         )}
       </Section>
     </>

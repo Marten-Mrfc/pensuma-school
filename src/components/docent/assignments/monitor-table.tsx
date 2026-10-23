@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,14 @@ import { computeGrade, type GradingScale } from "@/lib/grading/grade-scale";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { focusInvalidField } from "../a11y/invalid-field-focus";
+import { useResultAnnouncement } from "../a11y/result-announcement";
 import { formatGrade, formatNumber, formatRemaining } from "./format";
+import {
+  MINUTES_ERROR,
+  MinutesField,
+  parseExtraMinutes,
+} from "./minutes-field";
 import { useDialogReturnFocus } from "./use-dialog-return-focus";
 
 type Monitor = RouterOutputs["assignment"]["monitor"];
@@ -60,6 +68,14 @@ const INACTIVE_MS = 90_000;
 function rowState(row: StudentRow) {
   if (!row.attempt) return "not_started" as const;
   return row.attempt.status;
+}
+
+/** Status message after searching or filtering the live overview. */
+export function selectionMessage(count: number): string {
+  if (count === 0) return "Geen leerlingen in deze selectie.";
+  return count === 1
+    ? "1 leerling in deze selectie."
+    : `${count} leerlingen in deze selectie.`;
 }
 
 /** Help text for the focus-loss column. */
@@ -123,6 +139,15 @@ export function MonitorTable({
       default:
         return rowState(r) === filter;
     }
+  });
+
+  // Read the size of the selection aloud after a search or filter change
+  // (not on every poll: the key only changes when the teacher acts).
+  useResultAnnouncement({
+    key: `${q}|${filter}`,
+    ready: true,
+    message: selectionMessage(rows.length),
+    delayMs: 400,
   });
 
   const filters: { value: Filter; label: string }[] = [
@@ -792,8 +817,9 @@ function MinutesDialog({
 }) {
   const id = useId();
   const [value, setValue] = useState(String(defaultMinutes));
-  const minutes = Number.parseInt(value, 10);
-  const valid = Number.isFinite(minutes) && minutes >= 1 && minutes <= 600;
+  const [showError, setShowError] = useState(false);
+  const announce = useAnnounce();
+  const minutes = parseExtraMinutes(value);
   const returnFocus = useDialogReturnFocus();
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !pending && onClose()}>
@@ -804,44 +830,27 @@ function MinutesDialog({
         </div>
         <form
           className="flex flex-col gap-4"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            if (valid) onConfirm(minutes);
+            if (minutes === null) {
+              // Say what is wrong instead of a silently disabled button.
+              setShowError(true);
+              focusInvalidField(`${id}-minutes`, MINUTES_ERROR, announce);
+              return;
+            }
+            onConfirm(minutes);
           }}
         >
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={`${id}-minutes`} className="text-sm font-medium">
-              Minuten
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="w-28">
-                <Input
-                  id={`${id}-minutes`}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={600}
-                  autoFocus
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                />
-              </div>
-              {[5, 10, 15, 30].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setValue(String(m))}
-                  className={cn(
-                    "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums hover:bg-accent",
-                    minutes === m &&
-                      "border-primary bg-primary/10 text-primary",
-                  )}
-                >
-                  {m} min
-                </button>
-              ))}
-            </div>
-          </div>
+          <MinutesField
+            id={id}
+            value={value}
+            onChange={(next) => {
+              setValue(next);
+              if (parseExtraMinutes(next) !== null) setShowError(false);
+            }}
+            showError={showError}
+          />
           {children}
           {error ? (
             <p
@@ -860,7 +869,7 @@ function MinutesDialog({
             >
               Annuleren
             </Button>
-            <Button type="submit" disabled={!valid || pending}>
+            <Button type="submit" disabled={pending} aria-busy={pending}>
               {pending ? (
                 <Loader2
                   className="motion-safe:animate-spin"

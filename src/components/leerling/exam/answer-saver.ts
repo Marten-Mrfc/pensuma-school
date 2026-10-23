@@ -10,18 +10,34 @@ import { readStorage, removeStorage, storageKey, writeStorage } from "./types";
  *  - retries with exponential backoff while offline,
  *  - drops a question the teacher deleted during the attempt (the server
  *    answers "removed"); the other questions keep saving,
+ *  - sets aside an answer the server refuses as it is (too long, invalid:
+ *    see `isRejectedError`). That is not "offline": the question is marked
+ *    as rejected (its local backup stays), the other questions keep saving,
+ *    and the next change to it is tried again,
  *  - stops for good when the server says the attempt is closed, and then
  *    removes the local backup (shared school PCs keep nothing behind).
  *
  * React reads `getSnapshot()` through `useSyncExternalStore`.
  */
 
-export type SaveState = "saved" | "dirty" | "saving" | "offline" | "locked";
+export type SaveState =
+  | "saved"
+  | "dirty"
+  | "saving"
+  | "offline"
+  | "locked"
+  /** Online, but the server refused at least one answer (see `rejected`). */
+  | "error";
 
 export type SaverSnapshot = {
   state: SaveState;
   lastSavedAt: number | null;
   pendingCount: number;
+  /**
+   * Questions whose latest answer the server refused (too long, invalid).
+   * Those answers are not saved until the student changes them.
+   */
+  rejected: readonly string[];
 };
 
 type SaveFn = (
@@ -55,6 +71,35 @@ export function isLockedError(err: unknown): boolean {
   );
 }
 
+/** tRPC codes for a request the server will never accept as it is. */
+const REJECTED_CODES = new Set([
+  "BAD_REQUEST",
+  "PARSE_ERROR",
+  "PAYLOAD_TOO_LARGE",
+  "UNPROCESSABLE_CONTENT",
+]);
+
+/**
+ * Errors about this one answer, not about the connection: the server (or a
+ * proxy in front of it) refused it as it is, e.g. an open answer over the
+ * 20.000-character limit. Retrying the same answer can never succeed, so it
+ * must not count as "offline" or hold up the other questions. Rate limits,
+ * an expired session and network errors are not in this group: those are
+ * retried.
+ */
+export function isRejectedError(err: unknown): boolean {
+  if (isLockedError(err)) return false;
+  const e = err as {
+    data?: { code?: string; httpStatus?: number };
+    meta?: { response?: { status?: number } };
+  } | null;
+  const code = e?.data?.code;
+  if (code && REJECTED_CODES.has(code)) return true;
+  // A proxy's "413 Request Entity Too Large" carries no tRPC code.
+  const status = e?.data?.httpStatus ?? e?.meta?.response?.status;
+  return status === 413;
+}
+
 export class AnswerSaver {
   private pending = new Map<
     string,
@@ -63,6 +108,8 @@ export class AnswerSaver {
   private version = 0;
   /** Questions the teacher deleted during the attempt: never saved again. */
   private removed = new Set<string>();
+  /** Questions whose latest answer the server refused (with the error). */
+  private rejected = new Map<string, unknown>();
   private running = false;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -76,6 +123,7 @@ export class AnswerSaver {
     state: "saved",
     lastSavedAt: null,
     pendingCount: 0,
+    rejected: [],
   };
   private backupKey: string;
 
@@ -106,20 +154,28 @@ export class AnswerSaver {
       ? "locked"
       : this.offline
         ? "offline"
-        : this.running
-          ? "saving"
-          : this.pending.size
-            ? "dirty"
-            : "saved";
+        : this.rejected.size
+          ? "error"
+          : this.running
+            ? "saving"
+            : this.pending.size
+              ? "dirty"
+              : "saved";
+    const rejected = [...this.rejected.keys()];
+    const sameRejected =
+      rejected.length === this.snapshot.rejected.length &&
+      rejected.every((id, i) => id === this.snapshot.rejected[i]);
     const next: SaverSnapshot = {
       state,
       lastSavedAt: this.snapshot.lastSavedAt,
       pendingCount: this.pending.size,
+      rejected: sameRejected ? this.snapshot.rejected : rejected,
     };
     if (
       next.state !== this.snapshot.state ||
       next.pendingCount !== this.snapshot.pendingCount ||
-      next.lastSavedAt !== this.snapshot.lastSavedAt
+      next.lastSavedAt !== this.snapshot.lastSavedAt ||
+      next.rejected !== this.snapshot.rejected
     ) {
       this.snapshot = next;
       for (const l of this.listeners) l();
@@ -163,6 +219,16 @@ export class AnswerSaver {
     return this.pending.size > 0 || this.running;
   }
 
+  /** Something is not on the server yet: queued, saving or refused. */
+  get hasUnsaved() {
+    return this.hasPending || this.rejected.size > 0;
+  }
+
+  /** The error the server gave for this question's refused answer. */
+  rejectionOf(questionId: string): unknown {
+    return this.rejected.get(questionId);
+  }
+
   /** Record a change: backup now, save soon. */
   update(
     questionId: string,
@@ -171,16 +237,22 @@ export class AnswerSaver {
   ) {
     if (this.locked || this.removed.has(questionId)) return;
     if (opts.backup !== false) this.writeBackup(questionId, response);
+    // A changed answer gets a new chance.
+    this.rejected.delete(questionId);
     this.pending.set(questionId, { response, version: ++this.version });
     this.firstDirtyAt ??= Date.now();
     this.schedule();
     this.emit();
   }
 
-  /** Save everything now. Resolves true when nothing is left unsaved. */
+  /**
+   * Save everything now. Resolves true when nothing is left unsaved (false
+   * while offline, locked, or when an answer was refused).
+   */
   flush(): Promise<boolean> {
     if (this.locked) return Promise.resolve(false);
-    if (!this.pending.size && !this.running) return Promise.resolve(true);
+    if (!this.pending.size && !this.running)
+      return Promise.resolve(this.rejected.size === 0);
     const done = new Promise<boolean>((resolve) => this.waiters.push(resolve));
     this.clearDebounce();
     if (this.retryTimer) {
@@ -241,6 +313,7 @@ export class AnswerSaver {
         if (res.status === REMOVED_STATUS) {
           // Only this question is gone; keep saving the others.
           this.removed.add(questionId);
+          this.rejected.delete(questionId);
           this.pending.delete(questionId);
           this.removeFromBackup(questionId);
         } else if (this.pending.get(questionId)?.version === entry.version) {
@@ -254,9 +327,22 @@ export class AnswerSaver {
         if (isLockedError(err)) {
           this.locked = true;
           this.pending.clear();
+          this.rejected.clear();
           // Nothing can be saved any more: don't leave answers behind.
           this.clearBackup();
           this.hooks.onLocked?.(err);
+        } else if (isRejectedError(err)) {
+          // The server is reachable but refuses this answer as it is.
+          // Set it aside (the local backup keeps it) and save the others;
+          // a newer version typed meanwhile is still tried.
+          if (this.pending.get(questionId)?.version === entry.version) {
+            this.pending.delete(questionId);
+            this.rejected.set(questionId, err);
+          }
+          this.offline = false;
+          this.retryDelay = 0;
+          this.emit();
+          continue;
         } else {
           failed = true;
           this.offline = true;
@@ -276,7 +362,7 @@ export class AnswerSaver {
     if (!this.pending.size) this.firstDirtyAt = null;
     this.emit();
     if (!this.pending.size && !failed && !this.locked)
-      this.resolveWaiters(true);
+      this.resolveWaiters(this.rejected.size === 0);
     else if (failed || this.locked) this.resolveWaiters(false);
   }
 }

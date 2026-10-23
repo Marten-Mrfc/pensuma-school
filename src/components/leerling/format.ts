@@ -133,3 +133,29 @@ export function formatHintsUsed(used: number, penaltyPoints: number): string {
 export function formatPercent(fraction: number): string {
   return `${formatNumber(Math.round(fraction * 1000) / 10, 1)}%`;
 }
+
+/**
+ * Why a hand-in's result is not shown yet: "never" when the toets never
+ * shows results online (the teacher discusses it), otherwise "pending"
+ * (waiting for the close or the teacher's release). Read from the row's
+ * `hiddenReason` (portal.dashboard / portal.myResults); rows without it
+ * count as pending.
+ */
+export type HiddenResultReason = "never" | "pending";
+
+export function hiddenResultReason(row: object): HiddenResultReason {
+  return "hiddenReason" in row && row.hiddenReason === "never"
+    ? "never"
+    : "pending";
+}
+
+/**
+ * Short label for a hidden result (dashboard and Resultaten). For "never"
+ * it matches the result page ("Je docent bespreekt het met je."), so no
+ * result is promised that will never appear.
+ */
+export function hiddenResultLabel(row: object): string {
+  return hiddenResultReason(row) === "never"
+    ? "Je docent bespreekt het resultaat"
+    : "Resultaat volgt";
+}

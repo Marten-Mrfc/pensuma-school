@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { FocusReturningContent, type FocusReturningContentProps } from './return-focus'
 
 const Dialog = DialogPrimitive.Root
 
@@ -37,7 +38,7 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+interface DialogContentProps extends FocusReturningContentProps {
   showCloseButton?: boolean
 }
 
@@ -45,7 +46,7 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
   ({ className, children, showCloseButton = true, ...props }, ref) => (
     <DialogPrimitive.Portal>
       <DialogOverlay />
-      <DialogPrimitive.Content
+      <FocusReturningContent
         ref={ref}
         data-uipkge=""
         data-slot="dialog-content"
@@ -68,23 +69,21 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
             <span className="sr-only">Sluiten</span>
           </DialogPrimitive.Close>
         )}
-      </DialogPrimitive.Content>
+      </FocusReturningContent>
     </DialogPrimitive.Portal>
   ),
 )
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
-const DialogScrollContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+const DialogScrollContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, FocusReturningContentProps>(
+  ({ className, children, onPointerDownOutside, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay
       data-uipkge=""
       data-slot="dialog-overlay"
       className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:ease-emphasized data-[state=open]:blur-in-2 data-[state=closed]:blur-out-2 data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 bg-foreground/50 fixed inset-0 z-50 grid place-items-center overflow-y-auto data-[state=closed]:duration-[var(--dur-exit)] data-[state=open]:duration-200"
     >
-      <DialogPrimitive.Content
+      <FocusReturningContent
         ref={ref}
         data-uipkge=""
         data-slot="dialog-content"
@@ -94,11 +93,13 @@ const DialogScrollContent = React.forwardRef<
           className,
         )}
         onPointerDownOutside={(event) => {
+          // A click on the overlay's scrollbar is not a click outside.
           const originalEvent = event.detail.originalEvent
           const target = originalEvent.target as HTMLElement
           if (originalEvent.offsetX > target.clientWidth || originalEvent.offsetY > target.clientHeight) {
             event.preventDefault()
           }
+          onPointerDownOutside?.(event)
         }}
         {...props}
       >
@@ -112,10 +113,11 @@ const DialogScrollContent = React.forwardRef<
           <X className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">Sluiten</span>
         </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
+      </FocusReturningContent>
     </DialogPrimitive.Overlay>
   </DialogPrimitive.Portal>
-))
+  ),
+)
 DialogScrollContent.displayName = 'DialogScrollContent'
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

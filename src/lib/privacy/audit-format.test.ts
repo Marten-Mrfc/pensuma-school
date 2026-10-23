@@ -148,7 +148,10 @@ describe("specific actions instead of the generic 'Wijziging'", () => {
 
   test("student import and AVG art. 18 details", () => {
     expect(formatAuditDetails({ fields: ["name"], via: "import" })).toBe(
-      "velden: name · via: leerlingen importeren",
+      "velden: naam · via: leerlingen importeren",
+    );
+    expect(formatAuditDetails({ fields: ["name", "studentNumber"] })).toBe(
+      "velden: naam, leerlingnummer",
     );
     expect(
       formatAuditDetails({

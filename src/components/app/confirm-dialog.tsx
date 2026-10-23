@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert, Loader2, TriangleAlert } from "lucide-react";
-import { type ReactNode, type RefObject, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,22 +42,6 @@ export interface ConfirmDialogProps {
   returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
-/**
- * The element focus should return to: the active element, or for an item in
- * a (Radix) dropdown menu the menu's trigger, because the item disappears
- * when the menu closes. Menu content is labelled by its trigger.
- */
-function returnTarget(active: Element | null): HTMLElement | null {
-  let el = active;
-  for (let depth = 0; el && depth < 5; depth++) {
-    const menu = el.closest('[role="menu"]');
-    if (!menu) break;
-    const triggerId = menu.getAttribute("aria-labelledby");
-    el = triggerId ? document.getElementById(triggerId) : null;
-  }
-  return el instanceof HTMLElement && el !== document.body ? el : null;
-}
-
 /** "Weet je het zeker?" dialog with async confirm handling. */
 export function ConfirmDialog({
   trigger,
@@ -73,7 +57,6 @@ export function ConfirmDialog({
   returnFocusRef,
 }: ConfirmDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const openedFrom = useRef<HTMLElement | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = openProp ?? internalOpen;
@@ -110,39 +93,10 @@ export function ConfirmDialog({
         className="gap-5 sm:max-w-md"
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
-        onOpenAutoFocus={() => {
-          // Still the element that opened the dialog at this point.
-          openedFrom.current = returnTarget(document.activeElement);
-        }}
-        onCloseAutoFocus={(e) => {
-          // Radix only returns focus to a <DialogTrigger>. Without one
-          // (controlled dialogs opened by a button or shortcut elsewhere),
-          // send focus back to the element that opened it (WCAG 2.4.3).
-          const opener = openedFrom.current;
-          openedFrom.current = null;
-          // This runs after the close animation. If the page has already
-          // moved focus on purpose in the meantime (e.g. to the question a
-          // button in the dialog jumped to), leave it there.
-          const active = document.activeElement;
-          if (
-            active instanceof HTMLElement &&
-            active !== document.body &&
-            active.isConnected
-          ) {
-            e.preventDefault();
-            return;
-          }
-          if (opener?.isConnected) {
-            e.preventDefault();
-            opener.focus();
-            return;
-          }
-          const fallback = returnFocusRef?.current;
-          if (fallback?.isConnected) {
-            e.preventDefault();
-            fallback.focus();
-          }
-        }}
+        // Focus goes back to the element that opened the dialog (also
+        // without a trigger, see DialogContent), or to returnFocusRef when
+        // that element is gone.
+        returnFocusFallbackRef={returnFocusRef}
       >
         <div className="flex gap-4">
           <span

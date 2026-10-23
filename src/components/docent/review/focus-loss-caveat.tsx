@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Shown above the event log: a focus loss is not proof of cheating. */
+/** Shown above the event log: a vensterwissel is not proof of cheating. */
 export function FocusLossCaveat({ className }: { className?: string }) {
   return (
     <p
@@ -15,7 +15,7 @@ export function FocusLossCaveat({ className }: { className?: string }) {
         aria-hidden="true"
       />
       <span>
-        Een focusverlies kan ook ontstaan door een melding, een pop-up of een
+        Een vensterwissel kan ook ontstaan door een melding, een pop-up of een
         trage computer.
       </span>
     </p>

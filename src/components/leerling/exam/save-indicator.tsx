@@ -1,19 +1,29 @@
 "use client";
 
-import { CheckCircle2, CloudOff, Loader2, Lock } from "lucide-react";
+import {
+  CheckCircle2,
+  CloudOff,
+  Loader2,
+  Lock,
+  TriangleAlert,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaverSnapshot } from "./answer-saver";
 
 /**
- * "Alles opgeslagen ✓" / "Opslaan…" / "Offline: we proberen het opnieuw".
+ * "Alles opgeslagen ✓" / "Opslaan…" / "Offline: we proberen het opnieuw" /
+ * "Niet opgeslagen: vraag 12" (the server refused an answer).
  * Deliberately not a live region: autosave every few seconds must not
  * interrupt a screen reader. The exam runner announces transitions only.
  */
 export function SaveIndicator({
   snapshot,
+  rejectedLabel,
   className,
 }: {
   snapshot: SaverSnapshot;
+  /** For the "error" state, e.g. "vraag 12" (which answers were refused). */
+  rejectedLabel?: string;
   className?: string;
 }) {
   const { state } = snapshot;
@@ -31,6 +41,13 @@ export function SaveIndicator({
     label = "Offline: we proberen het opnieuw";
     short = "Offline";
     tone = "text-warning-ink";
+  } else if (state === "error") {
+    icon = <TriangleAlert className="size-4" aria-hidden="true" />;
+    label = rejectedLabel
+      ? `Niet opgeslagen: ${rejectedLabel}`
+      : "Niet alles is opgeslagen";
+    short = "Niet opgeslagen";
+    tone = "text-destructive-ink";
   } else if (state === "locked") {
     icon = <Lock className="size-4" aria-hidden="true" />;
     label = "Ingeleverd";
@@ -43,6 +60,7 @@ export function SaveIndicator({
       className={cn(
         "inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-sm font-medium whitespace-nowrap",
         state === "offline" && "bg-warning/12 px-3",
+        state === "error" && "bg-destructive/10 px-3",
         tone,
         className,
       )}

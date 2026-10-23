@@ -14,16 +14,26 @@ function plain(text: string): string {
   return text.replace(/`/g, "").trim();
 }
 
+type ChoiceSummary = Pick<Choices[number]["summary"], "answered" | "options">;
+
+/**
+ * One sentence for screen readers and the data table: how many students
+ * answered and which option was chosen most. Only names a "most chosen"
+ * option when someone actually chose it.
+ */
+export function choiceSummary(summary: ChoiceSummary): string {
+  const top = [...summary.options].sort((a, b) => b.count - a.count)[0];
+  if (!top || top.count <= 0) return "Niemand heeft deze vraag beantwoord.";
+  return `${summary.answered} ${summary.answered === 1 ? "leerling antwoordde" : "leerlingen antwoordden"}. Meest gekozen: ${plain(top.text)} (${formatShare(top.percentage)})${top.correct ? ", het juiste antwoord" : ""}.`;
+}
+
 /** How often each option of the multiple-choice questions was chosen. */
 export function ChoiceDistribution({ questions }: { questions: Choices }) {
   if (!questions.length) return null;
   return (
     <ul className="grid gap-4 lg:grid-cols-2">
       {questions.map((q) => {
-        const top = [...q.summary.options].sort((a, b) => b.count - a.count)[0];
-        const summary = top
-          ? `${q.summary.answered} ${q.summary.answered === 1 ? "leerling antwoordde" : "leerlingen antwoordden"}. Meest gekozen: ${plain(top.text)} (${formatShare(top.percentage)})${top.correct ? ", het juiste antwoord" : ""}.`
-          : "Nog geen antwoorden.";
+        const summary = choiceSummary(q.summary);
         return (
           <li
             key={q.questionId}

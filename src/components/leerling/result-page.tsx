@@ -551,7 +551,18 @@ function QuestionReview({
   );
 }
 
-function QuestionAccordion({
+/**
+ * Focus indicator of a question row. The card clips its content
+ * (overflow-hidden, for the rounded corners), which hides the trigger's own
+ * ring, so the card draws an outline while its trigger has keyboard focus:
+ * an element's own outline is not clipped by its overflow, and outlines
+ * stay visible in forced-colors mode (box-shadow rings do not). Only the
+ * row's own trigger counts, not buttons inside the opened review.
+ */
+export const QUESTION_ITEM_FOCUS_CLASS =
+  "has-[>[data-slot=accordion-header]>[data-slot=accordion-trigger]:focus-visible]:outline-2 has-[>[data-slot=accordion-header]>[data-slot=accordion-trigger]:focus-visible]:outline-offset-2 has-[>[data-slot=accordion-header]>[data-slot=accordion-trigger]:focus-visible]:outline-ring";
+
+export function QuestionAccordion({
   questions,
   solutions,
 }: {
@@ -572,10 +583,13 @@ function QuestionAccordion({
           <AccordionItem
             key={q.id}
             value={q.id}
-            className="overflow-hidden rounded-xl border bg-card shadow-xs"
+            className={cn(
+              "overflow-hidden rounded-xl border bg-card shadow-xs",
+              QUESTION_ITEM_FOCUS_CLASS,
+            )}
           >
             <AccordionHeader>
-              <AccordionTrigger className="items-center gap-3 px-4 py-3.5 hover:no-underline">
+              <AccordionTrigger className="items-center gap-3 px-4 py-3.5 hover:no-underline focus-visible:ring-0">
                 <span
                   className={cn(
                     "grid size-9 shrink-0 place-items-center rounded-full",

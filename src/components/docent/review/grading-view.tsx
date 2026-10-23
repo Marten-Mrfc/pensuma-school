@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type RefObject, use, useId, useRef, useState } from "react";
+import { type RefObject, use, useEffect, useId, useRef, useState } from "react";
 import { KeyCombo } from "@/components/a11y/key-combo";
 import { CodeEditor } from "@/components/app/code-editor";
 import { HighlightedCode } from "@/components/app/highlighted-code";
@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { AssignmentNav } from "@/components/docent/assignments/assignment-nav";
 import { formatNumber } from "@/components/docent/assignments/format";
+import { plural } from "@/components/docent/students/format";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useShortcut } from "@/lib/a11y/shortcuts";
@@ -36,6 +37,14 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { CodeResultView } from "./code-result-view";
+import { identicalAnswersNote } from "./copy";
+import {
+  clampIndex,
+  type FocusRequest,
+  identicalAnswers,
+  pendingReviewTotal,
+  shouldMoveFocus,
+} from "./grading-logic";
 import { ScoreBox } from "./score-box";
 
 type Queue = RouterOutputs["review"]["gradingQueue"];
@@ -87,7 +96,7 @@ export function GradingView({
     questions.find((q) => q.needsReview > 0)?.id ??
     questions[0]?.id ??
     null;
-  const totalOpen = questions.reduce((s, q) => s + q.needsReview, 0);
+  const totalOpen = pendingReviewTotal(questions);
   const a = assignment.data;
 
   const selectQuestion = (id: string) => {
@@ -187,7 +196,7 @@ function QuestionPicker({
               {done ? "Alles beoordeeld" : `${q.needsReview} te beoordelen`}
               <span className="font-normal text-muted-foreground">
                 {" "}
-                · {q.total} antwoorden
+                · {plural(q.total, "antwoord", "antwoorden")}
               </span>
             </span>
           </button>
@@ -261,26 +270,51 @@ function QuestionGrader({
   const reviewedCount = order.filter((x) => !byId.get(x)?.needsReview).length;
 
   // Answers identical to the current one (all of this question's answers).
-  const currentKey = current ? keyOf(current.answerId) : "";
-  const sameAnswerIds = currentKey
-    ? items
-        .filter(
-          (i) =>
-            i.answerId !== current?.answerId &&
-            keyOf(i.answerId) === currentKey,
-        )
-        .map((i) => i.answerId)
-    : [];
+  // Only those without a manual score may be graded together with it.
+  const same = identicalAnswers(items, current?.answerId, keyOf);
 
-  const goNext = () => setIndex((i) => Math.min(i + 1, order.length));
-  const goPrev = () => setIndex((i) => Math.max(i - 1, 0));
+  // Keyboard focus after moving to another student. Saving remounts the
+  // ScoreBox (and its focused button), and the last student is replaced by
+  // the "Klaar" panel: without this, focus would fall back to <body>.
+  const studentRef = useRef<HTMLHeadingElement>(null);
+  const doneRef = useRef<HTMLHeadingElement>(null);
+  // Set by a navigation, handled once the new index is on screen. Refetches
+  // (every 30 s) never move focus.
+  const focusRequest = useRef<{ index: number; mode: FocusRequest } | null>(
+    null,
+  );
+  const currentId = current?.answerId;
+  useEffect(() => {
+    const request = focusRequest.current;
+    if (!request || request.index !== index) return;
+    focusRequest.current = null;
+    if (!shouldMoveFocus(request.mode, document.activeElement, document.body))
+      return;
+    (currentId ? studentRef : doneRef).current?.focus();
+  }, [index, currentId]);
+
+  const goTo = (next: number, request: FocusRequest) => {
+    const target = clampIndex(next, order.length);
+    if (target === index) {
+      // Nothing to move to, but a save may still have removed the focused
+      // button: put focus back on this student.
+      if (request === "always") studentRef.current?.focus();
+      return;
+    }
+    focusRequest.current = { index: target, mode: request };
+    setIndex(target);
+  };
+  const goNext = (request: FocusRequest = "if-lost") =>
+    goTo(index + 1, request);
+  const goPrev = (request: FocusRequest = "if-lost") =>
+    goTo(index - 1, request);
   const afterSave = ({ answerIds }: { answerIds: string[] }) => {
-    if (answerIds.length <= 1) return goNext();
+    if (answerIds.length <= 1) return goNext("always");
     // Graded a whole group: continue after the last of them.
     const positions = answerIds
       .map((x) => order.indexOf(x))
       .filter((p) => p >= 0);
-    setIndex(Math.min(Math.max(index, ...positions) + 1, order.length));
+    goTo(Math.max(index, ...positions) + 1, "always");
   };
 
   if (query.isPending || groups.isPending)
@@ -297,7 +331,11 @@ function QuestionGrader({
 
   return (
     <div ref={panelRef} className="flex flex-col gap-4">
-      <GradingShortcuts scope={panelRef} onPrev={goPrev} onNext={goNext} />
+      <GradingShortcuts
+        scope={panelRef}
+        onPrev={() => goPrev("always")}
+        onNext={() => goNext("always")}
+      />
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs md:flex-row md:items-center md:justify-between">
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -377,13 +415,19 @@ function QuestionGrader({
           <span className="grid size-12 place-items-center rounded-2xl bg-success/12 text-success-ink">
             <PartyPopper className="size-6" aria-hidden="true" />
           </span>
-          <h3 className="text-lg font-semibold">Klaar met deze vraag!</h3>
+          <h2
+            ref={doneRef}
+            tabIndex={-1}
+            className="rounded-sm text-lg font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+          >
+            Klaar met deze vraag!
+          </h2>
           <p className="max-w-sm text-sm text-muted-foreground">
             Je hebt {reviewedCount} van de {order.length} antwoorden beoordeeld.
             Kies hierboven een andere vraag of bekijk de resultaten.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="outline" onClick={() => setIndex(0)}>
+            <Button variant="outline" onClick={() => goTo(0, "if-lost")}>
               Terug naar het begin
             </Button>
             <Button asChild>
@@ -402,7 +446,16 @@ function QuestionGrader({
                   <UserRound className="size-4" aria-hidden="true" />
                 </span>
                 <div className="flex flex-col">
-                  <span className="font-semibold">{label(current)}</span>
+                  <h2
+                    ref={studentRef}
+                    tabIndex={-1}
+                    className="rounded-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+                  >
+                    {label(current)}
+                    <span className="sr-only">
+                      , antwoord {index + 1} van {order.length}
+                    </span>
+                  </h2>
                   <span className="text-xs text-muted-foreground">
                     {hideNames
                       ? "Naam verborgen"
@@ -417,7 +470,7 @@ function QuestionGrader({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={goPrev}
+                  onClick={() => goPrev()}
                   disabled={index === 0}
                   aria-keyshortcuts="Alt+ArrowUp"
                 >
@@ -430,7 +483,7 @@ function QuestionGrader({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={goNext}
+                  onClick={() => goNext()}
                   aria-keyshortcuts="Alt+ArrowDown"
                 >
                   {index === order.length - 1
@@ -443,12 +496,10 @@ function QuestionGrader({
                 </Button>
               </div>
             </header>
-            {grouped && sameAnswerIds.length > 0 ? (
+            {grouped && same.ungraded.length + same.graded.length > 0 ? (
               <p className="flex items-center gap-2 rounded-lg bg-info/10 px-3 py-2 text-sm text-info-ink">
                 <UsersRound className="size-4 shrink-0" aria-hidden="true" />
-                {sameAnswerIds.length === 1
-                  ? "Nog 1 leerling gaf precies hetzelfde antwoord."
-                  : `Nog ${sameAnswerIds.length} leerlingen gaven precies hetzelfde antwoord.`}
+                {identicalAnswersNote(same.ungraded.length, same.graded.length)}
               </p>
             ) : null}
 
@@ -471,7 +522,7 @@ function QuestionGrader({
               questionId={question.id}
               questionNumber={question.number}
               rubricItems={groups.data.rubricItems}
-              sameAnswerIds={sameAnswerIds}
+              sameAnswerIds={same.ungraded}
               onSaved={afterSave}
             />
             {!hideNames ? (

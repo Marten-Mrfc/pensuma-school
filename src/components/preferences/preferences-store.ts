@@ -20,16 +20,19 @@ export interface PreferencesState {
   prefs: UserPreferences;
   /** True once the server value (or a local change) is in. */
   loaded: boolean;
+  /** The last save to the account failed (until a later one succeeds). */
+  saveFailed: boolean;
 }
 
 export const SAVE_DEBOUNCE_MS = 500;
-const SAVE_ERROR =
+export const PREFERENCES_SAVE_ERROR =
   "Opslaan lukte niet; je instellingen gelden nu alleen op deze computer.";
 
 const INITIAL_STATE: PreferencesState = Object.freeze({
   userId: null,
   prefs: parsePreferences({}),
   loaded: false,
+  saveFailed: false,
 });
 
 let state: PreferencesState = INITIAL_STATE;
@@ -125,7 +128,12 @@ export function initPreferences(userId: string) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   const mirror = readMirror(userId);
-  emit({ userId, prefs: mirror ?? INITIAL_STATE.prefs, loaded: false });
+  emit({
+    userId,
+    prefs: mirror ?? INITIAL_STATE.prefs,
+    loaded: false,
+    saveFailed: false,
+  });
 }
 
 /** The server value arrived; local changes that aren't saved yet win. */
@@ -158,11 +166,17 @@ function flush(): Promise<void> {
       if (state.userId !== userId || version !== sentVersion) return;
       unsaved = {};
       writeMirror(userId, serverPrefs);
-      emit({ ...state, prefs: serverPrefs, loaded: true });
+      emit({ ...state, prefs: serverPrefs, loaded: true, saveFailed: false });
     },
     () => {
       if (state.userId !== userId) return;
-      toast.error(SAVE_ERROR, { id: "preferences-save", duration: 10_000 });
+      // Also shown in the dialog itself (usePreferences().saveFailed): a
+      // toast can't be reached by keyboard while the dialog traps focus.
+      emit({ ...state, saveFailed: true });
+      toast.error(PREFERENCES_SAVE_ERROR, {
+        id: "preferences-save",
+        duration: 10_000,
+      });
     },
   );
 }

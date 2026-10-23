@@ -16,6 +16,8 @@ export interface UsePreferencesResult {
   update: (patch: PreferencesPatch) => void;
   /** True until the account's preferences are known. */
   isLoading: boolean;
+  /** The last save to the account failed; changes apply on this computer only. */
+  saveFailed: boolean;
 }
 
 /**
@@ -33,5 +35,6 @@ export function usePreferences(): UsePreferencesResult {
     prefs: state.prefs,
     update: updatePreferences,
     isLoading: state.userId !== null && !state.loaded,
+    saveFailed: state.saveFailed,
   };
 }

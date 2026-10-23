@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -21,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { useTRPC } from "@/trpc/react";
 import { ChangePasswordForm } from "../account/change-password-form";
+import { focusInvalidField } from "../a11y/invalid-field-focus";
 import { formatDate, plural } from "../students/format";
 
 /** Refresh the cached session cookie so the shell shows the new name. */
@@ -102,8 +104,12 @@ function ProfilePanel({
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const announce = useAnnounce();
   const [name, setName] = useState(initialName);
+  /** Validation error of the name field. */
   const [error, setError] = useState<string>();
+  /** Server error: shown (and announced) below the fields. */
+  const [formError, setFormError] = useState<string>();
   const nameId = useId();
   const emailId = useId();
 
@@ -115,14 +121,17 @@ function ProfilePanel({
         router.refresh();
         toast.success("Je naam is opgeslagen");
       },
-      onError: (e) => setError(getErrorMessage(e)),
+      onError: (e) => setFormError(getErrorMessage(e)),
     }),
   );
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    setFormError(undefined);
     if (name.trim().length < 2) {
-      setError("Vul je naam in.");
+      const message = "Vul je naam in (minstens 2 tekens).";
+      setError(message);
+      focusInvalidField(nameId, message, announce);
       return;
     }
     setError(undefined);
@@ -151,6 +160,14 @@ function ProfilePanel({
         >
           <Input id={emailId} value={email} readOnly disabled />
         </FormField>
+        {formError ? (
+          <p
+            role="alert"
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
+          >
+            {formError}
+          </p>
+        ) : null}
         <Button
           type="submit"
           className="w-fit"

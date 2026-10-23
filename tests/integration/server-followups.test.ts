@@ -590,6 +590,71 @@ describe("undoing a neutralised question after a reopen", () => {
     expect(after.manualScore).toBeNull();
     await drainGrading();
   });
+
+  test("a new review of the changed answer survives a switch to 'drop' and the undo", async () => {
+    const w = await createBasicWorld({
+      settings: { showResults: "immediately", maxAttempts: 1 },
+    });
+    const t = callerFor(w.teacher);
+    const openId = w.questions.open.id;
+    const s1 = callerFor(w.s1);
+    const { attemptId } = await s1.portal.startAttempt({
+      assignmentId: w.assignment.id,
+    });
+    await s1.portal.saveAnswer({
+      attemptId,
+      questionId: openId,
+      response: { text: "weet ik niet" },
+    });
+    await s1.portal.submitAttempt({ attemptId });
+    await waitForGrading(attemptId);
+    const [row] = await db
+      .select()
+      .from(answers)
+      .where(
+        and(eq(answers.attemptId, attemptId), eq(answers.questionId, openId)),
+      );
+    await t.review.setManualScore({ answerId: row.id, manualScore: 0.5 });
+    await t.analysis.neutralizeQuestion({
+      assignmentId: w.assignment.id,
+      questionId: openId,
+      mode: "full_points",
+    });
+    // Reopened, changed, and reviewed again while the question gave full
+    // points: that newer review belongs to the answer as it is now.
+    await t.assignment.reopenAttempt({ attemptId, minutes: 10 });
+    await s1.portal.saveAnswer({
+      attemptId,
+      questionId: openId,
+      response: { text: "Een for-lus herhaalt een vast aantal keer." },
+    });
+    await s1.portal.submitAttempt({ attemptId });
+    await waitForGrading(attemptId);
+    await t.review.setManualScore({ answerId: row.id, manualScore: 1 });
+
+    await t.analysis.neutralizeQuestion({
+      assignmentId: w.assignment.id,
+      questionId: openId,
+      mode: "drop",
+    });
+    await t.analysis.neutralizeQuestion({
+      assignmentId: w.assignment.id,
+      questionId: openId,
+      mode: null,
+    });
+    const [after] = await db
+      .select()
+      .from(answers)
+      .where(eq(answers.id, row.id));
+    expect(after.manualScore).toBe(1);
+    expect(after.maxScore).toBe(2);
+    const [attempt] = await db
+      .select()
+      .from(attempts)
+      .where(eq(attempts.id, attemptId));
+    expect(attempt.score).toBeGreaterThanOrEqual(1);
+    await drainGrading();
+  });
 });
 
 /* ---------------------------------- S09 --------------------------------- */

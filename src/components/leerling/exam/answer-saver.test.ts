@@ -8,7 +8,7 @@ import {
   test,
 } from "bun:test";
 import type { AnswerResponse } from "@/lib/questions/schema";
-import { AnswerSaver } from "./answer-saver";
+import { AnswerSaver, isRejectedError } from "./answer-saver";
 import { storageKey } from "./types";
 
 /* ------------------------- in-memory localStorage ------------------------ */
@@ -203,3 +203,123 @@ describe("AnswerSaver", () => {
     saver.dispose();
   });
 });
+
+/* -------------------- an answer the server refuses (A24) ------------------- */
+
+const text = (t: string): AnswerResponse => ({ text: t });
+/** What the tRPC client throws for a zod input error (e.g. 20.001 tekens). */
+const badRequest = () => ({
+  message: "Invalid input",
+  data: { code: "BAD_REQUEST", httpStatus: 400 },
+});
+
+function backupKeys(): string[] {
+  const raw = storage.getItem(storageKey(ATTEMPT));
+  return raw ? Object.keys(JSON.parse(raw) as object).sort() : [];
+}
+
+describe("AnswerSaver and a refused answer", () => {
+  test("a refused answer first in the queue does not block later answers and is not 'offline'", async () => {
+    let refuseQ12 = true;
+    const saved: string[] = [];
+    const save = jest.fn(async (questionId: string, r: AnswerResponse) => {
+      if (questionId === "q12" && refuseQ12) throw badRequest();
+      saved.push(`${questionId}:${"text" in r ? r.text.length : "code"}`);
+      return { status: "saved" };
+    });
+    const saver = makeSaver(save);
+    saver.update("q12", text("x".repeat(20_001)));
+    saver.update("q1", code('print("Hallo wereld!")'));
+
+    expect(await saver.flush()).toBe(false);
+    expect(saved).toEqual(["q1:code"]);
+    expect(saver.getSnapshot().state).toBe("error");
+    expect(saver.getSnapshot().rejected).toEqual(["q12"]);
+    expect(saver.getSnapshot().pendingCount).toBe(0);
+    expect(saver.hasPending).toBe(false);
+    expect(saver.hasUnsaved).toBe(true);
+    expect(saver.rejectionOf("q12")).toMatchObject({
+      data: { code: "BAD_REQUEST" },
+    });
+    // The refused answer stays in the local backup (nothing is lost).
+    expect(backupKeys()).toEqual(["q1", "q12"]);
+
+    // Not retried in the background like an offline save.
+    await advance(60_000);
+    expect(save).toHaveBeenCalledTimes(2);
+
+    // Other questions keep saving with the normal debounce.
+    saver.update("q3", code("x = 1"));
+    await advance(1500);
+    expect(saved).toEqual(["q1:code", "q3:code"]);
+    expect(saver.getSnapshot().state).toBe("error");
+
+    // Changing the refused answer gives it a new chance.
+    refuseQ12 = false;
+    saver.update("q12", text("x".repeat(20_000)));
+    expect(saver.getSnapshot().rejected).toEqual([]);
+    expect(await saver.flush()).toBe(true);
+    expect(saved).toEqual(["q1:code", "q3:code", "q12:20000"]);
+    expect(saver.getSnapshot().state).toBe("saved");
+    expect(saver.hasUnsaved).toBe(false);
+  });
+
+  test("a newer version typed while the refused one was being sent is still saved", async () => {
+    let release: (() => void) | null = null;
+    const save = jest.fn(async (_q: string, r: AnswerResponse) => {
+      if ("text" in r && r.text === "te lang") {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        throw badRequest();
+      }
+      return { status: "saved" };
+    });
+    const saver = makeSaver(save);
+    saver.update("q1", text("te lang"));
+    const done = saver.flush();
+    await settle();
+    saver.update("q1", text("korter"));
+    (release as (() => void) | null)?.();
+    expect(await done).toBe(true);
+    expect(save).toHaveBeenLastCalledWith("q1", text("korter"));
+    expect(saver.getSnapshot().rejected).toEqual([]);
+    expect(saver.getSnapshot().state).toBe("saved");
+  });
+
+  test("only errors about the answer itself count as refused", () => {
+    expect(isRejectedError(badRequest())).toBe(true);
+    expect(isRejectedError({ data: { code: "PAYLOAD_TOO_LARGE" } })).toBe(true);
+    expect(isRejectedError({ data: { code: "PARSE_ERROR" } })).toBe(true);
+    // A proxy's 413 without a tRPC body.
+    expect(isRejectedError({ meta: { response: { status: 413 } } })).toBe(true);
+    // Retried, or handled elsewhere:
+    expect(isRejectedError({ data: { code: "TOO_MANY_REQUESTS" } })).toBe(
+      false,
+    );
+    expect(isRejectedError({ data: { code: "UNAUTHORIZED" } })).toBe(false);
+    expect(isRejectedError({ data: { code: "INTERNAL_SERVER_ERROR" } })).toBe(
+      false,
+    );
+    expect(isRejectedError({ data: { code: "PRECONDITION_FAILED" } })).toBe(
+      false,
+    );
+    expect(isRejectedError(new TypeError("Failed to fetch"))).toBe(false);
+    expect(isRejectedError(null)).toBe(false);
+  });
+
+  test("the snapshot keeps the same rejected array while nothing changes", async () => {
+    const save = jest.fn(async (questionId: string) => {
+      if (questionId === "bad") throw badRequest();
+      return { status: "saved" };
+    });
+    const saver = makeSaver(save);
+    saver.update("bad", text("?"));
+    await saver.flush();
+    const first = saver.getSnapshot().rejected;
+    saver.update("ok", text("!"));
+    await saver.flush();
+    expect(saver.getSnapshot().rejected).toBe(first);
+  });
+});
+

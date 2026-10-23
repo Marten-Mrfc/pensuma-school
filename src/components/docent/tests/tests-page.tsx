@@ -46,6 +46,8 @@ import { markdownExcerpt as excerpt } from "@/lib/questions/excerpt";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { useResultAnnouncement } from "../a11y/result-announcement";
+import { useRovingRadioGroup } from "../a11y/roving-radio";
 import { downloadTestJson } from "./download";
 import { ExampleTestsDialog } from "./example-tests-dialog";
 import { ImportTestDialog } from "./import-test-dialog";
@@ -64,6 +66,12 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 const FILTER_STORAGE_KEY = "pensuma:toetsen:filter";
+
+/** Status message after searching or filtering the list of tests. */
+export function testsFoundMessage(count: number): string {
+  if (count === 0) return "Geen toetsen gevonden.";
+  return count === 1 ? "1 toets gevonden." : `${count} toetsen gevonden.`;
+}
 
 export function TestsPage() {
   const trpc = useTRPC();
@@ -101,6 +109,18 @@ export function TestsPage() {
 
   const rows = query.data ?? [];
   const filtering = Boolean(deferredSearch) || status !== "active";
+  const statusRadios = useRovingRadioGroup({
+    count: FILTERS.length,
+    checkedIndex: FILTERS.findIndex((f) => f.value === status),
+    onSelect: (index) => changeStatus(FILTERS[index].value),
+  });
+  // Read the new result count aloud after a search or filter change.
+  useResultAnnouncement({
+    key: `${deferredSearch}|${status}`,
+    ready: query.isSuccess && !query.isPlaceholderData && !query.isFetching,
+    message: testsFoundMessage(rows.length),
+    delayMs: 400,
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -137,14 +157,15 @@ export function TestsPage() {
           aria-label="Filter op status"
           className="flex w-full gap-0.5 overflow-x-auto rounded-lg border bg-muted/50 p-0.5 sm:w-auto"
         >
-          {FILTERS.map((f) => (
-            // biome-ignore lint/a11y/useSemanticElements: segmented control
+          {FILTERS.map((f, index) => (
+            // biome-ignore lint/a11y/useSemanticElements: segmented control (arrow keys and one Tab stop via useRovingRadioGroup)
             <button
               key={f.value}
               type="button"
               role="radio"
               aria-checked={status === f.value}
               onClick={() => changeStatus(f.value)}
+              {...statusRadios.itemProps(index)}
               className={cn(
                 "h-8 shrink-0 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 status === f.value && "bg-background text-foreground shadow-xs",

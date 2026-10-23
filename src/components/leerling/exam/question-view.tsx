@@ -1,6 +1,6 @@
 "use client";
 
-import { Flag } from "lucide-react";
+import { Flag, TriangleAlert } from "lucide-react";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
 import type { AnswerResponse } from "@/lib/questions/schema";
@@ -35,6 +35,8 @@ export interface QuestionViewProps {
   settings: ExamSettings;
   onLog: (type: ClientEventType, details?: EventDetails) => void;
   disabled?: boolean;
+  /** The server refused this answer as it is (e.g. too long): why. */
+  saveProblem?: string | null;
 }
 
 export function QuestionHeader({
@@ -44,10 +46,17 @@ export function QuestionHeader({
   headingId,
   flagged,
   onToggleFlag,
+  saveProblem,
   className,
 }: Pick<
   QuestionViewProps,
-  "question" | "number" | "total" | "headingId" | "flagged" | "onToggleFlag"
+  | "question"
+  | "number"
+  | "total"
+  | "headingId"
+  | "flagged"
+  | "onToggleFlag"
+  | "saveProblem"
 > & {
   className?: string;
 }) {
@@ -94,6 +103,12 @@ export function QuestionHeader({
         </span>
         {question.title}
       </h2>
+      {saveProblem ? (
+        <p className="mt-1.5 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-ink">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>{saveProblem}</span>
+        </p>
+      ) : null}
     </div>
   );
 }

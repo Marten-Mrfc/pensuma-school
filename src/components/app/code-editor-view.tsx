@@ -20,6 +20,7 @@ import CodeMirror, {
 import { useEffect, useId, useImperativeHandle, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { CodeEditorProps } from "./code-editor";
+import { exitEditorKeymap } from "./code-editor-keys";
 
 /* Colours come from CSS variables (globals.css), so one theme covers light and dark. */
 const pensumaTheme = EditorView.theme({
@@ -181,6 +182,7 @@ const DUTCH_PHRASES = EditorState.phrases.of({
   "No diagnostics": "Geen meldingen",
 });
 
+/** Ctrl+M works on every platform, also on a Mac (see code-editor-keys.ts). */
 const EDIT_HINT =
   "Tab springt in, Shift+Tab springt terug. Druk op Escape en daarna Tab, of op Ctrl+M, om de editor te verlaten.";
 
@@ -237,6 +239,7 @@ export function CodeEditorView({
   const extensions = useMemo<Extension[]>(
     () => [
       python(),
+      exitEditorKeymap,
       indentUnit.of("    "),
       DUTCH_PHRASES,
       pensumaTheme,

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { STUDENT_NUMBER_REGEX } from "@/lib/auth-shared";
 import { useTRPC } from "@/trpc/react";
+import { focusInvalidField } from "../a11y/invalid-field-focus";
 import type { PinDialogStudent } from "./pin-dialog";
 
 type EditableStudent = { id: string; name: string; studentNumber: string };
@@ -58,7 +60,12 @@ function StudentForm({
   const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const announce = useAnnounce();
   const editing = Boolean(student);
+  const ids = {
+    number: `${uid}-student-number`,
+    name: `${uid}-student-name`,
+  };
 
   const [studentNumber, setStudentNumber] = useState(
     student?.studentNumber ?? "",
@@ -118,7 +125,14 @@ function StudentForm({
       next.number = "Een leerlingnummer bestaat uit 3 tot 12 cijfers.";
     if (!cleanName) next.name = "Vul de naam van de leerling in.";
     setErrors(next);
-    if (next.number || next.name) return;
+    if (next.number) {
+      focusInvalidField(ids.number, next.number, announce);
+      return;
+    }
+    if (next.name) {
+      focusInvalidField(ids.name, next.name, announce);
+      return;
+    }
 
     if (student) {
       update.mutate({ id: student.id, name: cleanName, studentNumber: number });
@@ -147,7 +161,7 @@ function StudentForm({
       <div className="flex flex-col gap-4">
         <FormField
           label="Leerlingnummer"
-          htmlFor={`${uid}-student-number`}
+          htmlFor={ids.number}
           required
           error={errors.number}
           description={
@@ -157,7 +171,7 @@ function StudentForm({
           }
         >
           <Input
-            id={`${uid}-student-number`}
+            id={ids.number}
             inputMode="numeric"
             autoComplete="off"
             autoFocus={!editing}
@@ -172,12 +186,12 @@ function StudentForm({
 
         <FormField
           label="Naam"
-          htmlFor={`${uid}-student-name`}
+          htmlFor={ids.name}
           required
           error={errors.name}
         >
           <Input
-            id={`${uid}-student-name`}
+            id={ids.name}
             autoComplete="off"
             value={name}
             onChange={(e) => setName(e.target.value)}

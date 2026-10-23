@@ -74,26 +74,35 @@ async function submittedAnswers(
 type SavedNeutralization = {
   mode: NeutralizationMode;
   previous: Record<string, number | null>;
+  /**
+   * When `previous` was taken: the neutralisation itself, or the last
+   * switch between modes (which takes a new snapshot).
+   */
   createdAt: Date;
 };
 
 /**
  * The manual score an answer gets back when its question no longer
  * "vervalt" (undo, or before switching modes); undefined = keep the
- * current one. The saved score belongs to the review the teacher did
- * before the neutralisation, so it only comes back while that review
- * still stands:
+ * current one. The saved score belongs to the review that stood when the
+ * snapshot was taken (`createdAt`), so it only comes back while that
+ * review still stands:
  *  - reviewedAt is null: the student changed the answer in a reopened
  *    attempt, which clears the review (portal.saveAnswer). The saved score
  *    was for an answer that no longer exists → no manual score (the new
  *    answer is graded and reviewed again);
- *  - reviewed before the neutralisation: that review still stands → the
+ *  - reviewed before the snapshot: that review still stands → the saved
+ *    score;
+ *  - reviewed again since, while the question gave full points: after the
+ *    student saved again in a reopened attempt, the newer review is for
+ *    the newer answer and stays. On the same answer, a different score
+ *    than the full points is a deliberate new grade and stays; the
+ *    unchanged full points (e.g. only feedback added) make way for the
  *    saved score;
- *  - reviewed again since: after the student saved again in a reopened
- *    attempt, the newer review is for the newer answer and stays. On the
- *    same answer, a different score than the full points the question gave
- *    is a deliberate new grade and stays; the unchanged full points (e.g.
- *    only feedback added) make way for the saved score.
+ *  - reviewed again since, while the question did not count (max 0): any
+ *    score given then meant nothing. The same answer gets the saved score
+ *    back; an answer saved again since (possibly changed) gets none and is
+ *    reviewed again.
  */
 export function restoredManualScore(
   answer: {
@@ -108,13 +117,10 @@ export function restoredManualScore(
   const since = neutralization.createdAt;
   if (answer.reviewedAt == null) return null;
   if (answer.reviewedAt <= since) return saved;
-  if (answer.savedAt && answer.savedAt > since) return undefined;
-  if (
-    neutralization.mode === "full_points" &&
-    answer.manualScore !== answer.maxScore
-  ) {
-    return undefined;
-  }
+  const savedAgain = answer.savedAt != null && answer.savedAt > since;
+  if (neutralization.mode === "drop") return savedAgain ? null : saved;
+  if (savedAgain) return undefined;
+  if (answer.manualScore !== answer.maxScore) return undefined;
   return saved;
 }
 
@@ -231,6 +237,7 @@ export async function neutralizeQuestion(
         ? await restoreManualScores(tx, existing)
         : {};
       const rows = await submittedAnswers(tx, assignment.id, question.id);
+      const snapshotAt = new Date();
       for (const r of rows) {
         if (!(r.id in previous)) previous[r.id] = r.manualScore;
       }
@@ -262,13 +269,21 @@ export async function neutralizeQuestion(
           mode: input.mode,
           previous,
           createdById: ctx.user.id,
+          createdAt: snapshotAt,
         })
         .onConflictDoUpdate({
           target: [
             questionNeutralizations.assignmentId,
             questionNeutralizations.questionId,
           ],
-          set: { mode: input.mode, previous, createdById: ctx.user.id },
+          // A switch takes a new snapshot: `createdAt` says when, so a later
+          // undo knows which reviews came after it (restoredManualScore).
+          set: {
+            mode: input.mode,
+            previous,
+            createdById: ctx.user.id,
+            createdAt: snapshotAt,
+          },
         });
     }
     await auditFromCtx(

@@ -40,6 +40,7 @@ import { claimLocalData, removeAttemptBackups } from "@/lib/local-data";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { AccessCodeInput } from "./access-code-input";
 import {
   formatMinutes,
   formatMoment,
@@ -271,28 +272,16 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
             />
             Toegangscode
           </label>
-          <input
-            ref={codeRef}
+          <AccessCodeInput
+            inputRef={codeRef}
             id={codeId}
-            name="toegangscode"
             value={code}
-            onChange={(e) => {
-              setCode(e.target.value.toUpperCase().replace(/\s+/g, ""));
+            onValueChange={(next) => {
+              setCode(next);
               setError(null);
             }}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            maxLength={12}
-            placeholder="ABC123"
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? `${hintId} ${errorId}` : hintId}
-            className={cn(
-              "h-16 w-full rounded-xl border-2 border-input bg-background px-4 text-center font-mono text-3xl font-semibold tracking-[0.35em] uppercase shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
-              error &&
-                "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
-            )}
+            invalid={!!error}
+            describedBy={error ? `${hintId} ${errorId}` : hintId}
           />
           <p id={hintId} className="text-xs text-muted-foreground">
             Je docent laat de code op het bord zien.

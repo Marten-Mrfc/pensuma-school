@@ -4,6 +4,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { toastError } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
 export interface CopyButtonProps
@@ -44,7 +45,7 @@ export function CopyButton({
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(false), 1600);
     } catch {
-      toast.error(
+      toastError(
         "Kopiëren lukte niet. Selecteer de tekst en kopieer handmatig.",
       );
     }

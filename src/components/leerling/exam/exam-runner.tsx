@@ -7,9 +7,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  Flag,
-  LayoutGrid,
-  Lightbulb,
   Loader2,
   Maximize,
   Send,
@@ -64,13 +61,22 @@ import {
 } from "./activity-logger";
 import { AnswerSaver, REMOVED_STATUS, type SaveState } from "./answer-saver";
 import { focusAfterDialogs } from "./focus-after-dialogs";
+import {
+  HandInSummary,
+  handInDescription,
+  QuestionOverviewButton,
+} from "./hand-in-summary";
 import { QuestionNavigator } from "./question-navigator";
 import { QuestionView } from "./question-view";
 import { SaveIndicator } from "./save-indicator";
 import {
+  questionNumbersText,
+  rejectedAnswerMessage,
+  rejectedOnHandInMessage,
+} from "./save-problems";
+import {
   type AttemptData,
   codeData,
-  type ExamQuestion,
   isAnswered,
   type Responses,
   readStorage,
@@ -357,6 +363,12 @@ function ExamRunner({
   const log = (type: ClientEventType, details?: EventDetails) =>
     logger.log(type, details);
 
+  /** Question numbers (as the student sees them) of these question ids. */
+  const questionNumbers = (ids: readonly string[]) =>
+    ids
+      .map((id) => questions.findIndex((q) => q.id === id) + 1)
+      .filter((n) => n > 0);
+
   /* ------------------------------ lifecycle ------------------------------ */
 
   const goToResult = () => {
@@ -377,8 +389,12 @@ function ExamRunner({
       new Promise<boolean>((r) => setTimeout(() => r(false), 8000)),
     ]);
     if (!flushed && mode === "manual" && !saver.isLocked) {
+      const snap = saver.getSnapshot();
+      const refused = questionNumbers(snap.rejected);
       toast.warning(
-        "Niet alles kon worden opgeslagen. We leveren in wat er op de server staat.",
+        snap.state !== "offline" && refused.length
+          ? rejectedOnHandInMessage(refused)
+          : "Niet alles kon worden opgeslagen. We leveren in wat er op de server staat.",
         TOAST,
       );
     }
@@ -522,7 +538,7 @@ function ExamRunner({
       void logger.flush();
     };
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (saver.hasPending && !finishingRef.current) e.preventDefault();
+      if (saver.hasUnsaved && !finishingRef.current) e.preventDefault();
     };
     const onOnline = () => void saver.flush();
     document.addEventListener("visibilitychange", onHide);
@@ -567,6 +583,34 @@ function ExamRunner({
       announce("Alles is weer opgeslagen.", { dedupeKey: "save-online" });
     }
   }, [snapshot.state, announce]);
+
+  // An answer the server refused (e.g. over 20.000 tekens): say which one
+  // and why, once; drop the toast again once a changed answer is saved.
+  const lastRejected = useRef<readonly string[]>(snapshot.rejected);
+  useEffect(() => {
+    const previous = lastRejected.current;
+    lastRejected.current = snapshot.rejected;
+    if (previous === snapshot.rejected) return;
+    for (const id of previous) {
+      if (!snapshot.rejected.includes(id)) toast.dismiss(`save-rejected-${id}`);
+    }
+    for (const id of snapshot.rejected) {
+      if (previous.includes(id)) continue;
+      const i = questions.findIndex((q) => q.id === id);
+      const q = questions[i];
+      if (!q) continue;
+      const message = rejectedAnswerMessage(q, responses[id], i + 1);
+      announce(message, {
+        politeness: "assertive",
+        dedupeKey: `save-rejected-${id}`,
+      });
+      toast.error(message, {
+        ...TOAST,
+        id: `save-rejected-${id}`,
+        duration: 15_000,
+      });
+    }
+  }, [snapshot.rejected, questions, responses, announce]);
 
   // Heartbeat: last activity for the teacher + time extensions / force-submit.
   useEffect(() => {
@@ -734,6 +778,8 @@ function ExamRunner({
 
   const unanswered = questions.filter((q) => !answered.has(q.id));
   const flaggedList = questions.filter((q) => flagged.has(q.id));
+  const rejectedIds = new Set(snapshot.rejected);
+  const rejectedQuestions = questions.filter((q) => rejectedIds.has(q.id));
   const isLast = index === questions.length - 1;
   const monitored = settings.logFocusEvents || settings.requireFullscreen;
 
@@ -755,25 +801,6 @@ function ExamRunner({
         );
       })
     : [];
-
-  const jumpChip = (q: ExamQuestion) => {
-    const i = questions.indexOf(q);
-    return (
-      <button
-        key={q.id}
-        type="button"
-        onClick={() => {
-          setSubmitOpen(false);
-          goTo(i);
-        }}
-        aria-label={`Naar vraag ${i + 1}: ${q.title}`}
-        className="inline-flex h-9 min-w-9 items-center justify-center rounded-md border bg-card px-2 text-sm font-semibold tabular-nums transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring"
-        title={q.title}
-      >
-        {i + 1}
-      </button>
-    );
-  };
 
   const navigator = (
     <QuestionNavigator
@@ -844,7 +871,14 @@ function ExamRunner({
           actions={
             <>
               <MonitoringIndicator active={monitored} />
-              <SaveIndicator snapshot={snapshot} />
+              <SaveIndicator
+                snapshot={snapshot}
+                rejectedLabel={
+                  snapshot.rejected.length
+                    ? questionNumbersText(questionNumbers(snapshot.rejected))
+                    : undefined
+                }
+              />
               <DisplayPreferencesButton variant="icon" />
               <Button
                 onClick={() => setSubmitOpen(true)}
@@ -872,17 +906,12 @@ function ExamRunner({
                 <span className="max-sm:sr-only">Vorige</span>
               </Button>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
+                <QuestionOverviewButton
+                  index={index}
+                  total={questions.length}
                   className="xl:hidden"
                   onClick={() => setNavOpen(true)}
-                  aria-label={`Vragenoverzicht, vraag ${index + 1} van ${questions.length}`}
-                >
-                  <LayoutGrid aria-hidden="true" />
-                  <span className="tabular-nums" aria-hidden="true">
-                    {index + 1}/{questions.length}
-                  </span>
-                </Button>
+                />
                 <span className="hidden items-center gap-1.5 text-xs text-muted-foreground xl:flex">
                   <Kbd>Alt</Kbd>+<Kbd>←</Kbd>/<Kbd>→</Kbd> vorige/volgende vraag
                 </span>
@@ -925,6 +954,15 @@ function ExamRunner({
                   settings={settings}
                   onLog={log}
                   disabled={!!finishing || snapshot.state === "locked"}
+                  saveProblem={
+                    rejectedIds.has(question.id)
+                      ? rejectedAnswerMessage(
+                          question,
+                          responses[question.id],
+                          index + 1,
+                        )
+                      : null
+                  }
                 />
               ) : null}
             </div>
@@ -954,60 +992,26 @@ function ExamRunner({
         open={submitOpen}
         onOpenChange={setSubmitOpen}
         title="Toets inleveren?"
-        description="Na het inleveren kun je je antwoorden niet meer veranderen."
+        description={handInDescription({
+          unanswered: unanswered.length,
+          rejected: rejectedQuestions.length,
+        })}
         confirmLabel="Inleveren"
         cancelLabel="Nog even terug"
         onConfirm={() => finish("manual")}
       >
-        <div className="flex flex-col gap-3">
-          {unanswered.length ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/8 p-3">
-              <p className="font-medium text-warning-ink">
-                {unanswered.length === 1
-                  ? "1 vraag is nog niet beantwoord:"
-                  : `${unanswered.length} vragen zijn nog niet beantwoord:`}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {unanswered.map(jumpChip)}
-              </div>
-            </div>
-          ) : (
-            <p className="rounded-lg bg-success/10 p-3 font-medium text-success-ink">
-              Je hebt alle {questions.length} vragen beantwoord. Goed bezig!
-            </p>
-          )}
-          {withTips.length ? (
-            <div className="flex flex-col gap-2 rounded-lg border p-3">
-              <p className="flex items-center gap-1.5 font-medium">
-                <Lightbulb
-                  className="size-4 text-warning-ink"
-                  aria-hidden="true"
-                />
-                Misschien wil je dit nog nakijken:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {withTips.map(jumpChip)}
-              </div>
-            </div>
-          ) : null}
-          {flaggedList.length ? (
-            <div className="flex flex-col gap-2 rounded-lg border p-3">
-              <p className="flex items-center gap-1.5 font-medium">
-                <Flag className="size-4 text-warning-ink" aria-hidden="true" />
-                Gemarkeerd voor later:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {flaggedList.map(jumpChip)}
-              </div>
-            </div>
-          ) : null}
-          {snapshot.state === "offline" ? (
-            <p className="text-sm text-warning-ink">
-              Let op: je bent offline. We proberen je antwoorden eerst op te
-              slaan.
-            </p>
-          ) : null}
-        </div>
+        <HandInSummary
+          questions={questions}
+          unanswered={unanswered}
+          withTips={withTips}
+          flagged={flaggedList}
+          rejected={rejectedQuestions}
+          offline={snapshot.state === "offline"}
+          onJump={(i) => {
+            setSubmitOpen(false);
+            goTo(i);
+          }}
+        />
       </ConfirmDialog>
 
       <Dialog open={showOverlay}>

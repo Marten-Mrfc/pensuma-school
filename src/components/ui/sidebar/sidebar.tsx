@@ -195,9 +195,6 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
     ref,
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-    // Mobile sheet: it is opened by a button outside it (no SheetTrigger), so
-    // Radix has nowhere to return focus to on close (WCAG 2.4.3).
-    const openedFrom = React.useRef<HTMLElement | null>(null)
 
     if (collapsible === 'none') {
       return (
@@ -224,24 +221,8 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
             data-mobile="true"
             side={side}
             className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
-            onOpenAutoFocus={() => {
-              const active = document.activeElement
-              openedFrom.current = active instanceof HTMLElement && active !== document.body ? active : null
-            }}
-            onCloseAutoFocus={(event) => {
-              const opener = openedFrom.current
-              openedFrom.current = null
-              // Focus was already moved on purpose (runs after the close animation).
-              const active = document.activeElement
-              if (active instanceof HTMLElement && active !== document.body && active.isConnected) {
-                event.preventDefault()
-                return
-              }
-              if (opener?.isConnected) {
-                event.preventDefault()
-                opener.focus()
-              }
-            }}
+            // The mobile sheet is opened by a button outside it (no
+            // SheetTrigger); SheetContent returns focus to it on close.
             style={
               {
                 '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
@@ -597,6 +578,20 @@ const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonP
   ({ asChild = false, isActive = false, variant = 'default', size = 'default', tooltip, className, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button'
     const { isMobile, state } = useSidebar()
+    // The tooltip repeats the label, so it is only useful when the label is
+    // hidden: in the collapsed (icon-only) desktop sidebar. Elsewhere it must
+    // stay closed rather than merely invisible: an open tooltip adds a
+    // dismissable layer that eats the first Escape (the mobile menu stayed
+    // open) and an aria-describedby that repeats the link name.
+    const showTooltip = state === 'collapsed' && !isMobile
+    const [tooltipOpen, setTooltipOpen] = React.useState(false)
+    const [tooltipShown, setTooltipShown] = React.useState(showTooltip)
+    if (tooltipShown !== showTooltip) {
+      // Radix doesn't report "closed" while `open` is forced to false, so
+      // forget a stale hover or focus when the sidebar expands.
+      setTooltipShown(showTooltip)
+      setTooltipOpen(false)
+    }
 
     const button = (
       <Comp
@@ -624,10 +619,12 @@ const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonP
       tooltipProps = tooltip as React.ComponentProps<typeof TooltipContent>
     }
 
+    // Same element tree in every state, so the link keeps focus when the
+    // sidebar collapses or expands.
     return (
-      <Tooltip>
+      <Tooltip open={showTooltip && tooltipOpen} onOpenChange={setTooltipOpen}>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="right" align="center" hidden={state !== 'collapsed' || isMobile} {...tooltipProps} />
+        <TooltipContent side="right" align="center" {...tooltipProps} />
       </Tooltip>
     )
   },

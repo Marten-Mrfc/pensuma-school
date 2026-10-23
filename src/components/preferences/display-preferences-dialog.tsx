@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, Type } from "lucide-react";
+import { RotateCcw, TriangleAlert, Type } from "lucide-react";
 import { type ReactNode, type RefObject, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { timerThresholdsText } from "@/lib/a11y/timer-announcements";
 import {
   CODE_FONT_SIZE_LABELS,
   CODE_FONT_SIZES,
@@ -31,6 +32,7 @@ import {
   type UserPreferences,
 } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
+import { PREFERENCES_SAVE_ERROR } from "./preferences-store";
 import { usePreferences } from "./use-preferences";
 
 /* ------------------------------------------------------------------ */
@@ -162,7 +164,11 @@ function Preview() {
 export interface DisplayPreferencesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Focus this element on close (e.g. a menu trigger) instead of the default. */
+  /**
+   * Focus this element on close (e.g. the trigger of the menu the dialog was
+   * opened from). Without it focus goes back to the element that opened the
+   * dialog (DialogContent).
+   */
   returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
@@ -176,7 +182,7 @@ export function DisplayPreferencesDialog({
   onOpenChange,
   returnFocusRef,
 }: DisplayPreferencesDialogProps) {
-  const { prefs, update } = usePreferences();
+  const { prefs, update, saveFailed } = usePreferences();
   const motionId = useId();
   const motionHelpId = useId();
   const groupName = useId();
@@ -283,13 +289,28 @@ export function DisplayPreferencesDialog({
             </div>
             <SwitchRow
               label="Timer tonen tijdens toetsen"
-              help="Je krijgt nog steeds een melding bij 10, 5 en 1 minuut."
+              help={`Je krijgt nog steeds een melding bij ${timerThresholdsText()}.`}
               checked={prefs.showTimer}
               onChange={(v) => set("showTimer", v)}
             />
           </div>
 
           <Preview />
+
+          {saveFailed ? (
+            // Also a toast, but that can't be reached by keyboard while this
+            // dialog keeps focus inside it.
+            <p
+              role="alert"
+              className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
+            >
+              <TriangleAlert
+                className="mt-0.5 size-4 shrink-0"
+                aria-hidden="true"
+              />
+              {PREFERENCES_SAVE_ERROR}
+            </p>
+          ) : null}
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

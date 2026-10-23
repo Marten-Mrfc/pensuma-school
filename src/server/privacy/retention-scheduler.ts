@@ -31,6 +31,17 @@ function intervalMs(): number {
   return (valid ? hours : DEFAULT_INTERVAL_HOURS) * 3_600_000;
 }
 
+/**
+ * An error message for the log without Drizzle's query parameters (they
+ * can hold personal data; register category "Technische foutmeldingen").
+ */
+function loggableMessage(error: unknown): string {
+  if (!(error instanceof Error)) return "unknown";
+  return error.message
+    .replace(/\nparams:[\s\S]*$/, "\nparams: [weggelaten]")
+    .slice(0, 300);
+}
+
 function log(entry: Record<string, unknown>) {
   const line = JSON.stringify({ ts: new Date().toISOString(), ...entry });
   if (entry.level === "error") console.error(line);
@@ -72,7 +83,7 @@ export async function runLockedRetention(
       level: "error",
       msg: "retention_failed",
       durationMs: Date.now() - started,
-      error: error instanceof Error ? error.message : String(error),
+      error: loggableMessage(error),
     });
     return "failed";
   } finally {

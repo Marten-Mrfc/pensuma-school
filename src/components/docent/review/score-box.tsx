@@ -26,6 +26,7 @@ import {
 } from "@/lib/grading/rubric";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
+import { applyToSameLabel } from "./copy";
 import { FeedbackSnippets } from "./feedback-snippets";
 import { RubricChecklist } from "./rubric-checklist";
 
@@ -86,7 +87,11 @@ export function ScoreBox({
   questionNumber?: number;
   /** The question's rubric criteria (open questions). */
   rubricItems?: readonly RubricCriterion[];
-  /** Other answers with the same content (grading together). */
+  /**
+   * Other answers with the same content, graded together on request. Leave
+   * out answers that already have a manual score: a bulk save must never
+   * overwrite a score the teacher gave earlier.
+   */
   sameAnswerIds?: readonly string[];
 }) {
   const trpc = useTRPC();
@@ -405,8 +410,7 @@ export function ScoreBox({
                   onCheckedChange={(v) => setApplyToSame(v === true)}
                 />
                 <label htmlFor={`${id}-same`} className="text-sm">
-                  Ook toepassen op {others.length} gelijke{" "}
-                  {others.length === 1 ? "antwoord" : "antwoorden"}
+                  {applyToSameLabel(others.length)}
                 </label>
               </div>
             ) : null}

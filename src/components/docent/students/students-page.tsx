@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { routes } from "@/lib/routes";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { useResultAnnouncement } from "../a11y/result-announcement";
 import { formatDateTime, plural } from "./format";
 import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
@@ -33,6 +34,14 @@ type Row = RouterOutputs["student"]["list"]["rows"][number];
 type Status = "all" | "active" | "inactive";
 
 const PAGE_SIZE = 25;
+
+/** The result count in the header (and read aloud after a search). */
+export function studentsFoundMessage(total: number, filtered: boolean): string {
+  if (!filtered) return `${plural(total, "leerling", "leerlingen")} in Pensuma.`;
+  return total === 0
+    ? "Geen leerlingen gevonden."
+    : `${plural(total, "leerling", "leerlingen")} gevonden.`;
+}
 
 /** /docent/leerlingen: all students, searchable and paginated. */
 export function StudentsPage() {
@@ -73,6 +82,12 @@ export function StudentsPage() {
     if (data && data.page > data.pageCount) setPage(data.pageCount);
   }, [data]);
   const filtered = Boolean(debouncedSearch || classId || status !== "all");
+  // Read the new result count aloud after a search or filter change.
+  useResultAnnouncement({
+    key: `${debouncedSearch}|${classId}|${status}`,
+    ready: !!data && !query.isFetching && !query.isPlaceholderData,
+    message: data ? studentsFoundMessage(data.total, filtered) : "",
+  });
   const from = data && data.total > 0 ? (data.page - 1) * data.pageSize + 1 : 0;
   const to = data ? Math.min(data.page * data.pageSize, data.total) : 0;
   const selectedClass = classesQuery.data?.find((c) => c.id === classId);
@@ -187,9 +202,7 @@ export function StudentsPage() {
         title="Leerlingen"
         description={
           data
-            ? filtered
-              ? `${plural(data.total, "leerling", "leerlingen")} gevonden.`
-              : `${plural(data.total, "leerling", "leerlingen")} in Pensuma.`
+            ? studentsFoundMessage(data.total, filtered)
             : "Alle leerlingaccounts, met hun klassen en pincodes."
         }
         actions={

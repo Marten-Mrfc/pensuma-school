@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { focusInvalidField } from "../a11y/invalid-field-focus";
 
 type ClassRow = Pick<
   RouterOutputs["class"]["get"],
@@ -52,6 +54,7 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
   const uid = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const announce = useAnnounce();
   const editing = Boolean(klas);
   const [name, setName] = useState(klas?.name ?? "");
   const [schoolYear, setSchoolYear] = useState(
@@ -83,7 +86,9 @@ function ClassForm({ onOpenChange, klas, onSaved }: ClassFormDialogProps) {
     e.preventDefault();
     setFormError(undefined);
     if (!name.trim()) {
-      setNameError("Geef de klas een naam.");
+      const message = "Geef de klas een naam.";
+      setNameError(message);
+      focusInvalidField(`${uid}-class-name`, message, announce);
       return;
     }
     setNameError(undefined);

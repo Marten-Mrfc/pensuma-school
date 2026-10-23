@@ -39,6 +39,7 @@ import {
   formatPercent,
 } from "@/components/docent/assignments/format";
 import { ModeBadge } from "@/components/docent/assignments/shared";
+import { plural } from "@/components/docent/students/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -62,7 +63,14 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { GradeDistributionChart, QuestionAverageChart } from "./charts";
+import { passedSentence, regradeDescription } from "./copy";
+import { pendingReviewByQuestion, pendingReviewTotal } from "./grading-logic";
 import { retakeGroups } from "./retake-groups";
+import {
+  STICKY_SCROLL_PADDING_CLASS,
+  stickyColumnStyle,
+  useStickyColumnWidth,
+} from "./sticky-column";
 
 type Results = RouterOutputs["review"]["results"];
 type Row = Results["rows"][number];
@@ -105,7 +113,8 @@ export function ResultsView({
   return <ResultsContent data={results.data} />;
 }
 
-function ResultsContent({ data }: { data: Results }) {
+/** The page body for loaded results (exported for the render tests). */
+export function ResultsContent({ data }: { data: Results }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const id = useId();
@@ -120,6 +129,24 @@ function ResultsContent({ data }: { data: Results }) {
     dir: 1,
   });
   const [confirmRegrade, setConfirmRegrade] = useState(false);
+  const stickyColumn = useStickyColumnWidth();
+
+  // "Nog nakijken": the same source as the Nakijken tab and the dashboard
+  // (every submitted attempt), not only the attempt shown per student.
+  const queue = useQuery(
+    trpc.review.gradingQueue.queryOptions(
+      { assignmentId: a.id },
+      { refetchInterval: 20_000 },
+    ),
+  );
+  const needsReview = queue.data
+    ? pendingReviewTotal(queue.data.questions)
+    : queue.isError
+      ? data.stats.needsReview
+      : null;
+  const pendingByQuestion = queue.data
+    ? pendingReviewByQuestion(queue.data.questions)
+    : null;
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: trpc.review.pathKey() });
@@ -215,7 +242,7 @@ function ResultsContent({ data }: { data: Results }) {
             <ModeBadge mode={a.mode} />
           </>
         }
-        description={`${a.className} · ${a.testTitle} · ${data.questions.length} vragen · ${formatNumber(a.totalPoints)} punten`}
+        description={`${a.className} · ${a.testTitle} · ${plural(data.questions.length, "vraag", "vragen")} · ${formatNumber(a.totalPoints)} ${a.totalPoints === 1 ? "punt" : "punten"}`}
         actions={
           <>
             <Button
@@ -278,7 +305,7 @@ function ResultsContent({ data }: { data: Results }) {
       <AssignmentNav
         assignmentId={a.id}
         active="results"
-        needsReview={data.stats.needsReview}
+        needsReview={needsReview ?? undefined}
       />
 
       <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -297,7 +324,7 @@ function ResultsContent({ data }: { data: Results }) {
             id={`${id}-focus-export`}
             checked={includeFocus}
             onCheckedChange={(v) => setIncludeFocus(v === true)}
-            label="Focusverlies meenemen in export"
+            label="Vensterwissels meenemen in export"
           />
         ) : null}
       </div>
@@ -337,11 +364,13 @@ function ResultsContent({ data }: { data: Results }) {
         />
         <StatCard
           label="Nog nakijken"
-          value={data.stats.needsReview}
+          value={needsReview ?? "–"}
           icon={NotebookPen}
-          tone={data.stats.needsReview ? "warning" : "default"}
+          tone={needsReview ? "warning" : "default"}
           hint={
-            data.stats.needsReview ? (
+            needsReview == null ? (
+              "wordt geteld…"
+            ) : needsReview ? (
               <Link
                 href={routes.docent.assignmentGrading(a.id)}
                 className="font-medium text-primary hover:underline"
@@ -361,6 +390,7 @@ function ResultsContent({ data }: { data: Results }) {
         <section
           className="flex flex-col gap-3"
           aria-labelledby={`${id}-matrix`}
+          style={stickyColumnStyle(stickyColumn.width)}
         >
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -376,7 +406,11 @@ function ResultsContent({ data }: { data: Results }) {
           </div>
           <ScrollRegion
             label="Resultaten per leerling en vraag"
-            className="relative rounded-xl border bg-card shadow-xs"
+            className={cn(
+              "relative rounded-xl border bg-card shadow-xs",
+              // Focused cells scroll out from under the sticky first column.
+              STICKY_SCROLL_PADDING_CLASS,
+            )}
           >
             <table className="w-full border-separate border-spacing-0 text-sm">
               <caption className="sr-only">
@@ -385,6 +419,7 @@ function ResultsContent({ data }: { data: Results }) {
               <thead>
                 <tr className="text-xs text-muted-foreground">
                   <th
+                    ref={stickyColumn.ref}
                     scope="col"
                     aria-sort={ariaSort("name")}
                     className="sticky left-0 z-20 min-w-48 border-b bg-card px-4 py-2 text-left font-medium"
@@ -553,8 +588,11 @@ function ResultsContent({ data }: { data: Results }) {
               />
             </AccessibleChart>
             <p className="text-xs text-muted-foreground">
-              Percentage van de punten, gemiddeld over {data.stats.submitted}{" "}
-              ingeleverde pogingen. Rood = minder dan 50%.
+              Percentage van de punten, gemiddeld over{" "}
+              {data.stats.submitted === 1
+                ? "1 ingeleverde poging"
+                : `${data.stats.submitted} ingeleverde pogingen`}
+              . Rood = minder dan 50%.
             </p>
           </section>
           <section className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-xs">
@@ -590,13 +628,15 @@ function ResultsContent({ data }: { data: Results }) {
         </div>
       ) : null}
 
-      {data.stats.submitted > 0 ? <QuestionStatsTable data={data} /> : null}
+      {data.stats.submitted > 0 ? (
+        <QuestionStatsTable data={data} pendingByQuestion={pendingByQuestion} />
+      ) : null}
 
       <ConfirmDialog
         open={confirmRegrade}
         onOpenChange={setConfirmRegrade}
         title="Alles opnieuw nakijken?"
-        description={`Alle ${data.stats.submitted} ingeleverde pogingen worden opnieuw automatisch nagekeken met de huidige testgevallen. Handmatige scores en feedback blijven staan. Dit kan even duren.`}
+        description={regradeDescription(data.stats.submitted)}
         confirmLabel="Opnieuw nakijken"
         onConfirm={async () => {
           const res = await regrade.mutateAsync({ assignmentId: a.id });
@@ -606,7 +646,7 @@ function ResultsContent({ data }: { data: Results }) {
           });
           if (res.failed) {
             toast.warning(
-              `${res.graded} pogingen nagekeken, ${res.failed} mislukt`,
+              `${plural(res.graded, "poging", "pogingen")} nagekeken, ${res.failed} mislukt`,
               {
                 description:
                   "Probeer het later nog eens voor de mislukte pogingen.",
@@ -855,7 +895,14 @@ function Legend() {
   );
 }
 
-function QuestionStatsTable({ data }: { data: Results }) {
+function QuestionStatsTable({
+  data,
+  pendingByQuestion,
+}: {
+  data: Results;
+  /** From the grading queue (all attempts), like the Nakijken tab. */
+  pendingByQuestion: Map<string, number> | null;
+}) {
   const id = useId();
   const stats = new Map(data.stats.perQuestion.map((s) => [s.questionId, s]));
   return (
@@ -904,6 +951,9 @@ function QuestionStatsTable({ data }: { data: Results }) {
             {data.questions.map((q, i) => {
               const s = stats.get(q.id);
               const pct = s?.averagePercentage ?? null;
+              const pending = pendingByQuestion
+                ? (pendingByQuestion.get(q.id) ?? 0)
+                : (s?.needsReview ?? 0);
               return (
                 <tr key={q.id}>
                   <th scope="row" className="px-4 py-2.5 text-left font-normal">
@@ -946,12 +996,12 @@ function QuestionStatsTable({ data }: { data: Results }) {
                     {s?.answered ?? 0}/{data.stats.submitted}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">
-                    {s?.needsReview ? (
+                    {pending ? (
                       <Link
                         href={`${routes.docent.assignmentGrading(data.assignment.id)}?vraag=${q.id}`}
                         className="font-medium text-warning-ink hover:underline"
                       >
-                        {s.needsReview}
+                        {pending}
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">0</span>
@@ -986,7 +1036,7 @@ function questionAverageSummary(
 function distributionSummary(data: Results): string {
   const { submitted, passed, averageGrade } = data.stats;
   if (!submitted) return "Nog geen cijfers.";
-  return `${passed} van de ${submitted} leerlingen hebben een voldoende. Het gemiddelde cijfer is ${formatGrade(averageGrade)}.`;
+  return `${passedSentence(passed, submitted)} Het gemiddelde cijfer is ${formatGrade(averageGrade)}.`;
 }
 
 /** "Herkansing plannen": onvoldoendes, who missed it, or choose students. */

@@ -15,13 +15,9 @@ import {
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { CodeSplitLayout } from "./code-split-layout";
 import { CodeTipsButton } from "./code-tips";
 import { CodeRunTab, CodeTestTab, type RunHandle } from "./code-tools";
 import { HintPanel } from "./hint-panel";
@@ -258,43 +254,29 @@ export function CodeQuestion(props: QuestionViewProps) {
 
   return (
     <>
-      <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId="pensuma-exam-code-h"
-      >
-        <ResizablePanel defaultSize={hasTools ? 58 : 100} minSize={35}>
-          <ResizablePanelGroup
-            direction="vertical"
-            autoSaveId="pensuma-exam-code-v"
-          >
-            <ResizablePanel defaultSize={40} minSize={12}>
-              <div className="h-full overflow-y-auto px-6 py-5">
-                <div className="flex flex-col gap-4">
-                  {header}
-                  {prompt}
-                </div>
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={60} minSize={30}>
-              <div className="flex h-full min-h-0 flex-col gap-2 px-4 pt-3 pb-4">
-                {editorToolbar}
-                {editor}
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </ResizablePanel>
-        {hasTools ? (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={42} minSize={25}>
-              <div className="h-full min-h-0 bg-card/40 px-4 pt-4 pb-4">
-                {tools}
-              </div>
-            </ResizablePanel>
-          </>
-        ) : null}
-      </ResizablePanelGroup>
+      <CodeSplitLayout
+        prompt={
+          <div className="h-full overflow-y-auto px-6 py-5">
+            <div className="flex flex-col gap-4">
+              {header}
+              {prompt}
+            </div>
+          </div>
+        }
+        editor={
+          <div className="flex h-full min-h-0 flex-col gap-2 px-4 pt-3 pb-4">
+            {editorToolbar}
+            {editor}
+          </div>
+        }
+        tools={
+          hasTools ? (
+            <div className="h-full min-h-0 bg-card/40 px-4 pt-4 pb-4">
+              {tools}
+            </div>
+          ) : null
+        }
+      />
       {resetDialog}
     </>
   );

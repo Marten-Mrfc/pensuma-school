@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { toast } from "sonner";
 import { ShortcutsDialog } from "@/components/a11y/shortcuts-dialog";
 import { DisplayPreferencesDialog } from "@/components/preferences/display-preferences-dialog";
 import {
@@ -35,6 +34,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toastError } from "@/components/ui/sonner";
 import { signOut } from "@/lib/auth-client";
 import { ROUTES } from "@/lib/auth-shared";
 import { clearLocalUserData } from "@/lib/local-data";
@@ -116,7 +116,7 @@ export function UserMenu({
     const { error } = await signOut();
     if (error) {
       setSigningOut(false);
-      toast.error("Uitloggen lukte niet. Probeer het opnieuw.");
+      toastError("Uitloggen lukte niet. Probeer het opnieuw.");
       return;
     }
     // Shared school computers: remove preferences, drafts and backups first.

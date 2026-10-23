@@ -38,6 +38,7 @@ import {
   ModeBadge,
 } from "@/components/docent/assignments/shared";
 import { GradeDistributionChart } from "@/components/docent/review/charts";
+import { passedSentence } from "@/components/docent/review/copy";
 import { Button } from "@/components/ui/button";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { routes } from "@/lib/routes";
@@ -46,6 +47,15 @@ import { type RouterOutputs, useTRPC } from "@/trpc/react";
 
 type Overview = RouterOutputs["dashboard"]["overview"];
 type Active = Overview["activeAssignments"][number];
+
+/**
+ * Row links in the dashboard lists. The focus indicator is an inset ring (the
+ * rounded list clips anything drawn outside a row), with the tint as a
+ * second cue. In forced-colors mode box shadows are not painted and the
+ * global focus outline is used instead: pull it inside the row as well.
+ */
+export const LIST_ROW_LINK =
+  "flex items-center gap-3 px-4 transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset forced-colors:focus-visible:-outline-offset-2!";
 
 export function DashboardView() {
   const trpc = useTRPC();
@@ -168,7 +178,7 @@ export function DashboardView() {
                   <li key={a.id}>
                     <Link
                       href={routes.docent.assignment(a.id)}
-                      className="flex items-center gap-3 px-4 py-3 transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40"
+                      className={cn(LIST_ROW_LINK, "py-3")}
                     >
                       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-info/10 text-info-ink">
                         <CalendarClock className="size-4" aria-hidden="true" />
@@ -248,7 +258,7 @@ export function DashboardView() {
                   <li key={r.assignmentId}>
                     <Link
                       href={routes.docent.assignmentGrading(r.assignmentId)}
-                      className="flex items-center gap-3 px-4 py-3 transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40"
+                      className={cn(LIST_ROW_LINK, "py-3")}
                     >
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-sm font-medium">
@@ -294,7 +304,7 @@ export function DashboardView() {
                 <li key={s.attemptId}>
                   <Link
                     href={routes.docent.attempt(s.assignmentId, s.attemptId)}
-                    className="flex items-center gap-3 px-4 py-2.5 transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40"
+                    className={cn(LIST_ROW_LINK, "py-2.5")}
                   >
                     <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                       {s.studentName
@@ -398,7 +408,7 @@ export function DashboardView() {
               </div>
               <AccessibleChart
                 title={`Cijferverdeling · ${d.lastClosed.title}`}
-                summary={`${d.lastClosed.passed} van de ${d.lastClosed.submitted} leerlingen hebben een voldoende. Het gemiddelde cijfer is ${formatGrade(d.lastClosed.averageGrade)}.`}
+                summary={`${passedSentence(d.lastClosed.passed, d.lastClosed.submitted)} Het gemiddelde cijfer is ${formatGrade(d.lastClosed.averageGrade)}.`}
                 columns={[
                   { key: "cijfer", header: "Cijfer" },
                   { key: "aantal", header: "Aantal leerlingen" },
@@ -411,7 +421,10 @@ export function DashboardView() {
                 <GradeDistributionChart
                   bins={d.lastClosed.distribution}
                   height={200}
-                  ariaLabel={`${d.lastClosed.passed} van de ${d.lastClosed.submitted} leerlingen hebben een voldoende.`}
+                  ariaLabel={passedSentence(
+                    d.lastClosed.passed,
+                    d.lastClosed.submitted,
+                  )}
                 />
               </AccessibleChart>
               <p className="text-xs text-muted-foreground">

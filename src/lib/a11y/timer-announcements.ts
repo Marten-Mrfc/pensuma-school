@@ -6,8 +6,38 @@
 
 import type { Politeness } from "./announce";
 
-/** Warning moments in minutes, largest first. */
+/**
+ * Warning moments in minutes, largest first. The single source for the
+ * screen-reader announcements (below), the visible warnings in the exam
+ * (TIME_WARNING_TOASTS) and the copy that promises them (timerThresholdsText).
+ */
 export const TIMER_THRESHOLDS_MIN = [10, 5, 1] as const;
+
+export type TimerThreshold = (typeof TIMER_THRESHOLDS_MIN)[number];
+
+/**
+ * Visible warning (toast) at each threshold, so sighted students who hid
+ * the timer get the same moments as screen-reader users.
+ */
+export const TIME_WARNING_TOASTS: Readonly<Record<TimerThreshold, string>> = {
+  10: "Nog 10 minuten.",
+  5: "Nog 5 minuten! Rond je antwoorden af.",
+  1: "Nog 1 minuut. Je werk wordt straks automatisch ingeleverd.",
+};
+
+/** The thresholds as Dutch text: "10, 5 en 1 minuut". */
+export function timerThresholdsText(
+  thresholds: readonly number[] = TIMER_THRESHOLDS_MIN,
+): string {
+  if (thresholds.length === 0) return "";
+  const unit = thresholds.at(-1) === 1 ? "minuut" : "minuten";
+  const numbers = thresholds.map(String);
+  const list =
+    numbers.length === 1
+      ? numbers[0]
+      : `${numbers.slice(0, -1).join(", ")} en ${numbers.at(-1)}`;
+  return `${list} ${unit}`;
+}
 
 /** Extra time below this is treated as a clock correction, not announced. */
 export const EXTENSION_MIN_MS = 60_000;

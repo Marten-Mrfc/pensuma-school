@@ -836,10 +836,10 @@ function eventDescription(e: EventRow): string | null {
           : "Automatisch, toen de tijd om was";
       return "Door de leerling";
     case "time_extended":
-      return `+${d.minutes ?? "?"} minuten${d.by ? ` door ${d.by}` : ""}`;
+      return `+${d.minutes ?? "?"} ${d.minutes === 1 ? "minuut" : "minuten"}${d.by ? ` door ${d.by}` : ""}`;
     case "reopened":
       return d.minutes
-        ? `${d.minutes} minuten extra${d.by ? `, door ${d.by}` : ""}`
+        ? `${d.minutes} ${d.minutes === 1 ? "minuut" : "minuten"} extra${d.by ? `, door ${d.by}` : ""}`
         : d.by
           ? `Door ${d.by}`
           : null;

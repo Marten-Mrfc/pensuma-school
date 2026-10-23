@@ -119,7 +119,7 @@ function AnalysisContent({ data }: { data: Analysis }) {
               label="Ingeleverd"
               value={`${t.n}/${t.students}`}
               icon={Users}
-              hint={`${t.k} vragen tellen mee`}
+              hint={t.k === 1 ? "1 vraag telt mee" : `${t.k} vragen tellen mee`}
             />
           </div>
 

@@ -112,6 +112,88 @@ export function defaultRetakeTitle(
   return `${kind === "herkansing" ? "Herkansing" : "Inhaaltoets"} – ${testTitle}`;
 }
 
+/** What the form needs from `assignment.formOptions`. */
+export type FormOptionsLike = {
+  /** Published tests only. */
+  tests: readonly { id: string; title: string }[];
+  /** Classes that are not archived. */
+  classes: readonly { id: string }[];
+};
+
+export type InitialFormState = {
+  state: AssignmentFormState;
+  /**
+   * The link asked for this toets (?toets) but it can't be planned: it is
+   * archived, a draft or gone. The id, so the form can link to it.
+   */
+  unavailableTestId: string | null;
+  /** Same for ?klas: the class is archived or gone. */
+  unavailableClassId: string | null;
+};
+
+/**
+ * Initial form state from the query string (?toets, ?klas, ?leerlingen,
+ * ?herkansing). When there is only one toets or class, it is preselected,
+ * but only when the link doesn't ask for another one: a herkansing of an
+ * afname whose toets was archived must never silently get a different
+ * toets (or class).
+ */
+export function initialFormState(
+  options: FormOptionsLike,
+  params: URLSearchParams,
+): InitialFormState {
+  const preTest = params.get("toets") || null;
+  const preClass = params.get("klas") || null;
+  const retakeOfId = params.get("herkansing");
+  const studentIds = parseIdList(params.get("leerlingen"));
+  const testId = preTest
+    ? options.tests.some((t) => t.id === preTest)
+      ? preTest
+      : ""
+    : options.tests.length === 1
+      ? options.tests[0].id
+      : "";
+  const classIds = preClass
+    ? options.classes.some((c) => c.id === preClass)
+      ? [preClass]
+      : []
+    : options.classes.length === 1
+      ? [options.classes[0].id]
+      : [];
+  const testTitle = options.tests.find((t) => t.id === testId)?.title;
+  const targeted =
+    (studentIds.length > 0 || !!retakeOfId) && classIds.length === 1;
+  const title =
+    testTitle && retakeOfId
+      ? defaultRetakeTitle("herkansing", testTitle)
+      : testTitle && studentIds.length
+        ? defaultRetakeTitle("inhaaltoets", testTitle)
+        : "";
+  const preset: Preset = "exam";
+  const defaults = presetDefaults(preset);
+  return {
+    state: {
+      testId,
+      classIds,
+      studentIds: targeted ? studentIds : null,
+      retakeOfId: retakeOfId || null,
+      title,
+      preset,
+      settings: defaults.settings,
+      startMode: "now",
+      opensAt: "",
+      closesEnabled: false,
+      closesAt: "",
+      timeLimit: "",
+      codeMode: defaults.codeMode,
+      customCode: "",
+      accessCodePerClass: false,
+    },
+    unavailableTestId: preTest && !testId ? preTest : null,
+    unavailableClassId: preClass && classIds.length === 0 ? preClass : null,
+  };
+}
+
 export function parseTimeLimit(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

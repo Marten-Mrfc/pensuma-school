@@ -102,6 +102,11 @@ const DETAIL_LABELS: Record<string, string> = {
 
 /** Dutch words for enum-like values, per key. */
 const VALUE_LABELS: Record<string, Record<string, string>> = {
+  // student.updated: which fields of the account changed.
+  fields: {
+    name: "naam",
+    studentNumber: "leerlingnummer",
+  },
   via: {
     retention: "automatische opschoning",
     school_year: "schooljaar afsluiten",
@@ -175,9 +180,10 @@ function formatValue(key: string, value: unknown): string | null {
   if (Array.isArray(value)) {
     return value
       .map((v) =>
-        key === "changedKeys" ? (SETTING_LABELS[String(v)] ?? String(v)) : v,
+        key === "changedKeys"
+          ? (SETTING_LABELS[String(v)] ?? String(v))
+          : (VALUE_LABELS[key]?.[String(v)] ?? String(v)),
       )
-      .map(String)
       .join(", ");
   }
   if (typeof value === "string") return VALUE_LABELS[key]?.[value] ?? value;

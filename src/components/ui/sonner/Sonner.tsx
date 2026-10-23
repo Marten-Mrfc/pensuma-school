@@ -3,6 +3,10 @@
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon, XIcon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
+import { installErrorToastDefaults } from './toast'
+
+// Every error toast, also `toast.error` straight from "sonner", stays 10 s.
+installErrorToastDefaults()
 
 /** Rich-colour variables built from the theme tokens: a light tint of the
  *  status colour as background and the *-ink text token (≥ 4.5:1 in light
@@ -15,9 +19,11 @@ function richColorVars(name: 'success' | 'info' | 'warning' | 'error', token: st
   }
 }
 
-// Sonner cadence: 4000ms default (errors use toastError() for 10s), a close
-// button on every toast (WCAG 2.2.1), max 3 visible, rich colours mapped to
-// accessible theme tokens.
+// Sonner cadence: 4000ms default (errors 10s, see installErrorToastDefaults),
+// a close button on every toast (WCAG 2.2.1), max 3 visible, rich colours
+// mapped to accessible theme tokens. Toasts stay hoverable and closable while
+// a dialog is open (globals.css; DialogContent/SheetContent ignore clicks on
+// them as "outside" clicks).
 const Toaster = ({ ...props }: ToasterProps) => {
   // next-themes is the React registry theme stack (via init / use-theme bootstrap).
   // Falls back to 'system' when ThemeProvider is absent so the toaster still mounts.
