@@ -59,7 +59,8 @@ export const STORAGE_ITEMS: readonly StorageItem[] = [
     category: "noodzakelijk",
     audience: "alleen leerlingen",
     purpose: "Reservekopie van je antwoorden als de verbinding wegvalt",
-    retention: "tot inleveren of uitloggen",
+    retention:
+      "tot inleveren, uitloggen of tot iemand anders op deze computer inlogt",
   },
   {
     name: "pensuma:prefs:…",
@@ -73,15 +74,25 @@ export const STORAGE_ITEMS: readonly StorageItem[] = [
     kind: "lokale opslag",
     category: "functioneel",
     purpose: "Of sneltoetsen aan of uit staan",
-    retention: "tot je het wijzigt",
+    retention:
+      "tot je het wijzigt, uitlogt of iemand anders op deze computer inlogt",
   },
   {
-    name: "pensuma:oefenen:code",
+    name: "pensuma:oefenen:…",
     kind: "lokale opslag",
     category: "functioneel",
     audience: "alleen leerlingen",
     purpose: "Je code in de oefenomgeving bewaren",
-    retention: "tot je de code wist",
+    retention:
+      "tot je de code wist, uitlogt of iemand anders op deze computer inlogt",
+  },
+  {
+    name: "pensuma:owner",
+    kind: "lokale opslag",
+    category: "noodzakelijk",
+    purpose:
+      "Van wie de lokale gegevens op deze computer zijn, zodat ze worden gewist als iemand anders inlogt",
+    retention: "tot uitloggen",
   },
   {
     name: "pensuma:toetsen:filter",
@@ -89,7 +100,8 @@ export const STORAGE_ITEMS: readonly StorageItem[] = [
     category: "functioneel",
     audience: "alleen docenten",
     purpose: "Gekozen filter in het overzicht van toetsen",
-    retention: "tot je het wijzigt",
+    retention:
+      "tot je het wijzigt, uitlogt of iemand anders op deze computer inlogt",
   },
 ];
 

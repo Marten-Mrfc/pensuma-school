@@ -34,6 +34,8 @@ export interface EditorSectionProps {
   children: ReactNode;
   className?: string;
   id?: string;
+  /** The h2; when given it can get focus from script (tabIndex -1). */
+  headingRef?: React.Ref<HTMLHeadingElement>;
 }
 
 /** A titled card block inside the question editor. */
@@ -45,6 +47,7 @@ export function EditorSection({
   children,
   className,
   id,
+  headingRef,
 }: EditorSectionProps) {
   return (
     <section
@@ -62,7 +65,11 @@ export function EditorSection({
             </span>
           ) : null}
           <div className="flex min-w-0 flex-col gap-0.5">
-            <h2 className="text-[0.95rem] leading-snug font-semibold">
+            <h2
+              ref={headingRef}
+              tabIndex={headingRef ? -1 : undefined}
+              className="rounded-sm text-[0.95rem] leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               {title}
             </h2>
             {description ? (

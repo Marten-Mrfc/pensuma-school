@@ -1,12 +1,14 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Info, Loader2, TimerReset } from "lucide-react";
+import { Info, Loader2, ShieldAlert, TimerReset } from "lucide-react";
+import Link from "next/link";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { routes } from "@/lib/routes";
 import { useTRPC } from "@/trpc/react";
 import { ExtraTimeField } from "./extra-time-field";
 
@@ -15,6 +17,14 @@ export type AccommodationValue = {
   allowPaste: boolean;
   ignoreFocusEvents: boolean;
 };
+
+/**
+ * Help text of "Vensterwissels niet registreren". Must match what is logged
+ * (src/lib/privacy/event-details.ts, studentSettings in student-access.ts):
+ * the facility only switches off logFocusEvents for this student.
+ */
+export const IGNORE_FOCUS_HELP =
+  "Voor voorleessoftware of vergrotingsprogramma's die een eigen venster openen. Uitvoeren en testen van code wordt altijd vastgelegd; het verlaten van volledig scherm en geblokkeerd plakken alleen als de toets daarom vraagt. Die tellen dan niet als vensterwissel.";
 
 const NONE: AccommodationValue = {
   extraTimePercent: 0,
@@ -29,9 +39,12 @@ const NONE: AccommodationValue = {
 export function AccommodationPanel({
   userId,
   value,
+  restricted = false,
 }: {
   userId: string;
   value: AccommodationValue | null;
+  /** Processing restricted (AVG art. 18): show the facilities, no changes. */
+  restricted?: boolean;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -79,41 +92,66 @@ export function AccommodationPanel({
         className="flex flex-col gap-4 px-5 pb-5"
         onSubmit={(e) => {
           e.preventDefault();
-          save.mutate({ userId, ...draft });
+          if (!restricted) save.mutate({ userId, ...draft });
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <ExtraTimeField
-            value={draft.extraTimePercent}
-            onChange={(extraTimePercent) =>
-              setDraft((d) => ({ ...d, extraTimePercent }))
-            }
-            describedBy={`${id}-time-help`}
-          />
-          <p id={`${id}-time-help`} className="text-xs text-muted-foreground">
-            Geldt automatisch bij elke toets met een tijdslimiet of eindtijd.
-            Bij 50 minuten en +25% krijgt de leerling 63 minuten.
+        {restricted ? (
+          <p className="flex gap-2 rounded-lg border border-warning/35 bg-warning/10 px-3 py-2.5 text-xs text-pretty">
+            <ShieldAlert
+              className="mt-px size-3.5 shrink-0 text-warning-ink"
+              aria-hidden="true"
+            />
+            <span>
+              De verwerking is beperkt (AVG art. 18), dus deze faciliteiten kun
+              je nu niet wijzigen. De beperking beheer je via{" "}
+              <Link
+                href={routes.docent.privacy}
+                className="font-medium underline underline-offset-4"
+              >
+                Privacy &amp; gegevens
+              </Link>
+              .
+            </span>
           </p>
-        </div>
+        ) : null}
+        <fieldset
+          disabled={restricted}
+          className="flex min-w-0 flex-col gap-4 disabled:opacity-70"
+        >
+          <legend className="sr-only">Faciliteiten</legend>
+          <div className="flex flex-col gap-1.5">
+            <ExtraTimeField
+              value={draft.extraTimePercent}
+              onChange={(extraTimePercent) =>
+                setDraft((d) => ({ ...d, extraTimePercent }))
+              }
+              describedBy={`${id}-time-help`}
+            />
+            <p id={`${id}-time-help`} className="text-xs text-muted-foreground">
+              Geldt automatisch bij elke toets met een tijdslimiet of eindtijd.
+              Bij 50 minuten en +25% krijgt de leerling 63 minuten.
+            </p>
+          </div>
 
-        <ToggleRow
-          id={`${id}-paste`}
-          label="Plakken altijd toestaan"
-          help="Voor hulpmiddelen die via plakken werken, zoals dicteersoftware."
-          checked={draft.allowPaste}
-          onCheckedChange={(allowPaste) =>
-            setDraft((d) => ({ ...d, allowPaste }))
-          }
-        />
-        <ToggleRow
-          id={`${id}-focus`}
-          label="Vensterwissels niet registreren"
-          help="Voor voorleessoftware of vergrotingsprogramma's die een eigen venster openen."
-          checked={draft.ignoreFocusEvents}
-          onCheckedChange={(ignoreFocusEvents) =>
-            setDraft((d) => ({ ...d, ignoreFocusEvents }))
-          }
-        />
+          <ToggleRow
+            id={`${id}-paste`}
+            label="Plakken altijd toestaan"
+            help="Voor hulpmiddelen die via plakken werken, zoals dicteersoftware."
+            checked={draft.allowPaste}
+            onCheckedChange={(allowPaste) =>
+              setDraft((d) => ({ ...d, allowPaste }))
+            }
+          />
+          <ToggleRow
+            id={`${id}-focus`}
+            label="Vensterwissels niet registreren"
+            help={IGNORE_FOCUS_HELP}
+            checked={draft.ignoreFocusEvents}
+            onCheckedChange={(ignoreFocusEvents) =>
+              setDraft((d) => ({ ...d, ignoreFocusEvents }))
+            }
+          />
+        </fieldset>
 
         <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
           <p className="flex gap-2">
@@ -139,7 +177,11 @@ export function AccommodationPanel({
               Annuleren
             </Button>
           ) : null}
-          <Button type="submit" size="sm" disabled={!dirty || save.isPending}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={restricted || !dirty || save.isPending}
+          >
             {save.isPending ? (
               <Loader2
                 className="motion-safe:animate-spin"

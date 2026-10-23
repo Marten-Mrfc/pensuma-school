@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import type { MultipleChoiceData } from "@/lib/questions/schema";
 import { newOption } from "@/lib/questions/templates";
 import { optionLetter, type QuestionIssue } from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
+import { neighbourAfterRemoval } from "../a11y/list-focus";
 import { AutoTextarea, EditorSection, SwitchField } from "./fields";
 import { IssueDot, IssueList } from "./issue-list";
 import { ChoiceOptionsView } from "./question-preview";
@@ -43,10 +45,30 @@ export function MultipleChoiceEditor({
   const uid = useId();
   const [showAnswers, setShowAnswers] = useState(false);
   const [previewSelected, setPreviewSelected] = useState<string[]>([]);
-  const [focusId, setFocusId] = useState<string | null>(null);
+  /**
+   * Option whose text field gets focus: a new option, or the one that took
+   * a deleted option's place (else focus would drop to <body>, WCAG
+   * 2.4.3). `seq` makes a repeated request for the same option work.
+   */
+  const [focusRequest, setFocusRequest] = useState<{
+    id: string;
+    seq: number;
+  } | null>(null);
+  const announce = useAnnounce();
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const focusAddButton = useRef(false);
   const set = (patch: Partial<MultipleChoiceData>) =>
     onChange({ ...data, ...patch });
   const options = data.options;
+  useEffect(() => {
+    if (!focusAddButton.current) return;
+    focusAddButton.current = false;
+    addButtonRef.current?.focus();
+  });
+
+  function requestFocus(id: string) {
+    setFocusRequest((r) => ({ id, seq: (r?.seq ?? 0) + 1 }));
+  }
 
   function setOption(
     id: string,
@@ -79,7 +101,17 @@ export function MultipleChoiceEditor({
   function add() {
     const option = newOption();
     set({ options: [...options, option] });
-    setFocusId(option.id);
+    requestFocus(option.id);
+  }
+
+  function remove(index: number) {
+    const removed = options[index];
+    if (!removed) return;
+    const neighbour = neighbourAfterRemoval(options, index);
+    set({ options: options.filter((o) => o.id !== removed.id) });
+    if (neighbour) requestFocus(neighbour);
+    else focusAddButton.current = true;
+    announce(`Optie ${optionLetter(index)} verwijderd.`);
   }
 
   const optionIssues = (id: string) =>
@@ -118,18 +150,17 @@ export function MultipleChoiceEditor({
               correct={option.correct}
               multiple={data.multiple}
               issues={optionIssues(option.id)}
-              autoFocus={focusId === option.id}
+              focusSeq={focusRequest?.id === option.id ? focusRequest.seq : 0}
               onText={(text) => setOption(option.id, { text })}
               onToggle={() => toggleCorrect(option.id)}
               onMove={(d) => move(index, d)}
-              onRemove={() =>
-                set({ options: options.filter((o) => o.id !== option.id) })
-              }
+              onRemove={() => remove(index)}
             />
           ))}
         </ol>
         <div>
           <Button
+            ref={addButtonRef}
             variant="outline"
             size="sm"
             onClick={add}
@@ -267,7 +298,7 @@ function OptionRow({
   correct,
   multiple,
   issues,
-  autoFocus,
+  focusSeq,
   onText,
   onToggle,
   onMove,
@@ -281,7 +312,8 @@ function OptionRow({
   correct: boolean;
   multiple: boolean;
   issues: QuestionIssue[];
-  autoFocus: boolean;
+  /** Changes (non-zero) when this option's text field should get focus. */
+  focusSeq: number;
   onText: (text: string) => void;
   onToggle: () => void;
   onMove: (delta: -1 | 1) => void;
@@ -290,8 +322,8 @@ function OptionRow({
   const letter = optionLetter(index);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (autoFocus) ref.current?.querySelector("textarea")?.focus();
-  }, [autoFocus]);
+    if (focusSeq) ref.current?.querySelector("textarea")?.focus();
+  }, [focusSeq]);
 
   return (
     <li

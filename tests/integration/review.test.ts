@@ -11,7 +11,7 @@ import {
   insertStudent,
 } from "../support/factories";
 import { gradeCalls, setFakeGrader } from "../support/fake-grader";
-import { waitForGrading } from "../support/wait";
+import { settleGrading, waitForGrading } from "../support/wait";
 
 beforeEach(resetDatabase);
 
@@ -186,7 +186,9 @@ describe("regrading", () => {
     const out = await callerFor(w.teacher).review.regradeAssignment({
       assignmentId: w.assignment.id,
     });
-    expect(out).toMatchObject({ total: 1, graded: 1, failed: 0 });
+    // Returns at once; the grading itself runs in the background.
+    expect(out).toMatchObject({ total: 1, scheduled: 1, skippedRestricted: 0 });
+    await settleGrading();
     expect(gradeCalls).toHaveLength(1);
   });
 

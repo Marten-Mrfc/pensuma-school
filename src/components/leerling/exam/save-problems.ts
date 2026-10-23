@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import type { AnswerResponse } from "@/lib/questions/schema";
 import { formatNumber } from "../format";
 import type { ExamQuestion, OpenData } from "./types";
@@ -60,4 +61,18 @@ export function rejectedOnHandInMessage(numbers: readonly number[]): string {
   return numbers.length === 1
     ? `Je antwoord bij ${questionNumbersText(numbers)} is niet opgeslagen. We leveren de laatst opgeslagen versie in.`
     : `Je antwoorden bij ${questionNumbersText(numbers)} zijn niet opgeslagen. We leveren de laatst opgeslagen versies in.`;
+}
+
+/** Toast (and announcement) id for a question's refused answer. */
+export function rejectedToastId(questionId: string): string {
+  return `save-rejected-${questionId}`;
+}
+
+/**
+ * Close the "make it shorter" toasts of these questions: once the student
+ * hands in or leaves the exam that advice no longer applies, and it must
+ * not follow them to the result page.
+ */
+export function dismissRejectedToasts(questionIds: readonly string[]): void {
+  for (const id of questionIds) toast.dismiss(rejectedToastId(id));
 }

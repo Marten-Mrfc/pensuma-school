@@ -1,7 +1,7 @@
 "use client";
 
 import { Settings2 } from "lucide-react";
-import { useId } from "react";
+import { type Ref, useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
 import {
   EditorSection,
@@ -19,10 +19,13 @@ export function TestSettingsEditor({
   value,
   onChange,
   status,
+  headingRef,
 }: {
   value: TestSettingsDraft;
   onChange: (patch: Partial<TestSettingsDraft>) => void;
   status?: React.ReactNode;
+  /** The section heading (focus target after the last question is deleted). */
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const id = useId();
   const titleMissing = !value.title.trim();
@@ -32,6 +35,7 @@ export function TestSettingsEditor({
       description="De titel en beschrijving zien leerlingen voordat ze aan de toets beginnen."
       icon={<Settings2 />}
       actions={status}
+      headingRef={headingRef}
     >
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)]">
         <div className="flex flex-col gap-2">

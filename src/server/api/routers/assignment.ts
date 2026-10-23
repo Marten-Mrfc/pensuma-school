@@ -64,12 +64,16 @@ import {
   targetedStudentIds,
   withTargetingFlag,
 } from "@/server/services/assignment-targets";
+import { attemptDisplayNumbers } from "@/server/services/attempt-number";
 import {
   type AuditContext,
   type AuditDb,
   auditFromCtx,
 } from "@/server/services/audit";
-import { gradeAttempt } from "@/server/services/grading";
+import {
+  gradeAttemptsInBackground,
+  markGradingScheduled,
+} from "@/server/services/grading";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Helpers                                  */
@@ -99,34 +103,21 @@ export function runInBackground(label: string, task: () => Promise<void>) {
   }
 }
 
-/** Grade attempts one by one; failures are logged and counted. */
-export async function gradeAttemptsSafely(
-  attemptIds: string[],
+/**
+ * Grade attempts after the response (Next.js `after`, so a redeploy waits
+ * for it), `concurrency` at a time. They count as scheduled from now on, so
+ * the attempt sweeper leaves them alone. Never throws.
+ */
+export function gradeInBackground(
+  label: string,
+  attemptIds: readonly string[],
   concurrency = 2,
-) {
-  let graded = 0;
-  let failed = 0;
-  const queue = [...attemptIds];
-  const worker = async () => {
-    for (;;) {
-      const id = queue.shift();
-      if (!id) return;
-      try {
-        await gradeAttempt(id);
-        graded++;
-      } catch (err) {
-        failed++;
-        logServerError("grading.attempt_failed", err, { attemptId: id });
-      }
-    }
-  };
-  await Promise.all(
-    Array.from(
-      { length: Math.max(1, Math.min(concurrency, queue.length)) },
-      worker,
-    ),
-  );
-  return { graded, failed };
+): void {
+  if (attemptIds.length === 0) return;
+  for (const id of attemptIds) markGradingScheduled(id);
+  runInBackground(label, async () => {
+    await gradeAttemptsInBackground(attemptIds, concurrency);
+  });
 }
 
 export async function getAssignmentOrThrow(db: DB, id: string) {
@@ -411,6 +402,25 @@ export async function attemptCountsByAssignment(
     });
   }
   return map;
+}
+
+/** Whether the student has a later attempt at the same afname. */
+async function hasNewerAttempt(
+  db: AuditDb,
+  attempt: { assignmentId: string; userId: string; attemptNumber: number },
+): Promise<boolean> {
+  const [newer] = await db
+    .select({ id: attempts.id })
+    .from(attempts)
+    .where(
+      and(
+        eq(attempts.assignmentId, attempt.assignmentId),
+        eq(attempts.userId, attempt.userId),
+        gt(attempts.attemptNumber, attempt.attemptNumber),
+      ),
+    )
+    .limit(1);
+  return !!newer;
 }
 
 /** Keep only the attempt with the highest attempt number per user. */
@@ -739,9 +749,7 @@ export async function autoSubmitAttempts(
     })),
   );
   const ids = submitted.map((s) => s.id);
-  runInBackground("grading.auto_submit_failed", async () => {
-    await gradeAttemptsSafely(ids);
-  });
+  gradeInBackground("grading.auto_submit_failed", ids);
   return ids;
 }
 
@@ -1716,6 +1724,7 @@ export const assignmentRouter = createTRPCRouter({
         roster.map((r) => r.id),
       );
       const latest = latestPerUser(attemptRows);
+      const displayNumbers = attemptDisplayNumbers(attemptRows);
       const attemptCounts = new Map<string, number>();
       for (const r of attemptRows)
         attemptCounts.set(r.userId, (attemptCounts.get(r.userId) ?? 0) + 1);
@@ -1750,7 +1759,8 @@ export const assignmentRouter = createTRPCRouter({
           attempt: at
             ? {
                 id: at.id,
-                attemptNumber: at.attemptNumber,
+                /** "Poging X van attemptCount" (see attempt-number.ts). */
+                attemptNumber: displayNumbers.get(at.id) ?? at.attemptNumber,
                 status: at.status,
                 startedAt: at.startedAt,
                 deadlineAt: at.deadlineAt,
@@ -1917,18 +1927,7 @@ export const assignmentRouter = createTRPCRouter({
       const overridden = await assertNotRestricted(ctx.db, attempt.userId, {
         override: input.overrideRestriction,
       });
-      const [newer] = await ctx.db
-        .select({ id: attempts.id })
-        .from(attempts)
-        .where(
-          and(
-            eq(attempts.assignmentId, attempt.assignmentId),
-            eq(attempts.userId, attempt.userId),
-            sql`${attempts.attemptNumber} > ${attempt.attemptNumber}`,
-          ),
-        )
-        .limit(1);
-      if (newer) {
+      if (await hasNewerAttempt(ctx.db, attempt)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
@@ -2038,6 +2037,17 @@ export const assignmentRouter = createTRPCRouter({
             consequence: "Je kunt deze poging daarom niet wissen.",
           },
         );
+        // Only the latest attempt can be reset (the monitor shows that
+        // one). A newer one means the student started again after the
+        // teacher opened the dialog: refuse instead of deleting work the
+        // teacher did not mean, or leaving a gap in the attempt numbers.
+        if (await hasNewerAttempt(tx, attempt)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "De leerling heeft al een nieuwere poging. Vernieuw de pagina: alleen de laatste poging kan worden gereset.",
+          });
+        }
         // Written before the delete: afterwards the attempt id no longer
         // tells whose work it was.
         await auditFromCtx(

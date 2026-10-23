@@ -23,6 +23,19 @@ export function pendingReviewByQuestion(
   return new Map(questions.map((q) => [q.id, q.needsReview]));
 }
 
+/**
+ * How many handed-in attempts "Opnieuw nakijken" will regrade, as far as the
+ * Resultaten page knows: it only has the attempt shown per student, so the
+ * number is exact only when nobody started more than once. `null` otherwise
+ * (the dialog then says "alle ingeleverde pogingen" without a number).
+ */
+export function regradeCount(
+  rows: readonly { attemptCount: number }[],
+  submitted: number,
+): number | null {
+  return rows.every((r) => r.attemptCount <= 1) ? submitted : null;
+}
+
 export type IdenticalAnswers = {
   /** Identical answers without a manual score: a bulk save may grade these. */
   ungraded: string[];

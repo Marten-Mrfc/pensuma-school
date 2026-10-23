@@ -1133,6 +1133,79 @@ async function reliability(): Promise<void> {
     files.tests.map((t) => t.actual?.trim()).join(" | "),
   );
 
+  section("Module state does not survive between runs of one job");
+  const [moduleAttrs] = await gradeCodeBatch([
+    gradeItem(
+      [
+        "import sys, math, json, __main__",
+        "seen = [hasattr(sys, 'merk'), hasattr(math, 'merk'), hasattr(__main__, 'merk'), math.pi == 3, '/tmp/merk' in sys.path, type(json.dumps).__name__]",
+        "sys.merk = input()",
+        "math.merk = 1",
+        "__main__.merk = 1",
+        "math.pi = 3",
+        "json.dumps = len",
+        "sys.path.append('/tmp/merk')",
+        "print(seen)",
+      ].join("\n"),
+      [
+        ioTest(
+          "eerste",
+          "Geheim",
+          "[False, False, False, False, False, 'function']",
+        ),
+        ioTest(
+          "tweede",
+          "Open",
+          "[False, False, False, False, False, 'function']",
+        ),
+      ],
+    ),
+  ]);
+  check(
+    "module attributes, sys.path and patched functions are reset after each run",
+    moduleAttrs.fraction === 1,
+    moduleAttrs.tests.map((t) => t.actual?.trim()).join(" | "),
+  );
+  const [replaced] = await gradeCodeBatch([
+    gradeItem(
+      [
+        "import sys",
+        "m = sys.modules['math']",
+        "print(type(m).__name__, hasattr(m, 'sqrt'))",
+        "sys.modules['math'] = type(sys)('nep')",
+      ].join("\n"),
+      [ioTest("a", "", "module True"), ioTest("b", "", "module True")],
+    ),
+  ]);
+  check(
+    "a replaced sys.modules entry is put back",
+    replaced.fraction === 1,
+    replaced.tests.map((t) => t.actual?.trim()).join(" | "),
+  );
+  const fnTests = q({
+    tests: [
+      { id: "f1", kind: "function", call: "dubbel(2)", expected: "4" },
+      { id: "f2", kind: "function", call: "dubbel(5)", expected: "10" },
+    ],
+  }).tests;
+  const [patchedHarness] = await gradeCodeBatch([
+    gradeItem(
+      [
+        "import __main__",
+        "def dubbel(x):",
+        "    if x == 2:  # only during the first test",
+        "        __main__._serialize = lambda *a, **k: {'t': 'int', 'v': 999}",
+        "    return x * 2",
+      ].join("\n"),
+      fnTests,
+    ),
+  ]);
+  check(
+    "a patched harness function is restored for the next test",
+    patchedHarness.tests[1]?.passed === true,
+    patchedHarness.tests.map((t) => `${t.testId}:${t.actual}`).join(" | "),
+  );
+
   section("One job's time is shared fairly between its questions");
   const savedJobTimeout = process.env.GRADER_JOB_TIMEOUT_MS;
   process.env.GRADER_JOB_TIMEOUT_MS = "6000";

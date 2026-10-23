@@ -10,6 +10,7 @@ import {
   writeAudit,
   writeAuditMany,
 } from "@/server/privacy/audit-writer";
+import { logServerError } from "@/server/privacy/error-log";
 import { clientIp } from "@/server/security/client-ip";
 
 export {
@@ -120,15 +121,13 @@ function seenRecently(key: string, now: number): boolean {
   return false;
 }
 
+/**
+ * A read-audit insert failed: one log line with the action and the error
+ * code, never the error message (Drizzle quotes the row's values, such as
+ * the leerlingnummer).
+ */
 function logAuditError(action: AuditAction, error: unknown) {
-  console.error(
-    JSON.stringify({
-      level: "error",
-      msg: "audit_write_failed",
-      action,
-      error: error instanceof Error ? error.message : String(error),
-    }),
-  );
+  logServerError("audit_write_failed", error, { action });
 }
 
 /** Run after the response (or detached outside a request scope). */

@@ -66,3 +66,12 @@ export function initials(name: string): string {
   const last = source.length > 1 ? (source[source.length - 1]?.[0] ?? "") : "";
   return (first + last).toUpperCase() || "?";
 }
+
+/**
+ * "2 leerlingen overgeslagen: …": students a bulk action skipped because
+ * their processing is restricted (AVG art. 18). Empty when none.
+ */
+export function restrictedSkipNote(skipped: number): string {
+  if (skipped <= 0) return "";
+  return `${plural(skipped, "leerling", "leerlingen")} overgeslagen: voor ${skipped === 1 ? "deze leerling" : "hen"} is de verwerking beperkt (AVG art. 18).`;
+}

@@ -33,7 +33,7 @@ import {
   type QuestionSpec,
   q,
 } from "../support/factories";
-import { waitForGrading } from "../support/wait";
+import { settleGrading, waitForGrading } from "../support/wait";
 
 beforeEach(resetDatabase);
 
@@ -810,8 +810,12 @@ describe("AVG art. 18: a restriction stops teacher changes on the server", () =>
     const res = await t.review.regradeAssignment({
       assignmentId: w.afname.id,
     });
-    expect(res).toMatchObject({ total: 2, graded: 1, skippedRestricted: 1 });
-    await drainGrading();
+    expect(res).toMatchObject({
+      total: 2,
+      scheduled: 1,
+      skippedRestricted: 1,
+    });
+    await settleGrading();
   });
 
   test("assignment.reopenAttempt: refused, unless overridden (and then logged)", async () => {

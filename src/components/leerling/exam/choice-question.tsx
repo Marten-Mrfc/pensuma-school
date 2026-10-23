@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import { useId } from "react";
 import { Markdown } from "@/components/app/markdown";
+import { optionLetter } from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
 import type { ChoiceData } from "./types";
 
@@ -14,8 +15,6 @@ export interface ChoiceQuestionProps {
   onChange: (selected: string[]) => void;
   disabled?: boolean;
 }
-
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** Big selectable option cards (radio or checkbox behaviour). */
 export function ChoiceQuestion({
@@ -79,7 +78,8 @@ export function ChoiceQuestion({
               {isChosen ? (
                 <Check className="size-4" strokeWidth={3} />
               ) : (
-                LETTERS[index]
+                // Same as the teacher's editor: A–Z, then 27, 28, …
+                optionLetter(index)
               )}
             </span>
             <div className="min-w-0 flex-1 pt-1 text-[0.95rem] [&_p]:my-0 [&_pre]:my-2">

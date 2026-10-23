@@ -1,4 +1,3 @@
-import { forwardRef } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -28,15 +27,17 @@ export function parseExtraMinutes(value: string): number | null {
  * marked invalid and says what to fix (WCAG 3.3.1), instead of the submit
  * button silently staying disabled.
  */
-export const MinutesField = forwardRef<
-  HTMLInputElement,
-  {
-    id: string;
-    value: string;
-    onChange: (value: string) => void;
-    showError: boolean;
-  }
->(function MinutesField({ id, value, onChange, showError }, ref) {
+export function MinutesField({
+  id,
+  value,
+  onChange,
+  showError,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  showError: boolean;
+}) {
   const inputId = `${id}-minutes`;
   const hintId = `${id}-minutes-hint`;
   const errorId = `${id}-minutes-error`;
@@ -50,7 +51,6 @@ export const MinutesField = forwardRef<
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-28">
           <Input
-            ref={ref}
             id={inputId}
             type="number"
             inputMode="numeric"
@@ -88,4 +88,4 @@ export const MinutesField = forwardRef<
       </p>
     </div>
   );
-});
+}

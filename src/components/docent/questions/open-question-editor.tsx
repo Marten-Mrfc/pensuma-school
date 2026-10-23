@@ -11,6 +11,7 @@ import type { QuestionIssue } from "@/lib/questions/validate";
 import { EditorSection, FieldLabel, NumberInput } from "./fields";
 import { IssueList } from "./issue-list";
 import { RubricItemsEditor } from "./rubric-items-editor";
+import { OPEN_QUESTION_VISIBILITY_NOTE } from "./visibility-notes";
 
 export function OpenQuestionEditor({
   data,
@@ -31,7 +32,7 @@ export function OpenQuestionEditor({
   return (
     <EditorSection
       title="Nakijken"
-      description="Open vragen kijk je zelf na. Het modelantwoord, de criteria en de toelichting zie jij tijdens het nakijken; leerlingen zien ze nooit."
+      description={OPEN_QUESTION_VISIBILITY_NOTE}
       icon={<ClipboardCheck />}
     >
       <IssueList

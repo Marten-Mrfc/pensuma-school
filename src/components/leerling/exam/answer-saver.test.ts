@@ -322,4 +322,3 @@ describe("AnswerSaver and a refused answer", () => {
     expect(saver.getSnapshot().rejected).toBe(first);
   });
 });
-

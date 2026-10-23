@@ -56,9 +56,7 @@ export function createTestTrpc() {
 
 /** The opening tags of every element whose attributes match `pattern`. */
 export function tagsMatching(html: string, pattern: RegExp): string[] {
-  return (html.match(/<[a-z][^>]*>/g) ?? []).filter((tag) =>
-    pattern.test(tag),
-  );
+  return (html.match(/<[a-z][^>]*>/g) ?? []).filter((tag) => pattern.test(tag));
 }
 
 /** Visible text: tags removed, entities for quotes/ampersands decoded. */

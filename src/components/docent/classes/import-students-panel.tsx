@@ -31,6 +31,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { parseStudentList } from "@/lib/import/parse-students";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { useResultAnnouncement } from "../a11y/result-announcement";
+import { existingLabel, importPreviewSummary } from "../a11y/result-messages";
 
 export type ImportResult = RouterOutputs["student"]["import"];
 
@@ -146,6 +148,7 @@ export function ImportStudentsPanel({
     return rows.sort((a, b) => a.line - b.line);
   }, [parsed, existing]);
 
+  const hasInput = text.trim().length > 0;
   const counts = useMemo(() => {
     const c = { new: 0, existing: 0, member: 0, error: 0, renamable: 0 };
     for (const r of preview) {
@@ -158,6 +161,16 @@ export function ImportStudentsPanel({
     }
     return c;
   }, [preview]);
+
+  // Read the preview counts aloud once the check is done (WCAG 4.1.3).
+  useResultAnnouncement({
+    key: hasInput
+      ? `${counts.new}|${counts.existing}|${counts.member}|${counts.error}`
+      : "",
+    ready: !checking,
+    message: hasInput ? importPreviewSummary(counts) : "",
+    delayMs: 300,
+  });
 
   const importable = preview.filter((r) => r.status.kind !== "error");
   /** Rows that actually change something (members are only sent for renaming). */
@@ -215,8 +228,6 @@ export function ImportStudentsPanel({
       })),
     });
   }
-
-  const hasInput = text.trim().length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -321,7 +332,7 @@ export function ImportStudentsPanel({
               <SummaryChip
                 tone="info"
                 icon={UsersRound}
-                label={`${counts.existing} bestaan al`}
+                label={existingLabel(counts.existing)}
               />
               {counts.member > 0 ? (
                 <SummaryChip

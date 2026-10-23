@@ -15,7 +15,6 @@ import { DISABLED_AUTH_PATHS } from "@/server/security/auth-routes";
 import { clientIp, trustedProxiesFromEnv } from "@/server/security/client-ip";
 import { loggableErrorMessage } from "@/server/security/errors";
 import {
-  ACCOUNT_LOCKED_MESSAGE,
   type AccountKey,
   accountKeyFor,
   clearAccountKey,
@@ -294,7 +293,7 @@ export const auth = betterAuth({
       });
       if (!result.ok) {
         throw new APIError("TOO_MANY_REQUESTS", {
-          message: ACCOUNT_LOCKED_MESSAGE,
+          message: result.message,
           code: "ACCOUNT_LOCKED",
         });
       }

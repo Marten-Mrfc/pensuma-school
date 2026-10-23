@@ -7,8 +7,11 @@
  *     exits so Docker/Swarm restarts the container. Without that, Next keeps
  *     a server running that answers 500 on every route, also after the
  *     database is back;
- *  3. starts the retention scheduler (disable with RETENTION_SCHEDULER=false);
- *  4. starts the attempt sweeper (disable with ATTEMPT_SWEEPER=false): it
+ *  3. backfills the "for selected students" flag on afnames created before
+ *     it existed (idempotent; also runs lazily on first use). In the
+ *     background: a failure is logged and never stops the start-up;
+ *  4. starts the retention scheduler (disable with RETENTION_SCHEDULER=false);
+ *  5. starts the attempt sweeper (disable with ATTEMPT_SWEEPER=false): it
  *     auto-submits expired attempts and re-grades attempts whose grading was
  *     lost in a restart.
  */
@@ -18,8 +21,33 @@ function logJson(entry: Record<string, unknown>) {
   else console.log(line);
 }
 
+/**
+ * The message for the log, without the parameters a failed database query
+ * appends (they can hold personal data; see src/server/privacy/error-log.ts).
+ */
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/\nparams:[\s\S]*$/, "\nparams: [weggelaten]")
+    .slice(0, 500);
+}
+
+/** Start-up backfill of the targeting flag; never throws, never blocks. */
+function backfillTargetingInBackground(): void {
+  void (async () => {
+    const [{ db }, { ensureTargetingBackfill }] = await Promise.all([
+      import("./server/db"),
+      import("./server/services/assignment-targets"),
+    ]);
+    // Shares its promise with the lazy callers; logs its own failure.
+    await ensureTargetingBackfill(db);
+  })().catch((error: unknown) => {
+    logJson({
+      level: "error",
+      msg: "targeting_backfill_failed",
+      error: errorMessage(error),
+    });
+  });
 }
 
 export async function register() {
@@ -49,6 +77,7 @@ export async function register() {
     }
   }
   if (building) return;
+  backfillTargetingInBackground();
   if (process.env.RETENTION_SCHEDULER !== "false") {
     try {
       const { startRetentionScheduler } = await import(

@@ -69,12 +69,14 @@ function overview(lastClosed: Overview["lastClosed"]): Overview {
   } as Overview;
 }
 
-function renderDashboard(lastClosed: Overview["lastClosed"]) {
+function renderDashboard(
+  lastClosed: Overview["lastClosed"],
+  answersNeedingReview = 6,
+) {
   const { queryClient, trpc, render } = createTestTrpc();
-  queryClient.setQueryData(
-    trpc.dashboard.overview.queryKey(),
-    overview(lastClosed),
-  );
+  const data = overview(lastClosed);
+  data.counts.answersNeedingReview = answersNeedingReview;
+  queryClient.setQueryData(trpc.dashboard.overview.queryKey(), data);
   return render(<DashboardView />);
 }
 
@@ -123,6 +125,18 @@ describe("dashboard pass-mark sentence agrees with the count (A40)", () => {
     const text = textOf(renderDashboard(closed(0, 1)));
     expect(text).toContain("1 leerling leverde in en heeft geen voldoende.");
     expect(text).not.toContain("van de 1 leerlingen");
+  });
+
+  test("'Te beoordelen': one answer waits, not 'antwoorden wachten'", () => {
+    expect(textOf(renderDashboard(closed(1, 2), 1))).toContain(
+      "Te beoordelen 1 antwoord wacht op jou",
+    );
+    expect(textOf(renderDashboard(closed(1, 2), 6))).toContain(
+      "Te beoordelen 6 antwoorden wachten op jou",
+    );
+    expect(textOf(renderDashboard(closed(1, 2), 0))).toContain(
+      "Te beoordelen 0 alles is nagekeken",
+    );
   });
 
   test("one of several students passed: 'heeft', not 'hebben'", () => {

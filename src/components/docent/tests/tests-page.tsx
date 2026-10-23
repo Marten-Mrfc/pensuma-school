@@ -47,6 +47,7 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { useResultAnnouncement } from "../a11y/result-announcement";
+import { testsFoundMessage } from "../a11y/result-messages";
 import { useRovingRadioGroup } from "../a11y/roving-radio";
 import { downloadTestJson } from "./download";
 import { ExampleTestsDialog } from "./example-tests-dialog";
@@ -66,12 +67,6 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 const FILTER_STORAGE_KEY = "pensuma:toetsen:filter";
-
-/** Status message after searching or filtering the list of tests. */
-export function testsFoundMessage(count: number): string {
-  if (count === 0) return "Geen toetsen gevonden.";
-  return count === 1 ? "1 toets gevonden." : `${count} toetsen gevonden.`;
-}
 
 export function TestsPage() {
   const trpc = useTRPC();

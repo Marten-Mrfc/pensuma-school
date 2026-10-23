@@ -75,8 +75,10 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
 )
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
-const DialogScrollContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, FocusReturningContentProps>(
-  ({ className, children, onPointerDownOutside, ...props }, ref) => (
+const DialogScrollContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  FocusReturningContentProps
+>(({ className, children, onPointerDownOutside, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay
       data-uipkge=""
@@ -116,8 +118,7 @@ const DialogScrollContent = React.forwardRef<React.ElementRef<typeof DialogPrimi
       </FocusReturningContent>
     </DialogPrimitive.Overlay>
   </DialogPrimitive.Portal>
-  ),
-)
+))
 DialogScrollContent.displayName = 'DialogScrollContent'
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

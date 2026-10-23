@@ -5,7 +5,10 @@ import {
   actionsByCategory,
   auditActionCategory,
   auditActionLabel,
+  auditRowLabel,
   formatAuditDetails,
+  PROCEDURE_LABELS,
+  procedureLabel,
 } from "./audit-format";
 
 describe("formatAuditDetails", () => {
@@ -74,8 +77,8 @@ describe("formatAuditDetails", () => {
   test("empty and unknown keys", () => {
     expect(formatAuditDetails(null)).toBe("");
     expect(formatAuditDetails({})).toBe("");
-    expect(formatAuditDetails({ path: "student.update", extra: 1500 })).toBe(
-      "functie: student.update · extra: 1.500",
+    expect(formatAuditDetails({ path: "onbekend.pad", extra: 1500 })).toBe(
+      "functie: onbekend.pad · extra: 1.500",
     );
   });
 
@@ -168,5 +171,134 @@ describe("specific actions instead of the generic 'Wijziging'", () => {
     expect(formatAuditDetails({ rows: 25, restrictedRows: 1 })).toBe(
       "regels: 25 · zonder resultaten (beperking AVG art. 18): 1",
     );
+  });
+});
+
+describe("generic teacher changes ('trpc.mutation') read as Dutch", () => {
+  // Rows exactly as /docent/privacy/logboek showed them before.
+  const rows: [Record<string, unknown>, string, string][] = [
+    [
+      {
+        path: "assignment.extendTime",
+        attemptId: "a",
+        minutes: 5,
+        deadlineAt: "2026-10-23T05:04:47.614Z",
+        totalExtraMinutes: 5,
+      },
+      "Extra tijd gegeven",
+      "minuten: 5 · eindtijd: 23-10-2026 07:04 · extra tijd in totaal (minuten): 5",
+    ],
+    [
+      {
+        path: "assignment.reopenAttempt",
+        attemptId: "a",
+        minutes: 15,
+        deadlineAt: "2026-10-23T05:15:56.076Z",
+      },
+      "Poging heropend",
+      "minuten: 15 · eindtijd: 23-10-2026 07:15",
+    ],
+    [
+      {
+        path: "class.delete",
+        id: "c",
+        studentsCount: 1,
+        deletedAttempts: 1,
+        assignmentsCount: 1,
+      },
+      "Klas verwijderd",
+      "leerlingen: 1 · pogingen verwijderd: 1 · afnames: 1",
+    ],
+    [
+      {
+        path: "question.delete",
+        id: "q",
+        answersCount: 1,
+        studentsCount: 1,
+        attemptsAffected: 1,
+        assignmentsAffected: 1,
+      },
+      "Vraag verwijderd",
+      "antwoorden: 1 · leerlingen: 1 · pogingen: 1 · afnames: 1",
+    ],
+    [{ path: "assignment.close", id: "x" }, "Afname gesloten", ""],
+    [{ path: "test.setStatus", id: "t" }, "Status van een toets gewijzigd", ""],
+    [{ path: "code.grade" }, "Code van een vraag uitgevoerd", ""],
+    [
+      { path: "review.regradeAssignment", assignmentId: "a" },
+      "Afname opnieuw nagekeken",
+      "",
+    ],
+    [{ path: "student.create", classId: "c" }, "Leerling aangemaakt", ""],
+    [
+      { path: "question.reorder", testId: "t", orderedIdsCount: 12 },
+      "Volgorde van de vragen gewijzigd",
+      "vragen: 12",
+    ],
+  ];
+
+  test("the row label says what happened, the details hold no code names", () => {
+    for (const [details, label, text] of rows) {
+      expect(auditRowLabel("trpc.mutation", details)).toBe(label);
+      const shown = formatAuditDetails(details, 8, "trpc.mutation");
+      expect(shown).toBe(text);
+      expect(shown).not.toMatch(/[a-z][A-Z]|\.[a-z]/);
+      expect(shown).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    }
+  });
+
+  test("an unknown procedure keeps 'Wijziging' and shows its path", () => {
+    expect(auditRowLabel("trpc.mutation", { path: "nieuw.ding" })).toBe(
+      "Wijziging",
+    );
+    expect(formatAuditDetails({ path: "nieuw.ding" }, 8, "trpc.mutation")).toBe(
+      "functie: nieuw.ding",
+    );
+    expect(auditRowLabel("trpc.mutation", null)).toBe("Wijziging");
+  });
+
+  test("other rows keep their own label; their path names the function", () => {
+    expect(
+      auditRowLabel("security.rate_limited", { path: "portal.saveAnswer" }),
+    ).toBe("Te veel verzoeken (afgeremd)");
+    expect(
+      formatAuditDetails(
+        { path: "privacy.eraseStudent" },
+        8,
+        "security.rate_limited",
+      ),
+    ).toBe("functie: leerling wissen");
+    expect(
+      formatAuditDetails(
+        { path: "assignment.delete", attemptsCount: 1 },
+        8,
+        "attempt.reset",
+      ),
+    ).toBe("functie: afname verwijderen · pogingen: 1");
+    expect(procedureLabel("portal.heartbeat")).toBe(
+      "verbinding tijdens een toets controleren",
+    );
+  });
+
+  test("a reset attempt: status and attempt number in Dutch", () => {
+    expect(
+      formatAuditDetails(
+        { status: "submitted", attemptId: "a", attemptNumber: 4 },
+        8,
+        "attempt.reset",
+      ),
+    ).toBe("status: ingeleverd · pogingnummer: 4");
+  });
+
+  test("labels are Dutch phrases, not identifiers", () => {
+    for (const [path, { fn, done }] of Object.entries(PROCEDURE_LABELS)) {
+      expect(path).toMatch(/^[a-z]+\.[A-Za-z]+$/);
+      expect(fn).not.toMatch(/[a-z][A-Z]|_|\.[a-z]/);
+      expect(fn[0]).toBe(fn[0]?.toLowerCase());
+      if (done) {
+        expect(done).not.toMatch(/[a-z][A-Z]|_|\.[a-z]/);
+        expect(done[0]).toBe(done[0]?.toUpperCase());
+      }
+    }
   });
 });

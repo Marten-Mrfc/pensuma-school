@@ -1,7 +1,7 @@
 "use client";
 
 import { Library, Loader2, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   QUESTION_TYPE_ICONS,
   QUESTION_TYPE_TONE,
@@ -23,6 +23,25 @@ import {
   type QuestionTemplate,
 } from "@/lib/questions/templates";
 import { cn } from "@/lib/utils";
+
+/**
+ * Whether focus already moved on to the page while the menu was closing:
+ * the new question's Titel field (the server answered before the close
+ * animation ended) or a dialog an item opened. The menu must then leave it
+ * there instead of moving it back to its trigger (WCAG 2.4.3). `menu` is
+ * the menu content (detached by the time the menu has closed).
+ */
+export function focusMovedOutOfMenu(
+  active: Element | null,
+  body: Element | null,
+  menu: EventTarget | null,
+): boolean {
+  if (!active || active === body || !active.isConnected) return false;
+  const container = menu as Partial<Pick<Element, "contains">> | null;
+  return !(
+    typeof container?.contains === "function" && container.contains(active)
+  );
+}
 
 const GROUPS: { type: QuestionType; label: string }[] = [
   { type: "code", label: "Programmeren" },
@@ -52,15 +71,25 @@ export function AddQuestionMenu({
   className?: string;
   align?: "start" | "end" | "center";
 }) {
+  const [open, setOpen] = useState(false);
+  // While a question is being created the trigger stays focusable
+  // (aria-disabled, the menu just doesn't open): a disabled button would
+  // drop keyboard focus to <body> (WCAG 2.4.3).
+  const blocked = Boolean(disabled || pending);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild disabled={disabled || pending}>
+    <DropdownMenu
+      open={open && !blocked}
+      onOpenChange={(next) => setOpen(next && !blocked)}
+    >
+      <DropdownMenuTrigger asChild disabled={disabled}>
         {trigger ?? (
           <Button
             variant={variant}
             size={size}
             className={className}
-            disabled={disabled || pending}
+            disabled={disabled}
+            aria-disabled={pending || undefined}
+            aria-busy={pending || undefined}
           >
             {pending ? (
               <Loader2
@@ -77,6 +106,17 @@ export function AddQuestionMenu({
       <DropdownMenuContent
         align={align}
         collisionPadding={12}
+        onCloseAutoFocus={(event) => {
+          if (
+            focusMovedOutOfMenu(
+              document.activeElement,
+              document.body,
+              event.target,
+            )
+          ) {
+            event.preventDefault();
+          }
+        }}
         className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-[min(40rem,calc(100vw-1.5rem))] overflow-y-auto p-1.5"
       >
         <div className="grid md:grid-cols-2 md:gap-x-1">

@@ -1,11 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import {
+  ASSIGNMENT_EVENT_TYPES,
+  codeGradingResultSchema,
+} from "@/lib/questions/schema";
+import { MONITORING_EVENT_TYPES } from "./event-details";
+import {
   buildStudentExport,
+  EXPORT_GUIDE,
   type ExportAttemptRow,
   exportFileName,
   myExportFileName,
   type StudentExportRows,
 } from "./export-format";
+import { HOLD_KIND_LABELS } from "./retention";
 import { privacySettingsSchema } from "./settings";
 
 const NOW = new Date("2026-10-22T12:00:00Z");
@@ -204,7 +211,7 @@ describe("buildStudentExport", () => {
 
   test("admin export: full shape", () => {
     const out = buildStudentExport(rows(), { audience: "admin", now: NOW });
-    expect(out.schemaVersion).toBe(2);
+    expect(out.schemaVersion).toBe(3);
     expect(out.generatedAt).toBe(NOW.toISOString());
     expect(out.controller).toEqual({
       school: "Het Lyceum",
@@ -506,6 +513,98 @@ describe("export completeness (schemaVersion 2)", () => {
     const bare = buildStudentExport(rows(), { audience: "admin", now: NOW });
     expect(bare.holds).toEqual([]);
     expect(bare.targetedAssignments).toEqual([]);
+  });
+});
+
+describe("uitleg: the file explains itself in Dutch", () => {
+  const isDutchSentence = (text: string) =>
+    text.trim().length >= 3 && !/\b[a-z]+_[a-z]+\b/.test(text);
+
+  test("comes first after the version, for both audiences", () => {
+    for (const audience of ["admin", "student"] as const) {
+      const out = buildStudentExport(rows(), { audience, now: NOW });
+      expect(Object.keys(out).slice(0, 4)).toEqual([
+        "schemaVersion",
+        "generatedAt",
+        "audience",
+        "uitleg",
+      ]);
+      expect(out.uitleg).toEqual(EXPORT_GUIDE);
+      expect(out.uitleg.overDitBestand).toContain("JSON");
+      expect(out.uitleg.overDitBestand).toContain("Mijn gegevens");
+      expect(out.uitleg.tijden).toContain("UTC");
+    }
+  });
+
+  test("explains that attemptNumber keeps the stored number (gaps after a reset)", () => {
+    // Pensuma itself numbers the attempts that still exist 1, 2, 3, …; the
+    // file keeps the stored number, which skips a reset attempt.
+    expect(EXPORT_GUIDE.onderdelen.attempts).toContain("attemptNumber");
+    expect(EXPORT_GUIDE.onderdelen.attempts).toContain("niet opnieuw gebruikt");
+  });
+
+  test("every section of the file is explained", () => {
+    const out = buildStudentExport(rows(), { audience: "admin", now: NOW });
+    for (const key of Object.keys(out)) {
+      if (key === "uitleg") continue;
+      expect(EXPORT_GUIDE.onderdelen[key]).toBeString();
+    }
+    for (const text of Object.values(EXPORT_GUIDE.onderdelen))
+      expect(isDutchSentence(text)).toBe(true);
+  });
+
+  test("every code that can appear has a Dutch meaning", () => {
+    const { codes } = EXPORT_GUIDE;
+    expect(Object.keys(codes.eventType).sort()).toEqual(
+      [
+        ...new Set([...ASSIGNMENT_EVENT_TYPES, ...MONITORING_EVENT_TYPES]),
+      ].sort(),
+    );
+    expect(Object.keys(codes.resultStatus).sort()).toEqual(
+      [...codeGradingResultSchema.shape.status.options].sort(),
+    );
+    expect(codes.mode).toEqual({ exam: "toets", practice: "oefentoets" });
+    expect(codes.status).toEqual({
+      submitted: "ingeleverd",
+      in_progress: "nog bezig",
+    });
+    expect(codes.actorRole).toEqual({
+      admin: "een docent",
+      student: "jij",
+      system: "Pensuma zelf (automatisch)",
+    });
+    expect(codes.holdKind).toEqual(HOLD_KIND_LABELS);
+    expect(Object.keys(codes.answerType).sort()).toEqual([
+      "code",
+      "multiple_choice",
+      "open",
+    ]);
+    for (const legend of Object.values(codes))
+      for (const text of Object.values(legend))
+        expect(isDutchSentence(text)).toBe(true);
+  });
+
+  test("the codes and event details in an export are all in the legend", () => {
+    const out = buildStudentExport(rows(), { audience: "admin", now: NOW });
+    const { codes, eventDetails } = out.uitleg;
+    expect(codes.audience[out.audience]).toBeString();
+    for (const a of out.attempts) {
+      expect(codes.mode[a.mode]).toBeString();
+      expect(codes.status[a.status]).toBeString();
+      for (const ans of a.answers)
+        expect(codes.answerType[ans.type]).toBeString();
+      for (const e of a.events) {
+        expect(
+          codes.eventType[e.type as keyof typeof codes.eventType],
+        ).toBeString();
+        for (const key of Object.keys(e.details ?? {}))
+          expect(eventDetails[key]).toBeString();
+      }
+    }
+    for (const entry of out.accessLog)
+      expect(
+        codes.actorRole[entry.actorRole as keyof typeof codes.actorRole],
+      ).toBeString();
   });
 });
 

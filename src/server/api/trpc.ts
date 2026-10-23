@@ -14,6 +14,7 @@
  * only), and every FORBIDDEN on a student procedure is logged as
  * `security.access_denied`. Audit failures are logged, never thrown.
  */
+
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { env } from "@/env";
@@ -22,6 +23,7 @@ import type { AuditAction } from "@/lib/privacy/audit-actions";
 import { pickAuditIds } from "@/lib/privacy/audit-sanitize";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
+import { logServerError } from "@/server/privacy/error-log";
 import { clientIp } from "@/server/security/client-ip";
 import { formatErrorShape, RateLimitError } from "@/server/security/errors";
 import { take } from "@/server/security/rate-limit";
@@ -72,16 +74,8 @@ export const createTRPCRouter = t.router;
 export const middleware = t.middleware;
 
 function logAuditFailure(action: AuditAction, path: string, error: unknown) {
-  console.error(
-    JSON.stringify({
-      level: "error",
-      ts: new Date().toISOString(),
-      event: "audit_write_failed",
-      action,
-      path,
-      error: error instanceof Error ? error.message.slice(0, 300) : "unknown",
-    }),
-  );
+  // Never log the raw message: Drizzle quotes the row's parameters.
+  logServerError("audit_write_failed", error, { action, path });
 }
 
 /** Writes one audit row for the request's actor; never throws. */

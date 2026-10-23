@@ -37,7 +37,7 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { CodeResultView } from "./code-result-view";
-import { identicalAnswersNote } from "./copy";
+import { identicalAnswersNote, wordCountLabel } from "./copy";
 import {
   clampIndex,
   type FocusRequest,
@@ -152,7 +152,8 @@ export function GradingView({
   );
 }
 
-function QuestionPicker({
+/** The question tabs (exported for the render tests). */
+export function QuestionPicker({
   questions,
   active,
   onSelect,
@@ -206,7 +207,8 @@ function QuestionPicker({
   );
 }
 
-function QuestionGrader({
+/** Grading one question, student by student (exported for the render tests). */
+export function QuestionGrader({
   assignmentId,
   question,
 }: {
@@ -418,7 +420,7 @@ function QuestionGrader({
           <h2
             ref={doneRef}
             tabIndex={-1}
-            className="rounded-sm text-lg font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+            className="rounded-sm px-1 text-lg font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
           >
             Klaar met deze vraag!
           </h2>
@@ -449,7 +451,7 @@ function QuestionGrader({
                   <h2
                     ref={studentRef}
                     tabIndex={-1}
-                    className="rounded-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+                    className="-mx-1 rounded-sm px-1 font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
                   >
                     {label(current)}
                     <span className="sr-only">
@@ -600,7 +602,8 @@ function QuestionGrader({
                 </div>
               ) : null}
               <p className="text-xs text-muted-foreground">
-                Maximaal {formatNumber(question.points)} punten.
+                Maximaal {formatNumber(question.points)}{" "}
+                {question.points === 1 ? "punt" : "punten"}.
               </p>
             </div>
           </aside>
@@ -681,7 +684,7 @@ function StudentAnswer({
         {text}
       </div>
       <span className="text-xs text-muted-foreground tabular-nums">
-        {text.trim().split(/\s+/).length} woorden
+        {wordCountLabel(text)}
       </span>
     </div>
   ) : (

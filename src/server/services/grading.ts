@@ -30,6 +30,7 @@ import {
   gradeCodeBatch,
 } from "@/server/grader";
 import { isGraderUnavailable } from "@/server/grader/errors";
+import { logServerError } from "@/server/privacy/error-log";
 
 export { effectiveScore, isBlankResponse, scoreMultipleChoice };
 
@@ -133,7 +134,7 @@ async function computeOutcome(
       } catch (err) {
         // Not this answer's fault: the caller keeps the previous state.
         if (isGraderUnavailable(err)) throw err;
-        console.error("[grading] gradeCode failed", err);
+        logServerError("grading.grade_code_failed", err);
         const message =
           err instanceof Error ? err.message : "Onbekende fout in de nakijker";
         return {
@@ -379,6 +380,8 @@ export class GradingIncompleteError extends Error {
     readonly attemptId: string,
     readonly reason: "grader_unavailable" | "internal_error",
     detail: string,
+    /** internal_error: how many answers now wait for the teacher. */
+    readonly answerCount?: number,
   ) {
     super(`grading of attempt ${attemptId} incomplete (${reason}): ${detail}`);
     this.name = "GradingIncompleteError";
@@ -395,10 +398,26 @@ export function isGradingIncomplete(
   );
 }
 
-/** Log a failed background grading run (one line for an expected case). */
+/**
+ * Log a failed background grading run: an expected incomplete run (grader
+ * busy, internal error) as one warning line, anything else as an error
+ * line without the error's database parameters (see error-log.ts).
+ */
 export function logGradingFailure(attemptId: string, err: unknown): void {
-  if (isGradingIncomplete(err)) console.warn(`[grading] ${err.message}`);
-  else console.error(`[grading] attempt ${attemptId} failed`, err);
+  if (isGradingIncomplete(err)) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        ts: new Date().toISOString(),
+        event: "grading.incomplete",
+        attemptId,
+        reason: err.reason,
+        ...(err.answerCount ? { answers: err.answerCount } : {}),
+      }),
+    );
+  } else {
+    logServerError("grading.attempt_failed", err, { attemptId });
+  }
 }
 
 /**
@@ -448,12 +467,10 @@ async function saveOutcomeWithRetry(
   try {
     await saveOutcome(answerId, outcome, maxScore);
   } catch (first) {
-    console.error(
-      `[grading] saving answer ${answerId} failed, retrying`,
-      first,
-    );
+    // The query parameters hold the student's output: never log them.
+    logServerError("grading.save_answer_retry", first, { answerId });
     await saveOutcome(answerId, outcome, maxScore).catch((err) =>
-      console.error(`[grading] saving answer ${answerId} failed`, err),
+      logServerError("grading.save_answer_failed", err, { answerId }),
     );
   }
 }
@@ -573,7 +590,10 @@ async function gradeAttemptNow(
       const applied = neutralizeOutcome(outcome, mode, question.points);
       await saveOutcome(answer.id, applied.outcome, applied.maxScore);
     } catch (err) {
-      console.error(`[grading] answer ${answer.id} failed`, err);
+      logServerError("grading.answer_failed", err, {
+        attemptId,
+        answerId: answer.id,
+      });
       const applied = neutralizeOutcome(
         {
           status: "needs_review",
@@ -609,7 +629,7 @@ async function gradeAttemptNow(
         await recomputeAttemptScore(attemptId);
         return { deferred: err.message, internalErrors };
       }
-      console.error(`[grading] batch for attempt ${attemptId} failed`, err);
+      logServerError("grading.batch_failed", err, { attemptId });
       failure =
         err instanceof Error ? err.message : "Onbekende fout in de nakijker";
     }
@@ -737,6 +757,7 @@ export async function gradeAttempt(
       attemptId,
       "internal_error",
       `${summary.internalErrors} answer(s) could not be graded automatically`,
+      summary.internalErrors,
     );
   }
 }
@@ -868,7 +889,7 @@ export async function rescoreAnswers(
     try {
       await gradeAnswer(id);
     } catch (err) {
-      console.error(`[grading] regrading answer ${id} failed`, err);
+      logServerError("grading.regrade_answer_failed", err, { answerId: id });
     }
   }
   return {

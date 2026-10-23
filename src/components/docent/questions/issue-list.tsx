@@ -6,7 +6,44 @@ import {
 } from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
 
-/** Coloured dot for a list item: red for errors, amber for warnings. */
+/**
+ * Small marker for one severity. Errors (they block publishing) and
+ * warnings differ in shape, not only in colour (WCAG 1.4.1): a circle
+ * with "!" versus a triangle, drawn in the "-ink" tones that keep
+ * 3:1 contrast on cards, hover and selected backgrounds (WCAG 1.4.11).
+ * The same icon pair as IssueList.
+ */
+export function IssueIcon({
+  severity,
+  label,
+  className,
+}: {
+  severity: IssueSeverity;
+  /** Accessible name, e.g. "2 problemen". */
+  label: string;
+  className?: string;
+}) {
+  const Icon = severity === "error" ? CircleAlert : TriangleAlert;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      data-severity={severity}
+      className={cn("inline-flex shrink-0", className)}
+    >
+      <Icon
+        className={cn(
+          "size-3.5",
+          severity === "error" ? "text-destructive-ink" : "text-warning-ink",
+        )}
+        strokeWidth={2.5}
+        aria-hidden="true"
+      />
+    </span>
+  );
+}
+
+/** Marker for a list item with issues: the worst severity, with a count. */
 export function IssueDot({
   issues,
   className,
@@ -16,18 +53,22 @@ export function IssueDot({
 }) {
   const severity = worstSeverity(issues);
   if (!severity) return null;
-  const count = issues.length;
   return (
-    <span
-      role="img"
-      aria-label={`${count} ${severity === "error" ? "probleem" : "aandachtspunt"}${count === 1 ? "" : "en"}`}
-      className={cn(
-        "inline-block size-2 shrink-0 rounded-full ring-2 ring-card",
-        severity === "error" ? "bg-destructive" : "bg-warning",
-        className,
-      )}
+    <IssueIcon
+      severity={severity}
+      label={issueCountLabel(issues)}
+      className={className}
     />
   );
+}
+
+/** "1 probleem", "3 problemen", "2 aandachtspunten". */
+export function issueCountLabel(issues: readonly QuestionIssue[]): string {
+  const count = issues.length;
+  if (worstSeverity(issues) === "error") {
+    return `${count} ${count === 1 ? "probleem" : "problemen"}`;
+  }
+  return `${count} ${count === 1 ? "aandachtspunt" : "aandachtspunten"}`;
 }
 
 export function worstSeverity(

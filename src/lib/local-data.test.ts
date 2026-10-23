@@ -150,6 +150,23 @@ describe("claimLocalData (shared computers, browser closed without signing out)"
     expect(local().getItem(LOCAL_DATA_OWNER_KEY)).toBe("student-b");
   });
 
+  test("answer backups without a known owner survive (a test running while Pensuma is updated)", () => {
+    // Stored before the owner marker existed; may hold answers the server
+    // never got. Only its own attempt restores it, and the dashboard prunes
+    // backups that aren't this student's running attempts.
+    local().setItem("pensuma:poging:att-1:answers", '{"q1":"print(1)"}');
+    local().setItem("pensuma:shortcuts", "off");
+    expect(claimLocalData("student-a")).toBe(true);
+    expect(local().getItem("pensuma:poging:att-1:answers")).toBe(
+      '{"q1":"print(1)"}',
+    );
+    expect(local().getItem("pensuma:shortcuts")).toBeNull();
+    expect(local().getItem(LOCAL_DATA_OWNER_KEY)).toBe("student-a");
+    // From now on the owner is known: the next student gets none of it.
+    expect(claimLocalData("student-b")).toBe(true);
+    expect(local().getItem("pensuma:poging:att-1:answers")).toBeNull();
+  });
+
   test("the new user's own id-keyed keys, written before the claim, survive", () => {
     claimLocalData("student-a");
     local().setItem(practiceCodeKey("student-a"), JSON.stringify("# geheim"));

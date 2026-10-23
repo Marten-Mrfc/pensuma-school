@@ -13,8 +13,10 @@ import {
  * The handle between the side-by-side editor and tools is a vertical line,
  * so it says so (a separator is horizontal by default).
  */
-export const PROMPT_EDITOR_HANDLE_LABEL = "Hoogte van opdracht en code aanpassen";
-export const EDITOR_TOOLS_HANDLE_LABEL = "Breedte van code en uitvoer aanpassen";
+export const PROMPT_EDITOR_HANDLE_LABEL =
+  "Hoogte van opdracht en code aanpassen";
+export const EDITOR_TOOLS_HANDLE_LABEL =
+  "Breedte van code en uitvoer aanpassen";
 
 /**
  * Code question from 1024px: the assignment above the editor (resizable
@@ -33,7 +35,10 @@ export function CodeSplitLayout({
 }) {
   const hasTools = tools != null;
   return (
-    <ResizablePanelGroup direction="horizontal" autoSaveId="pensuma-exam-code-h">
+    <ResizablePanelGroup
+      direction="horizontal"
+      autoSaveId="pensuma-exam-code-h"
+    >
       <ResizablePanel defaultSize={hasTools ? 58 : 100} minSize={35}>
         <ResizablePanelGroup
           direction="vertical"

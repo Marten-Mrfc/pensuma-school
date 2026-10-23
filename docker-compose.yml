@@ -41,6 +41,11 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # On a redeploy Docker sends SIGTERM and waits this long before killing
+    # the container. Next.js finishes open requests and pending after()
+    # work first: grading a just-submitted attempt can take up to
+    # GRADER_JOB_TIMEOUT_MS (120 s). The default is only 10 s.
+    stop_grace_period: 130s
     depends_on:
       db:
         condition: service_healthy
@@ -54,6 +59,9 @@ services:
       LOGIN_IP_MAX_FAILURES: ${LOGIN_IP_MAX_FAILURES:-100}
       RETENTION_SCHEDULER: ${RETENTION_SCHEDULER:-true}
       RETENTION_INTERVAL_HOURS: ${RETENTION_INTERVAL_HOURS:-6}
+      ATTEMPT_SWEEPER: ${ATTEMPT_SWEEPER:-true}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      MIGRATIONS_WAIT_MS: ${MIGRATIONS_WAIT_MS:-60000}
       GRADER_POOL_SIZE: ${GRADER_POOL_SIZE:-2}
       GRADER_MAX_CONCURRENCY: ${GRADER_MAX_CONCURRENCY:-3}
       GRADER_MEMORY_LIMIT_MB: ${GRADER_MEMORY_LIMIT_MB:-768}

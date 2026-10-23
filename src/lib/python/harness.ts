@@ -386,6 +386,38 @@ def _serialize(v, budget, depth, active):
     return {"t": "other", "type": tp.__name__, "repr": r[:2000]}
 
 
+def _restore_module_dict(mod, saved):
+    try:
+        d = mod.__dict__
+        for k in list(d):
+            if k not in saved:
+                del d[k]
+        d.update(saved)
+    except Exception:
+        pass
+
+
+def _restore_module_state():
+    # Module attributes (sys.foo = ..., math.pi = 3, a patched harness
+    # function): every module loaded at start-up gets back exactly the
+    # attributes it had then, and sys.modules its original module objects.
+    # A shallow restore: objects that were changed in place keep their
+    # changes, except the import lists of sys below. sys goes first, so
+    # sys.modules is the real one again.
+    if "sys" in _orig_module_state:
+        _restore_module_dict(*_orig_module_state["sys"])
+    modules = _sys.modules
+    for name, (mod, saved) in _orig_module_state.items():
+        _restore_module_dict(mod, saved)
+        if modules.get(name) is not mod:
+            modules[name] = mod
+    for attr, saved in _orig_sys_lists.items():
+        try:
+            getattr(_sys, attr)[:] = saved
+        except Exception:
+            pass
+
+
 def _restore_interpreter():
     _sys.stdout = _orig_stdout
     _sys.stderr = _orig_stderr
@@ -396,6 +428,7 @@ def _restore_interpreter():
     except Exception:
         pass
     # Undo changes to builtins and imported modules, so runs can't affect each other.
+    _restore_module_state()
     d = _builtins.__dict__
     for k in list(d):
         if k not in _orig_builtins:
@@ -628,4 +661,26 @@ def _pensuma_analyze_json(code):
         return _dumps(_pensuma_analyze(code), ensure_ascii=False)
     except BaseException as e:
         return _dumps({"internalError": type(e).__name__ + ": " + str(e)})
+
+
+# Snapshot of every module loaded at start-up, restored after each run by
+# _restore_module_state. Taken last, so the harness's own globals (the
+# interpreter's __main__, where the runtimes load this source) are in it
+# too: names a run adds there are removed, patched functions come back.
+_orig_sys_lists = {}
+_orig_module_state = {}
+
+
+def _snapshot_module_state():
+    for attr in ("path", "meta_path", "path_hooks"):
+        value = getattr(_sys, attr, None)
+        if isinstance(value, list):
+            _orig_sys_lists[attr] = list(value)
+    for name, mod in list(_sys.modules.items()):
+        d = getattr(mod, "__dict__", None)
+        if type(d) is dict:
+            _orig_module_state[name] = (mod, dict(d))
+
+
+_snapshot_module_state()
 `;

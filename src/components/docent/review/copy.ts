@@ -51,11 +51,38 @@ export function identicalAnswersNote(ungraded: number, graded: number): string {
     : `${head} ${n(graded)} daarvan hebben al een handmatige score en veranderen niet mee.`;
 }
 
-/** "Alle 3 ingeleverde pogingen worden …" / "De ingeleverde poging wordt …". */
-export function regradeDescription(submitted: number): string {
+/**
+ * "Alle 3 ingeleverde pogingen worden …" / "De ingeleverde poging wordt …".
+ * `null` when the exact number is not known on the page (a practice afname
+ * where students handed in more than once: every attempt is regraded, not
+ * only the one shown per student).
+ */
+export function regradeDescription(submitted: number | null): string {
   const lead =
-    submitted === 1
-      ? "De ingeleverde poging wordt opnieuw automatisch nagekeken"
-      : `Alle ${n(submitted)} ingeleverde pogingen worden opnieuw automatisch nagekeken`;
+    submitted == null
+      ? "Alle ingeleverde pogingen, ook eerdere pogingen van dezelfde leerling, worden opnieuw automatisch nagekeken"
+      : submitted === 1
+        ? "De ingeleverde poging wordt opnieuw automatisch nagekeken"
+        : `Alle ${n(submitted)} ingeleverde pogingen worden opnieuw automatisch nagekeken`;
   return `${lead} met de huidige testgevallen. Handmatige scores en feedback blijven staan. Dit kan even duren.`;
+}
+
+/** After "Opnieuw nakijken": how many attempts are being regraded. */
+export function regradeToast(scheduled: number): string {
+  if (scheduled <= 0) return "Er is geen poging om opnieuw na te kijken";
+  return scheduled === 1
+    ? "1 poging wordt opnieuw nagekeken"
+    : `${n(scheduled)} pogingen worden opnieuw nagekeken`;
+}
+
+/** "1 woord" / "12 woorden": the length of a written answer. */
+export function wordCountLabel(text: string): string {
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  return words === 1 ? "1 woord" : `${n(words)} woorden`;
+}
+
+/** "1 seconde" / "5 seconden" (rounded to whole seconds). */
+export function secondsLabel(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  return seconds === 1 ? "1 seconde" : `${n(seconds)} seconden`;
 }

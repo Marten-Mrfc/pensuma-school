@@ -13,6 +13,7 @@ import { ROLES } from "@/lib/auth-shared";
 import { auth, studentEmail } from "@/server/auth";
 import { db } from "@/server/db";
 import { account, session, studentPins, user } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
 
 /**
  * Account helpers. Sign-up is disabled in better-auth, so all accounts are
@@ -68,6 +69,24 @@ async function hashPassword(password: string) {
   return ctx.password.hash(password);
 }
 
+/**
+ * Remove a user row this call inserted itself, after a later step failed
+ * (cascades to its account and PIN). Never a row found by e-mail: that could
+ * be another teacher's account that is still being set up.
+ */
+async function removeCreatedUser(userId: string): Promise<void> {
+  await db
+    .delete(user)
+    .where(eq(user.id, userId))
+    .catch((error: unknown) =>
+      logServerError("accounts.cleanup_failed", error, { userId }),
+    );
+}
+
+/**
+ * Create a user with a password. All-or-nothing: when linking the password
+ * fails, the user row created here is removed again.
+ */
 async function createCredentialUser(input: {
   name: string;
   email: string;
@@ -76,6 +95,9 @@ async function createCredentialUser(input: {
   username?: string;
 }) {
   const ctx = await auth.$context;
+  // Hash first: the user row should exist as briefly as possible without
+  // a password.
+  const passwordHash = await hashPassword(input.password);
   const created = await ctx.internalAdapter.createUser(
     {
       name: input.name,
@@ -88,12 +110,17 @@ async function createCredentialUser(input: {
     },
     { method: "admin" },
   );
-  await ctx.internalAdapter.linkAccount({
-    userId: created.id,
-    providerId: "credential",
-    accountId: created.id,
-    password: await hashPassword(input.password),
-  });
+  try {
+    await ctx.internalAdapter.linkAccount({
+      userId: created.id,
+      providerId: "credential",
+      accountId: created.id,
+      password: passwordHash,
+    });
+  } catch (error) {
+    await removeCreatedUser(created.id);
+    throw error;
+  }
   return created;
 }
 
@@ -109,6 +136,11 @@ export async function createAdminAccount(input: {
 /**
  * Create a student account with a fresh PIN.
  * Returns the plaintext PIN so it can be shown / printed.
+ *
+ * All-or-nothing: when a step after inserting the user fails, exactly the
+ * user row created by this call is removed again (two teachers adding the
+ * same leerlingnummer at once: the one whose insert fails never touches
+ * the other's account).
  */
 export async function createStudentAccount(input: {
   studentNumber: string;
@@ -124,13 +156,18 @@ export async function createStudentAccount(input: {
     role: ROLES.student,
     username: studentNumber.toLowerCase(),
   });
-  await db
-    .insert(studentPins)
-    .values({ userId: created.id, pinEncrypted: encryptPin(pin) })
-    .onConflictDoUpdate({
-      target: studentPins.userId,
-      set: { pinEncrypted: encryptPin(pin) },
-    });
+  try {
+    await db
+      .insert(studentPins)
+      .values({ userId: created.id, pinEncrypted: encryptPin(pin) })
+      .onConflictDoUpdate({
+        target: studentPins.userId,
+        set: { pinEncrypted: encryptPin(pin) },
+      });
+  } catch (error) {
+    await removeCreatedUser(created.id);
+    throw error;
+  }
   return { user: created, pin };
 }
 

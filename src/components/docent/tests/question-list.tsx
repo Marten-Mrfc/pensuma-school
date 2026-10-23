@@ -1,9 +1,9 @@
 "use client";
 
 import { GripVertical, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
-import { IssueDot } from "@/components/docent/questions/issue-list";
+import { IssueDot, IssueIcon } from "@/components/docent/questions/issue-list";
 import {
   QUESTION_TYPE_ICONS,
   QUESTION_TYPE_TONE,
@@ -52,6 +52,11 @@ export interface QuestionListProps {
   adding: boolean;
   settingsTitle: string;
   settingsHasIssue: boolean;
+  /**
+   * Every error that blocks publishing (also test-level ones such as "no
+   * questions"), the same number as the Publiceren badge.
+   */
+  errorCount: number;
 }
 
 export function QuestionList({
@@ -66,7 +71,9 @@ export function QuestionList({
   adding,
   settingsTitle,
   settingsHasIssue,
+  errorCount,
 }: QuestionListProps) {
+  const uid = useId();
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const totalPoints = questions.reduce(
@@ -74,9 +81,6 @@ export function QuestionList({
     0,
   );
   const full = questions.length >= MAX_QUESTIONS_PER_TEST;
-  const errorCount = Object.values(issuesById).filter((list) =>
-    list.some((i) => i.severity === "error"),
-  ).length;
 
   function drop() {
     if (dragId === null || dropIndex === null) return;
@@ -111,11 +115,7 @@ export function QuestionList({
           </span>
         </span>
         {settingsHasIssue ? (
-          <span
-            className="size-2 shrink-0 rounded-full bg-destructive"
-            role="img"
-            aria-label="Probleem"
-          />
+          <IssueIcon severity="error" label="Probleem" />
         ) : null}
       </button>
 
@@ -149,6 +149,7 @@ export function QuestionList({
               const Icon = QUESTION_TYPE_ICONS[q.type];
               const issues = issuesById[q.id] ?? [];
               const firstIssue = issues[0];
+              const issuesId = `${uid}-${q.id}-issues`;
               return (
                 <li
                   key={q.id}
@@ -210,6 +211,7 @@ export function QuestionList({
                       type="button"
                       onClick={() => onSelect({ kind: "question", id: q.id })}
                       aria-current={selected ? "true" : undefined}
+                      aria-describedby={firstIssue ? issuesId : undefined}
                       className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-2 pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring lg:pl-0.5"
                     >
                       <span
@@ -261,6 +263,13 @@ export function QuestionList({
                         {formatPoints(q.points)} p
                       </span>
                     </button>
+                    {firstIssue ? (
+                      // The tooltip text for keyboard and screen-reader
+                      // users, as the button's description.
+                      <span id={issuesId} className="sr-only">
+                        {issues.map((i) => capitalize(i.message)).join(". ")}
+                      </span>
+                    ) : null}
                     <ReorderButtons
                       index={index}
                       count={questions.length}

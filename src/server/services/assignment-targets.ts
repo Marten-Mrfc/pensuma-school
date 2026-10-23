@@ -14,6 +14,7 @@ import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
 import type { PgDatabase } from "drizzle-orm/pg-core";
 import type * as schema from "@/server/db/schema";
 import { assignmentStudents, assignments, attempts } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
 import { anyoneStillWorking } from "@/server/services/assignment-status";
 
 type Db = PgDatabase<NodePgQueryResultHKT, typeof schema>;
@@ -88,13 +89,17 @@ export async function backfillTargetingFlags(db: Db): Promise<number> {
   return result.rowCount ?? 0;
 }
 
-/** Run `backfillTargetingFlags` once per process (errors are logged). */
+/**
+ * Run `backfillTargetingFlags` once per process: at start-up
+ * (instrumentation) and before the first targeting lookup, sharing one
+ * promise. Never rejects: a failure is logged and the next call tries again.
+ */
 export function ensureTargetingBackfill(db: Db): Promise<void> {
   globalForTargets.targetingBackfill ??= backfillTargetingFlags(db).then(
     () => undefined,
     (error: unknown) => {
       globalForTargets.targetingBackfill = undefined;
-      console.error("[assignment-targets] backfill failed", error);
+      logServerError("assignment_targets.backfill_failed", error);
     },
   );
   return globalForTargets.targetingBackfill;

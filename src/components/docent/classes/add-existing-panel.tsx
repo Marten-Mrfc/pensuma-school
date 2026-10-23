@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
+import { restrictedSkipNote } from "../students/format";
 
 export interface AddExistingPanelProps {
   classId: string;
@@ -60,11 +61,18 @@ export function AddExistingPanel({
           queryClient.invalidateQueries({ queryKey: trpc.class.pathKey() }),
           queryClient.invalidateQueries({ queryKey: trpc.student.pathKey() }),
         ]);
-        toast.success(
+        const added =
           res.added === 1
             ? `1 leerling toegevoegd aan ${className}`
-            : `${res.added} leerlingen toegevoegd aan ${className}`,
-        );
+            : `${res.added} leerlingen toegevoegd aan ${className}`;
+        if (res.skippedRestricted > 0) {
+          toast.warning(added, {
+            description: restrictedSkipNote(res.skippedRestricted),
+            duration: 15_000,
+          });
+        } else {
+          toast.success(added);
+        }
         setSelected(new Map());
         onAdded();
       },
@@ -146,7 +154,11 @@ export function AddExistingPanel({
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-medium">
                         {s.name}
-                        {s.banned ? (
+                        {s.restricted ? (
+                          <span className="ml-2 text-xs font-normal text-warning-ink">
+                            (verwerking beperkt)
+                          </span>
+                        ) : s.banned ? (
                           <span className="ml-2 text-xs font-normal text-muted-foreground">
                             (gedeactiveerd)
                           </span>

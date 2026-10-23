@@ -11,10 +11,13 @@ import {
   SquareFunction,
   Terminal,
   Trash2,
+  Undo2,
   WandSparkles,
+  X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
@@ -46,6 +49,7 @@ import {
 } from "@/lib/questions/templates";
 import type { QuestionIssue } from "@/lib/questions/validate";
 import { cn } from "@/lib/utils";
+import { neighbourAfterRemoval } from "../a11y/list-focus";
 import {
   AutoTextarea,
   FieldLabel,
@@ -107,10 +111,43 @@ export function TestCaseEditor({
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [generating, setGenerating] = useState<Set<string>>(() => new Set());
   const [genErrors, setGenErrors] = useState<Record<string, GenError>>({});
+  /**
+   * The last deleted test, for the inline "Ongedaan maken" button. Deleting
+   * saves right away; a timed toast alone is too short for keyboard and
+   * screen-reader users (WCAG 2.2.1, 3.3.4). Cleared by the next change
+   * to the list of tests.
+   */
+  const [lastRemoved, setLastRemoved] = useState<{
+    test: CodeTest;
+    index: number;
+  } | null>(null);
   const generate = useGenerateExpected();
+  const announce = useAnnounce();
   const latest = useRef({ tests, onChange });
   useEffect(() => {
     latest.current = { tests, onChange };
+  });
+
+  // Focus after deleting/restoring a test: the header of the test in its
+  // place, or the "Uitvoertest" button when the list is empty (WCAG 2.4.3).
+  const headerRefs = useRef(new Map<string, HTMLButtonElement>());
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<{ testId: string } | "add" | null>(null);
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    if (target === "add") {
+      pendingFocus.current = null;
+      addButtonRef.current?.focus();
+      return;
+    }
+    const el = headerRefs.current.get(target.testId);
+    if (el) {
+      pendingFocus.current = null;
+      el.focus();
+    } else if (!tests.some((t) => t.id === target.testId)) {
+      pendingFocus.current = null;
+    }
   });
 
   function setTest(id: string, patch: Partial<IoTest> | Partial<FunctionTest>) {
@@ -131,6 +168,7 @@ export function TestCaseEditor({
           });
     onChange([...tests, test]);
     setOpen((s) => new Set(s).add(test.id));
+    setLastRemoved(null);
   }
 
   function duplicate(index: number) {
@@ -140,24 +178,31 @@ export function TestCaseEditor({
     next.splice(index + 1, 0, copy);
     onChange(next);
     setOpen((s) => new Set(s).add(copy.id));
+    setLastRemoved(null);
   }
 
   function remove(index: number) {
     const removed = tests[index];
+    if (!removed) return;
+    const neighbour = neighbourAfterRemoval(tests, index);
     onChange(tests.filter((_, i) => i !== index));
-    toast(`Test ${index + 1} verwijderd`, {
-      action: {
-        label: "Ongedaan maken",
-        onClick: () => {
-          // Use the newest list/handler: edits made after deleting are kept.
-          const current = latest.current.tests.filter(
-            (t) => t.id !== removed.id,
-          );
-          current.splice(Math.min(index, current.length), 0, removed);
-          latest.current.onChange(current);
-        },
-      },
-    });
+    setLastRemoved({ test: removed, index });
+    pendingFocus.current = neighbour ? { testId: neighbour } : "add";
+    announce(
+      `Test ${index + 1} verwijderd. Ongedaan maken kan met de knop boven de tests.`,
+    );
+  }
+
+  function undoRemove() {
+    if (!lastRemoved) return;
+    const { test: removed, index } = lastRemoved;
+    // Use the newest list/handler: edits made after deleting are kept.
+    const current = latest.current.tests.filter((t) => t.id !== removed.id);
+    current.splice(Math.min(index, current.length), 0, removed);
+    latest.current.onChange(current);
+    setLastRemoved(null);
+    pendingFocus.current = { testId: removed.id };
+    announce(`Test ${index + 1} is teruggezet.`);
   }
 
   function move(index: number, delta: -1 | 1) {
@@ -166,6 +211,7 @@ export function TestCaseEditor({
     const next = [...tests];
     [next[index], next[target]] = [next[target], next[index]];
     onChange(next);
+    setLastRemoved(null);
   }
 
   function markGenerating(ids: string[], on: boolean) {
@@ -265,7 +311,12 @@ export function TestCaseEditor({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={() => add("io")}>
+        <Button
+          ref={addButtonRef}
+          size="sm"
+          variant="outline"
+          onClick={() => add("io")}
+        >
           <Terminal aria-hidden="true" />
           Uitvoertest
         </Button>
@@ -273,13 +324,16 @@ export function TestCaseEditor({
           <SquareFunction aria-hidden="true" />
           Functietest
         </Button>
-        <div className="ml-auto">
+        {/* The long label wraps on narrow screens instead of overflowing
+            the card (WCAG 1.4.10 at 320 px). */}
+        <div className="ml-auto max-w-full min-w-0">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span>
+              <span className="inline-flex max-w-full">
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
                   disabled={
                     tests.length === 0 || !solution.trim() || anyGenerating
                   }
@@ -305,6 +359,41 @@ export function TestCaseEditor({
           </Tooltip>
         </div>
       </div>
+
+      {lastRemoved ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-dashed bg-muted/40 px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1">
+            <span className="font-medium">
+              Test {lastRemoved.index + 1} verwijderd
+            </span>
+            {lastRemoved.test.name ? (
+              <span className="text-muted-foreground">
+                {" "}
+                ({lastRemoved.test.name})
+              </span>
+            ) : null}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" onClick={undoRemove}>
+              <Undo2 aria-hidden="true" />
+              Ongedaan maken
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Melding sluiten"
+              onClick={() => {
+                setLastRemoved(null);
+                pendingFocus.current = tests[0]
+                  ? { testId: tests[0].id }
+                  : "add";
+              }}
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <IssueList issues={generalIssues} />
 
@@ -348,6 +437,10 @@ export function TestCaseEditor({
               onDuplicate={() => duplicate(index)}
               onRemove={() => remove(index)}
               onGenerate={() => void fill([test])}
+              headerRef={(el) => {
+                if (el) headerRefs.current.set(test.id, el);
+                else headerRefs.current.delete(test.id);
+              }}
             />
           ))}
         </ol>
@@ -376,6 +469,8 @@ interface TestCardProps {
   onDuplicate: () => void;
   onRemove: () => void;
   onGenerate: () => void;
+  /** The header button (focus target after a neighbour is deleted). */
+  headerRef: (el: HTMLButtonElement | null) => void;
 }
 
 function IconAction({
@@ -429,6 +524,7 @@ function TestCard({
   onDuplicate,
   onRemove,
   onGenerate,
+  headerRef,
 }: TestCardProps) {
   const id = useId();
   const KindIcon = test.kind === "io" ? Terminal : SquareFunction;
@@ -448,6 +544,7 @@ function TestCard({
         <div className="flex items-center gap-1 py-1.5 pr-1.5 pl-1">
           <CollapsibleTrigger asChild>
             <button
+              ref={headerRef}
               type="button"
               className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1.5 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

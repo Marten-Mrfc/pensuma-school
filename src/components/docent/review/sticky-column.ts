@@ -44,3 +44,30 @@ export function useStickyColumnWidth() {
   }, []);
   return { ref, width };
 }
+
+/**
+ * Marks the sticky cells (`<th data-sticky-col>`): their content never needs
+ * scrolling into view.
+ */
+export const STICKY_CELL_ATTR = "data-sticky-col";
+
+type FocusTarget = {
+  closest: (selector: string) => unknown;
+  matches: (selector: string) => boolean;
+  scrollIntoView: (options: ScrollIntoViewOptions) => void;
+};
+
+/**
+ * `onFocus` of the area around a table with a sticky first column. Chrome
+ * leaves a focused cell that is only partly visible at the edge of the
+ * scroll container cut off; this scrolls the whole cell into view (the
+ * scroll padding keeps it clear of the sticky column). Keyboard focus only:
+ * a mouse click never makes the table jump.
+ */
+export function revealFocusedCell(event: { target: unknown }): void {
+  const el = event.target as Partial<FocusTarget> | null;
+  if (!el?.closest || !el.matches || !el.scrollIntoView) return;
+  if (!el.closest("td, th") || el.closest(`[${STICKY_CELL_ATTR}]`)) return;
+  if (!el.matches(":focus-visible")) return;
+  el.scrollIntoView({ block: "nearest", inline: "nearest" });
+}

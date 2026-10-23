@@ -126,9 +126,11 @@ export function DashboardView() {
           icon={NotebookPen}
           tone={d.counts.answersNeedingReview ? "warning" : "default"}
           hint={
-            d.counts.answersNeedingReview
-              ? "antwoorden wachten op jou"
-              : "alles is nagekeken"
+            d.counts.answersNeedingReview === 1
+              ? "antwoord wacht op jou"
+              : d.counts.answersNeedingReview
+                ? "antwoorden wachten op jou"
+                : "alles is nagekeken"
           }
         />
       </div>

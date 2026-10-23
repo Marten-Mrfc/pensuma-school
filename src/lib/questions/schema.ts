@@ -13,28 +13,42 @@ import { z } from "zod";
 
 /**
  * How the printed output of a program is compared with the expected output.
+ * The implementation and its full rules live in src/lib/grading/compare.ts
+ * (keep this summary in line with its header).
  *
  * All modes compare the program's *clean* stdout: the prompt text passed to
  * `input("...")` is never part of it. That is the whole point of this app:
  * `naam = input("Wat is je naam? ")` and `naam = input()` grade the same.
+ * Every mode ignores "\r\n" vs "\n", trailing whitespace per line and
+ * trailing empty lines.
  *
- * - flexible: case/whitespace-insensitive; every expected line must appear,
- *   in order, inside the output lines (extra text such as labels is allowed).
- *   Details (see src/lib/grading/compare.ts): only words and numbers count
- *   (punctuation is ignored, case too unless `ignoreCase` is false); numbers
- *   compare by value ("108.50" = "108.5"); matching respects token
- *   boundaries ("5" never matches inside "15"); extra output lines are only
- *   allowed when they look like a prompt/heading (end with ":" or "?").
- * - exact: lines must match exactly (trailing whitespace and trailing empty
- *   lines are ignored; `ignoreCase` still applies).
- * - contains: every expected line must appear somewhere in the output
- *   (as whole words/numbers, any order).
+ * - exact: lines must match exactly (`ignoreCase` applies).
+ * - flexible: only words and numbers count, so case (when `ignoreCase`, the
+ *   default), spacing and punctuation don't matter; numbers compare by
+ *   value ("108.50" = "108.5") and "1x3=3" reads as "1 x 3 = 3". Each
+ *   expected line must appear, in order, inside its own output line, with
+ *   token boundaries ("5" never matches inside "15"). Text around it is
+ *   fine when it is a label or a sentence ("Antwoord: 15", "Het getal 4 is
+ *   even", "3 + 4 = 7"), but NOT when it changes or doubles the answer:
+ *   a negation next to a word answer ("Niet geslaagd" is not "Geslaagd"),
+ *   another number glued to a numeric answer ("7 8 9" is not "8"; a number
+ *   before it needs a label such as ":" or "="), the expected line of
+ *   another test of the same question next to the answer ("even oneven"),
+ *   or, when the answer is one of the inputs, a line that lists the inputs
+ *   instead of choosing one. Extra output lines are allowed when they
+ *   contain no words/numbers, or when they look like a prompt or heading
+ *   (end with ":" or "?", contain a word, carry no other test's answer, at
+ *   most stdin lines + 2 of them), so printing every candidate answer
+ *   doesn't pass.
+ * - contains: every expected line must appear (as whole words/numbers)
+ *   somewhere in the output, in any order.
  * - numbers: only the numbers count: the expected numbers must appear in
  *   order (as a subsequence) among the printed numbers, each within
  *   `tolerance`; other numbers (e.g. the echoed input) may appear in
  *   between ("108,50", "1e3" and "-5" are understood).
- * - regex: `expectedOutput` is a (JavaScript) regular expression searched in
- *   the output (multiline; case-insensitive when `ignoreCase`).
+ * - regex: `expectedOutput` is a JavaScript regular expression searched in
+ *   the output (flags "m", plus "i" when `ignoreCase`), with a time limit:
+ *   a pattern that backtracks too long fails the test instead of hanging.
  */
 export const outputMatchModeSchema = z.enum([
   "flexible",
@@ -352,7 +366,10 @@ export type GradingResult = z.infer<typeof gradingResultSchema>;
 
 /**
  * Remove everything a student may not see from a code grading result:
- * hidden tests keep only pass/fail, weight and their (generic) name.
+ * hidden tests keep only pass/fail, weight and their (generic) name. Their
+ * run time is reported as 0: how long a hidden test took would tell
+ * something about its input (a timing side channel). The shape stays the
+ * same (`durationMs` is still a number).
  */
 export function redactCodeResultForStudent(
   result: CodeGradingResult,
@@ -369,7 +386,7 @@ export function redactCodeResultForStudent(
             weight: t.weight,
             passed: t.passed,
             timedOut: t.timedOut,
-            durationMs: t.durationMs,
+            durationMs: 0,
           }
         : t,
     ),

@@ -1,5 +1,6 @@
 import { type ReactNode, Suspense } from "react";
 import { shortcutsByScope } from "@/lib/a11y/shortcut-registry";
+import { timerThresholdsText } from "@/lib/a11y/timer-announcements";
 import { KeyCombo } from "./key-combo";
 import { ScrollRegion } from "./scroll-region";
 import {
@@ -155,8 +156,8 @@ export function AccessibilityStatement() {
           </li>
           <li>
             Tijdens een toets met tijdslimiet hoor je met een schermlezer een
-            melding als je nog 10, 5 en 1 minuut hebt. Je kunt de timer ook
-            verbergen.
+            melding als je nog {timerThresholdsText()} hebt. Je kunt de timer
+            ook verbergen.
           </li>
           <li>
             Of iets goed of fout is, zie je altijd aan een icoon en een woord,
@@ -216,8 +217,7 @@ export function AccessibilityStatement() {
           <li>
             <strong>Inlogkaarten.</strong> De printbare inlogkaarten zijn
             bedoeld om op papier uit te delen. Leerlingen die dat lastig vinden,
-            kunnen hun PIN-code ook mondeling of digitaal van hun docent
-            krijgen.
+            kunnen hun pincode ook mondeling of digitaal van hun docent krijgen.
           </li>
         </Bullets>
         <p>

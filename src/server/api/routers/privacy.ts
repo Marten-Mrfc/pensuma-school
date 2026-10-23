@@ -24,7 +24,7 @@ import {
 import {
   ACTOR_ROLE_LABELS,
   auditActionCategory,
-  auditActionLabel,
+  auditRowLabel,
   formatAuditDetails,
 } from "@/lib/privacy/audit-format";
 import { DATA_CATEGORIES, registerAsMarkdown } from "@/lib/privacy/register";
@@ -345,7 +345,7 @@ async function queryAuditRows(
     id: r.id,
     createdAt: r.createdAt,
     action: r.action,
-    label: auditActionLabel(r.action),
+    label: auditRowLabel(r.action, r.details),
     category: auditActionCategory(r.action),
     actorRole: r.actorRole,
     actorId: r.actorId,
@@ -366,7 +366,7 @@ async function queryAuditRows(
     /** The student was deleted after this entry was written. */
     subjectDeleted: r.subjectUserId != null && !r.subjectExists,
     details: r.details,
-    detailsText: formatAuditDetails(r.details),
+    detailsText: formatAuditDetails(r.details, 8, r.action),
     ipPrefix: r.ipPrefix,
   }));
 }

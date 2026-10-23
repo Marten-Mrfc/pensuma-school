@@ -70,9 +70,11 @@ import { QuestionNavigator } from "./question-navigator";
 import { QuestionView } from "./question-view";
 import { SaveIndicator } from "./save-indicator";
 import {
+  dismissRejectedToasts,
   questionNumbersText,
   rejectedAnswerMessage,
   rejectedOnHandInMessage,
+  rejectedToastId,
 } from "./save-problems";
 import {
   type AttemptData,
@@ -391,6 +393,8 @@ function ExamRunner({
     if (!flushed && mode === "manual" && !saver.isLocked) {
       const snap = saver.getSnapshot();
       const refused = questionNumbers(snap.rejected);
+      // The hand-in warning replaces the advice to shorten the answer.
+      dismissRejectedToasts(snap.rejected);
       toast.warning(
         snap.state !== "offline" && refused.length
           ? rejectedOnHandInMessage(refused)
@@ -592,7 +596,7 @@ function ExamRunner({
     lastRejected.current = snapshot.rejected;
     if (previous === snapshot.rejected) return;
     for (const id of previous) {
-      if (!snapshot.rejected.includes(id)) toast.dismiss(`save-rejected-${id}`);
+      if (!snapshot.rejected.includes(id)) toast.dismiss(rejectedToastId(id));
     }
     for (const id of snapshot.rejected) {
       if (previous.includes(id)) continue;
@@ -602,15 +606,18 @@ function ExamRunner({
       const message = rejectedAnswerMessage(q, responses[id], i + 1);
       announce(message, {
         politeness: "assertive",
-        dedupeKey: `save-rejected-${id}`,
+        dedupeKey: rejectedToastId(id),
       });
       toast.error(message, {
         ...TOAST,
-        id: `save-rejected-${id}`,
+        id: rejectedToastId(id),
         duration: 15_000,
       });
     }
   }, [snapshot.rejected, questions, responses, announce]);
+  // Leaving the exam (handed in, or another page): "make it shorter" no
+  // longer applies, so those toasts must not follow the student there.
+  useEffect(() => () => dismissRejectedToasts(lastRejected.current), []);
 
   // Heartbeat: last activity for the teacher + time extensions / force-submit.
   useEffect(() => {

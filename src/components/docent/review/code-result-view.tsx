@@ -112,7 +112,10 @@ function TestRow({ test: t, index }: { test: TestResult; index: number }) {
   return (
     <li
       className={cn(
-        "overflow-hidden rounded-lg border",
+        // The focus indicator is the row's own outline: overflow-hidden
+        // would clip a ring on the button, and outlines also show in
+        // forced-colors mode.
+        "overflow-hidden rounded-lg border has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
         t.passed ? "border-success/25" : "border-destructive/25",
       )}
     >
@@ -121,7 +124,7 @@ function TestRow({ test: t, index }: { test: TestResult; index: number }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className={cn(
-          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none",
           t.passed ? "bg-success/6" : "bg-destructive/6",
         )}
       >

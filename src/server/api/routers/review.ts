@@ -22,7 +22,7 @@ import {
 import {
   answeredCondition,
   getAssignmentOrThrow,
-  gradeAttemptsSafely,
+  gradeInBackground,
   rosterForAssignment,
 } from "@/server/api/routers/assignment";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
@@ -49,10 +49,16 @@ import {
   effectiveAssignmentStatus,
   parseAssignmentSettings,
 } from "@/server/services/assignment-status";
+import {
+  attemptDisplayNumberSql,
+  attemptDisplayNumbers,
+} from "@/server/services/attempt-number";
+import { autoSubmitExpiredAttempts } from "@/server/services/attempts";
 import { auditFromCtx, auditRead } from "@/server/services/audit";
 import {
   effectiveScore,
   gradeAttempt,
+  isGradingIncomplete,
   recomputeAttemptScore,
 } from "@/server/services/grading";
 
@@ -118,9 +124,14 @@ export type ResultCell = {
  * Everything the results matrix, the CSV export and the toetsanalyse need.
  * Grades are computed on the fly with the afname's grading scale, so
  * changing the scale updates every view without regrading.
+ *
+ * Attempts whose deadline has passed are handed in first (as the attempt
+ * sweeper would within a minute), so right after a deadline nobody shows
+ * as "bezig" and the export and analysis include their work.
  */
 export async function computeResults(db: DB, assignmentId: string) {
   const a = await getAssignmentOrThrow(db, assignmentId);
+  await autoSubmitExpiredAttempts({ assignmentId: a.id });
   const settings = parseAssignmentSettings(a.settings);
   const [[test], [klas], neutralizationRows] = await Promise.all([
     db
@@ -160,6 +171,7 @@ export async function computeResults(db: DB, assignmentId: string) {
     db.select().from(attempts).where(eq(attempts.assignmentId, a.id)),
   ]);
   const chosen = representativeAttempts(attemptRows);
+  const displayNumbers = attemptDisplayNumbers(attemptRows);
   const attemptCounts = new Map<string, number>();
   for (const r of attemptRows)
     attemptCounts.set(r.userId, (attemptCounts.get(r.userId) ?? 0) + 1);
@@ -230,7 +242,8 @@ export async function computeResults(db: DB, assignmentId: string) {
       attemptCount: attemptCounts.get(student.id) ?? 1,
       attempt: {
         id: at.id,
-        attemptNumber: at.attemptNumber,
+        /** "Poging X van attemptCount" (see attempt-number.ts). */
+        attemptNumber: displayNumbers.get(at.id) ?? at.attemptNumber,
         status: at.status,
         startedAt: at.startedAt,
         submittedAt: at.submittedAt,
@@ -325,6 +338,34 @@ export async function computeResults(db: DB, assignmentId: string) {
       distribution: gradeDistribution(grades),
     },
   };
+}
+
+/**
+ * A teacher's regrade that could not finish: the grader was too busy (a
+ * retry is scheduled, the previous scores stay), or some answers ended
+ * with an internal error and now wait for the teacher.
+ */
+function regradeIncompleteError(err: {
+  reason: "grader_unavailable" | "internal_error";
+  answerCount?: number;
+}): TRPCError {
+  if (err.reason === "grader_unavailable") {
+    return new TRPCError({
+      code: "SERVICE_UNAVAILABLE",
+      message:
+        "De nakijker is even overbelast. Probeer het over een minuut opnieuw; Pensuma kijkt deze poging intussen ook zelf nog een keer na.",
+    });
+  }
+  const n = err.answerCount ?? 0;
+  return new TRPCError({
+    code: "BAD_GATEWAY",
+    message:
+      n === 1
+        ? "Opnieuw nagekeken, maar één antwoord kon niet automatisch worden nagekeken. Het staat klaar om zelf na te kijken."
+        : n > 1
+          ? `Opnieuw nagekeken, maar ${n} antwoorden konden niet automatisch worden nagekeken. Ze staan klaar om zelf na te kijken.`
+          : "Opnieuw nagekeken, maar niet elk antwoord kon automatisch worden nagekeken. Die antwoorden staan klaar om zelf na te kijken.",
+  });
 }
 
 /** CSV status of a student whose processing is restricted (AVG art. 18). */
@@ -528,19 +569,21 @@ export const reviewRouter = createTRPCRouter({
           x.userId.localeCompare(y.userId),
       );
       const index = representative.findIndex((s) => s.userId === at.userId);
+      // "Poging X van studentAttempts.length" (see attempt-number.ts).
+      const displayNumbers = attemptDisplayNumbers(siblings);
       const studentAttempts = siblings
         .filter((s) => s.userId === at.userId)
         .sort((x, y) => x.attemptNumber - y.attemptNumber)
         .map((s) => ({
           id: s.id,
-          attemptNumber: s.attemptNumber,
+          attemptNumber: displayNumbers.get(s.id) ?? s.attemptNumber,
           status: s.status,
         }));
 
       return {
         attempt: {
           id: at.id,
-          attemptNumber: at.attemptNumber,
+          attemptNumber: displayNumbers.get(at.id) ?? at.attemptNumber,
           status: at.status,
           startedAt: at.startedAt,
           deadlineAt: at.deadlineAt,
@@ -742,16 +785,22 @@ export const reviewRouter = createTRPCRouter({
       const overridden = await assertNotRestricted(ctx.db, at.userId, {
         override: input.overrideRestriction,
       });
+      // The teacher waits for this one: it queues before background
+      // grading and gives up after GRADER_QUEUE_TIMEOUT_MS.
+      let incomplete: unknown = null;
       try {
-        await gradeAttempt(at.id);
+        await gradeAttempt(at.id, { interactive: true });
       } catch (err) {
-        logServerError("review.regrade_attempt_failed", err, {
-          attemptId: at.id,
-        });
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Opnieuw nakijken is mislukt. Probeer het later nog eens.",
-        });
+        if (!isGradingIncomplete(err)) {
+          logServerError("review.regrade_attempt_failed", err, {
+            attemptId: at.id,
+          });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Opnieuw nakijken is mislukt. Probeer het later nog eens.",
+          });
+        }
+        incomplete = err;
       }
       if (overridden) {
         await auditFromCtx(ctx, {
@@ -768,6 +817,8 @@ export const reviewRouter = createTRPCRouter({
           },
         });
       }
+      if (isGradingIncomplete(incomplete))
+        throw regradeIncompleteError(incomplete);
       return { attemptId: at.id };
     }),
 
@@ -775,6 +826,12 @@ export const reviewRouter = createTRPCRouter({
    * Regrade every handed-in attempt of an afname, except those of
    * students whose processing is restricted (AVG art. 18): their scores
    * stay as they are (`skippedRestricted`).
+   *
+   * Runs in the background (3 at a time, after runs that someone is
+   * waiting for) and returns at once: a whole class can take minutes when
+   * the grader is busy. The results page picks up the new scores as each
+   * attempt finishes; one that fails keeps its previous score (grader busy:
+   * retried automatically) or waits for the teacher (internal error).
    */
   regradeAssignment: adminProcedure
     .input(z.object({ assignmentId: idSchema }))
@@ -794,14 +851,22 @@ export const reviewRouter = createTRPCRouter({
         rows.map((r) => r.userId),
       );
       const allowed = rows.filter((r) => !restricted.has(r.userId));
-      const { graded, failed } = await gradeAttemptsSafely(
+      gradeInBackground(
+        "review.regrade_assignment_failed",
         allowed.map((r) => r.id),
         3,
       );
       return {
         total: rows.length,
-        graded,
-        failed,
+        /** Attempts being regraded in the background. */
+        scheduled: allowed.length,
+        /**
+         * For clients from before `scheduled`: the same number (they show
+         * "N pogingen opnieuw nagekeken"); the outcome is not known yet.
+         */
+        graded: allowed.length,
+        /** Always 0 now: a failure shows per attempt in the results. */
+        failed: 0,
         skippedRestricted: rows.length - allowed.length,
       };
     }),
@@ -827,7 +892,7 @@ export const reviewRouter = createTRPCRouter({
           .select({
             answer: answers,
             attemptId: attempts.id,
-            attemptNumber: attempts.attemptNumber,
+            attemptNumber: attemptDisplayNumberSql,
             student: {
               id: user.id,
               name: user.name,

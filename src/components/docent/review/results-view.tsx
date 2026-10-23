@@ -63,10 +63,15 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { GradeDistributionChart, QuestionAverageChart } from "./charts";
-import { passedSentence, regradeDescription } from "./copy";
-import { pendingReviewByQuestion, pendingReviewTotal } from "./grading-logic";
+import { passedSentence, regradeDescription, regradeToast } from "./copy";
+import {
+  pendingReviewByQuestion,
+  pendingReviewTotal,
+  regradeCount,
+} from "./grading-logic";
 import { retakeGroups } from "./retake-groups";
 import {
+  revealFocusedCell,
   STICKY_SCROLL_PADDING_CLASS,
   stickyColumnStyle,
   useStickyColumnWidth,
@@ -391,6 +396,7 @@ export function ResultsContent({ data }: { data: Results }) {
           className="flex flex-col gap-3"
           aria-labelledby={`${id}-matrix`}
           style={stickyColumnStyle(stickyColumn.width)}
+          onFocus={revealFocusedCell}
         >
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -420,6 +426,7 @@ export function ResultsContent({ data }: { data: Results }) {
                 <tr className="text-xs text-muted-foreground">
                   <th
                     ref={stickyColumn.ref}
+                    data-sticky-col
                     scope="col"
                     aria-sort={ariaSort("name")}
                     className="sticky left-0 z-20 min-w-48 border-b bg-card px-4 py-2 text-left font-medium"
@@ -521,6 +528,7 @@ export function ResultsContent({ data }: { data: Results }) {
                   <tr className="text-xs text-muted-foreground">
                     <th
                       scope="row"
+                      data-sticky-col
                       className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-medium"
                     >
                       Gemiddeld
@@ -547,7 +555,9 @@ export function ResultsContent({ data }: { data: Results }) {
               ) : null}
             </table>
           </ScrollRegion>
-          <span className="sr-only">{questionIndex.size} vragen</span>
+          <span className="sr-only">
+            {plural(questionIndex.size, "vraag", "vragen")}
+          </span>
         </section>
       )}
 
@@ -636,7 +646,9 @@ export function ResultsContent({ data }: { data: Results }) {
         open={confirmRegrade}
         onOpenChange={setConfirmRegrade}
         title="Alles opnieuw nakijken?"
-        description={regradeDescription(data.stats.submitted)}
+        description={regradeDescription(
+          regradeCount(data.rows, data.stats.submitted),
+        )}
         confirmLabel="Opnieuw nakijken"
         onConfirm={async () => {
           const res = await regrade.mutateAsync({ assignmentId: a.id });
@@ -644,18 +656,14 @@ export function ResultsContent({ data }: { data: Results }) {
           await queryClient.invalidateQueries({
             queryKey: trpc.assignment.pathKey(),
           });
-          if (res.failed) {
-            toast.warning(
-              `${plural(res.graded, "poging", "pogingen")} nagekeken, ${res.failed} mislukt`,
-              {
-                description:
-                  "Probeer het later nog eens voor de mislukte pogingen.",
-              },
-            );
+          // The server regrades in the background: the results refresh by
+          // themselves (every 20 seconds). A failed attempt shows up there.
+          if (res.scheduled > 0) {
+            toast.success(regradeToast(res.scheduled), {
+              description: "Scores en cijfers worden vanzelf bijgewerkt.",
+            });
           } else {
-            toast.success(
-              `${res.graded} ${res.graded === 1 ? "poging" : "pogingen"} opnieuw nagekeken`,
-            );
+            toast.info(regradeToast(res.scheduled));
           }
         }}
       />
@@ -672,6 +680,7 @@ function ResultRow({ row, data }: { row: Row; data: Results }) {
     <tr className="group">
       <th
         scope="row"
+        data-sticky-col
         className="sticky left-0 z-10 border-b bg-card px-4 py-2 text-left font-normal group-hover:bg-muted/40"
       >
         {attemptHref ? (

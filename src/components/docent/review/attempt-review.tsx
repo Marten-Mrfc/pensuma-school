@@ -66,6 +66,7 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { CodeResultView } from "./code-result-view";
+import { secondsLabel, wordCountLabel } from "./copy";
 import { FocusLossCaveat } from "./focus-loss-caveat";
 import { scoreTone } from "./results-view";
 import { ScoreBox } from "./score-box";
@@ -704,7 +705,7 @@ function AnswerView({ item }: { item: Item }) {
         )}
         {text.trim() ? (
           <span className="text-xs text-muted-foreground tabular-nums">
-            {text.trim().split(/\s+/).length} woorden
+            {wordCountLabel(text)}
           </span>
         ) : null}
       </div>
@@ -845,21 +846,21 @@ function eventDescription(e: EventRow): string | null {
           : null;
     case "paste":
       return typeof d.length === "number"
-        ? `${d.length} tekens${d.blocked ? " (geblokkeerd)" : ""}`
+        ? `${d.length} ${d.length === 1 ? "teken" : "tekens"}${d.blocked ? " (geblokkeerd)" : ""}`
         : d.blocked
           ? "Geblokkeerd"
           : null;
     case "focus_lost":
     case "visibility_hidden":
       return typeof d.durationMs === "number"
-        ? `${Math.round(d.durationMs / 1000)} seconden weg`
+        ? `${secondsLabel(d.durationMs)} weg`
         : null;
     case "focus_gained":
     case "visibility_visible":
       return typeof d.awayMs === "number"
-        ? `Na ${Math.round(d.awayMs / 1000)} seconden`
+        ? `Na ${secondsLabel(d.awayMs)}`
         : typeof d.durationMs === "number"
-          ? `Na ${Math.round(d.durationMs / 1000)} seconden`
+          ? `Na ${secondsLabel(d.durationMs)}`
           : null;
     default:
       return null;

@@ -21,8 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { useTRPC } from "@/trpc/react";
-import { ChangePasswordForm } from "../account/change-password-form";
 import { focusInvalidField } from "../a11y/invalid-field-focus";
+import { ChangePasswordForm } from "../account/change-password-form";
 import { formatDate, plural } from "../students/format";
 
 /** Refresh the cached session cookie so the shell shows the new name. */

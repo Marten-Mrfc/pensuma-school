@@ -44,6 +44,7 @@ import {
 import { clearLocalUserData } from "@/lib/local-data";
 import { cn, safeRedirectPath } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
+import { completeSignIn } from "./complete-sign-in";
 
 type LoginKind = "leerling" | "docent";
 
@@ -73,7 +74,7 @@ function loginErrorMessage(error: AuthError, kind: LoginKind): string {
     return "Er ging iets mis aan onze kant. Probeer het zo nog eens.";
   }
   return kind === "leerling"
-    ? "Je leerlingnummer of PIN-code klopt niet. Controleer ze en probeer het opnieuw."
+    ? "Je leerlingnummer of pincode klopt niet. Controleer ze en probeer het opnieuw."
     : "Je e-mailadres of wachtwoord klopt niet.";
 }
 
@@ -173,7 +174,7 @@ function StudentLoginForm({
         : "Vul je leerlingnummer in.";
     }
     if (!STUDENT_PIN_REGEX.test(pinValue)) {
-      errors.pin = "Je PIN-code bestaat uit 6 cijfers.";
+      errors.pin = "Je pincode bestaat uit 6 cijfers.";
     }
     setFieldError(errors);
     setError(null);
@@ -201,7 +202,7 @@ function StudentLoginForm({
       return;
     }
     const role = (data.user as { role?: string | null }).role ?? ROLES.student;
-    window.location.assign(targetFor(role, next));
+    completeSignIn(data.user.id, targetFor(role, next));
   }
 
   function onSubmit(e: FormEvent) {
@@ -236,14 +237,14 @@ function StudentLoginForm({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label htmlFor={ids.pin} className="text-sm leading-none font-medium">
-            PIN-code
+            Pincode
           </label>
-          {/* Constant name + aria-pressed: "PIN-code tonen, ingedrukt". */}
+          {/* Constant name + aria-pressed: "Pincode tonen, ingedrukt". */}
           <button
             type="button"
             onClick={() => setShowPin((v) => !v)}
             className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="PIN-code tonen"
+            aria-label="Pincode tonen"
             aria-pressed={showPin}
           >
             {showPin ? (
@@ -324,7 +325,7 @@ function StudentLoginForm({
         {pending ? "Bezig met inloggen…" : "Inloggen"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        PIN-code vergeten? Je docent kan je een nieuwe geven.
+        Pincode vergeten? Je docent kan je een nieuwe geven.
       </p>
     </form>
   );
@@ -404,7 +405,7 @@ function TeacherLoginForm({
       return;
     }
     const role = (data.user as { role?: string | null }).role ?? ROLES.admin;
-    window.location.assign(targetFor(role, next));
+    completeSignIn(data.user.id, targetFor(role, next));
   }
 
   return (

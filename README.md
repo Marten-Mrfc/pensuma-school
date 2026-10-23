@@ -177,6 +177,56 @@ en sandboxen starten in ~0,5 s vanuit een snapshot. Een klas van 30 die tegelijk
 een machine met 2 vCPU en 2–4 GB met de standaardinstellingen (`mem_limit: 4g`,
 `GRADER_POOL_SIZE=2`, `GRADER_MAX_CONCURRENCY=3`). Verhoog die waarden op grotere machines.
 
+Instellingen voor nakijken en opstarten (alle variabelen staan met uitleg in `.env.example`):
+
+| Variabele | Standaard | Wat het doet |
+| --- | --- | --- |
+| `GRADER_JOB_TIMEOUT_MS` | `120000` | Eén tijdsbudget per inzending: alle programmeervragen van een poging gaan in één job en delen het budget eerlijk, zodat een oneindige lus in één vraag de andere vragen hun tests niet kost. |
+| `GRADER_QUEUE_TIMEOUT_MS` | `120000` | Hoe lang een run waar een docent op wacht (code uitvoeren of controleren in de vraageditor, één poging opnieuw nakijken) in de wachtrij mag staan. Nakijken na het inleveren wacht zo lang als nodig en mislukt nooit doordat de nakijker druk is. |
+| `ATTEMPT_SWEEPER` | `true` | Elke minuut levert de server pogingen in waarvan de tijd om is, en kijkt ingeleverde pogingen na waarvan het nakijken verloren ging (herstart, crash). Eén server tegelijk (databaseslot). `false` zet dit uit. |
+| `MIGRATIONS_WAIT_MS` | `60000` | Hoe lang de server bij het starten wacht op een database die nog opstart. Lukt de migratie daarna nog niet, dan stopt de server met exitcode 1 en start Docker de container opnieuw (in plaats van een server die overal 500 antwoordt). |
+| `RUN_MIGRATIONS` | `true` | `false` slaat de databasemigraties bij het starten over. |
+
+### Opnieuw deployen zonder nakijkwerk te verliezen
+
+Bij een nieuwe deploy krijgt de oude container een stopsignaal (SIGTERM). Pensuma maakt dan eerst
+lopende verzoeken af en kijkt zojuist ingeleverde pogingen nog na; dat kan tot
+`GRADER_JOB_TIMEOUT_MS` (standaard 120 seconden) duren. Docker wacht standaard maar 10 seconden
+en stopt de container daarna hard.
+
+- **Compose:** `docker-compose.yml` zet daarom `stop_grace_period: 130s` voor de app.
+- **Application** (de productie-installatie): Dokploy gebruikt `docker-compose.yml` dan niet.
+  Heeft jouw Dokploy-versie bij de app een instelling voor de stopwachttijd (*Stop Grace Period*,
+  bij **Advanced → Swarm Settings**), zet die dan ook op 130 seconden. Let op de eenheid die het
+  veld vraagt: de Docker-API rekent in nanoseconden (`130000000000`).
+
+Een poging waarvan het nakijken toch werd afgebroken, gaat niet verloren: de nieuwe server kijkt
+pogingen die blijven hangen binnen een paar minuten opnieuw na (`ATTEMPT_SWEEPER`).
+
+### Serverlogboek: logrotatie
+
+De logregels van de app (standaarduitvoer van de container) bevatten technische foutmeldingen met
+een foutcode en id's, nooit invoer, antwoorden of pincodes. Het verwerkingsregister belooft dat ze
+niet onbeperkt bewaard blijven: ze verdwijnen door logrotatie ("Technische foutmeldingen
+(serverlogboek)").
+
+- **Compose:** het `logging`-blok in `docker-compose.yml` houdt per container hoogstens 5
+  bestanden van 10 MB.
+- **Application:** Dokploy gebruikt dat blok dan niet. Stel de logrotatie daarom in voor de hele
+  Docker-server, in `/etc/docker/daemon.json`:
+
+  ```json
+  {
+    "log-driver": "json-file",
+    "log-opts": { "max-size": "10m", "max-file": "5" }
+  }
+  ```
+
+  Herstart daarna Docker (`sudo systemctl restart docker`; alle containers op de server starten
+  dan opnieuw) en deploy de app opnieuw: de instelling geldt alleen voor containers die daarna
+  worden gemaakt. Controleer het met
+  `docker inspect --format '{{.HostConfig.LogConfig}}' <container>`.
+
 ## Beveiliging bij installatie
 
 - **HTTPS is verplicht.** In productie start de app niet als `BETTER_AUTH_URL` niet met

@@ -56,7 +56,23 @@ export const FAILURES_AFTER_EXPIRED_LOCK = MAX_FAILURES - 3;
  */
 export const RESTRICTED_NETWORK_MAX_FAILURES = FAILURES_AFTER_EXPIRED_LOCK;
 
+/** A locked student account (a teacher can lift the lock). */
 export const ACCOUNT_LOCKED_MESSAGE = `Te veel mislukte pogingen. Probeer het over ${LOCK_MINUTES} minuten opnieuw of vraag je docent om hulp.`;
+
+/**
+ * A locked teacher account: nobody can lift that lock, but a colleague can
+ * set a temporary password for when it has expired.
+ */
+export const TEACHER_ACCOUNT_LOCKED_MESSAGE = `Te veel mislukte pogingen. Probeer het over ${LOCK_MINUTES} minuten opnieuw. Wachtwoord vergeten? Een collega-docent kan je een tijdelijk wachtwoord geven.`;
+
+/** The refusal for a locked account: students and teachers get their own. */
+export function accountLockedMessage(
+  account: Pick<AccountKey, "kind"> | null | undefined,
+): string {
+  return account?.kind === "email"
+    ? TEACHER_ACCOUNT_LOCKED_MESSAGE
+    : ACCOUNT_LOCKED_MESSAGE;
+}
 
 export const SIGN_IN_PATHS: ReadonlySet<string> = new Set([
   "/sign-in/username",
@@ -320,7 +336,12 @@ export async function releaseIpAttempt(
 
 export type ReserveSignInResult =
   | { ok: true; reservation: SignInReservation }
-  | { ok: false; reason: "account_locked" };
+  | {
+      ok: false;
+      reason: "account_locked";
+      /** Dutch refusal for this kind of account (`accountLockedMessage`). */
+      message: string;
+    };
 
 /**
  * Before the password check of a sign-in: counts the attempt for the
@@ -356,7 +377,11 @@ export async function reserveSignInAttempt(
     throw error;
   }
   if (ip) await releaseIpAttempt(db, ip);
-  return { ok: false, reason: "account_locked" };
+  return {
+    ok: false,
+    reason: "account_locked",
+    message: accountLockedMessage(input.account),
+  };
 }
 
 /** Gives every part of a reservation back. */

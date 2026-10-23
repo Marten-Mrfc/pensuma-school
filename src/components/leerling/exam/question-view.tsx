@@ -105,7 +105,10 @@ export function QuestionHeader({
       </h2>
       {saveProblem ? (
         <p className="mt-1.5 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-ink">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <TriangleAlert
+            className="mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
           <span>{saveProblem}</span>
         </p>
       ) : null}

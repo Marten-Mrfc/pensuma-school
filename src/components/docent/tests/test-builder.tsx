@@ -63,6 +63,7 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { CopyToTestDialog } from "./copy-to-test-dialog";
+import { deleteQuestionKeepingEdits } from "./delete-question";
 import { downloadTestJson } from "./download";
 import { PreviewSheet } from "./preview-sheet";
 import { PublishDialog } from "./publish-dialog";
@@ -165,11 +166,28 @@ function Builder({ test }: { test: BuilderTest }) {
     problems: TestProblem[];
     warnings: TestProblem[];
   } | null>(null);
-  const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null);
+  /** The question in the "Vraag verwijderen?" dialog (kept while it closes). */
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    number: number;
+    title: string;
+  } | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [copyQuestionId, setCopyQuestionId] = useState<string | null>(null);
   const [deleteTestOpen, setDeleteTestOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  /** Title field and heading of the question editor that is shown. */
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const editorHeadingRef = useRef<HTMLDivElement>(null);
+  const settingsHeadingRef = useRef<HTMLHeadingElement>(null);
+  /** Focus this question's title once its editor is shown (after adding). */
+  const focusTitleOf = useRef<string | null>(null);
+  /**
+   * Where focus goes after deleting a question: the heading of the editor
+   * that replaced it (the button that opened the dialog is gone).
+   */
+  const afterDeleteFocus = useRef<HTMLElement | null>(null);
   const bankTags = useQuery(trpc.bank.tags.queryOptions());
   const tagSuggestions = (bankTags.data ?? []).map((t) => t.tag);
 
@@ -332,6 +350,19 @@ function Builder({ test }: { test: BuilderTest }) {
       : -1;
   const selectedQuestion = selectedIndex >= 0 ? questions[selectedIndex] : null;
 
+  // A new question's editor mounts under a new key: move focus into it, so
+  // keyboard users don't land on <body> (WCAG 2.4.3).
+  useEffect(() => {
+    const id = focusTitleOf.current;
+    if (!id || selectedQuestion?.id !== id) return;
+    focusTitleOf.current = null;
+    titleInputRef.current?.focus();
+  });
+  useEffect(() => {
+    afterDeleteFocus.current =
+      editorHeadingRef.current ?? settingsHeadingRef.current ?? null;
+  });
+
   /* ------------------------------ Selection ------------------------------ */
 
   function select(next: BuilderSelection, opts: { scroll?: boolean } = {}) {
@@ -467,6 +498,7 @@ function Builder({ test }: { test: BuilderTest }) {
         questions: [...old.questions, res.question],
       }));
       noteAttempts(res.hasAttempts);
+      focusTitleOf.current = res.question.id;
       select({ kind: "question", id: res.question.id });
       void invalidateAll();
     } catch (error) {
@@ -519,6 +551,8 @@ function Builder({ test }: { test: BuilderTest }) {
       const res = await duplicateQuestion.mutateAsync({ id });
       noteAttempts(res.hasAttempts);
       await invalidateAll();
+      // The Dupliceren button belonged to the old editor: focus the copy.
+      focusTitleOf.current = res.question.id;
       select({ kind: "question", id: res.question.id });
       toast.success("Vraag gedupliceerd.");
     } catch (error) {
@@ -526,12 +560,25 @@ function Builder({ test }: { test: BuilderTest }) {
     }
   }
 
+  function askDeleteQuestion(question: BuilderQuestion) {
+    setDeleteTarget({
+      id: question.id,
+      number: questions.findIndex((q) => q.id === question.id) + 1,
+      title: question.title,
+    });
+    setDeleteOpen(true);
+  }
+
   async function confirmDeleteQuestion() {
-    const id = deleteQuestionId;
+    const id = deleteTarget?.id;
     if (!id) return;
     const index = questions.findIndex((q) => q.id === id);
-    autosave.discard(qKey(id));
-    await deleteQuestion.mutateAsync({ id, force: test.hasAttempts });
+    await deleteQuestionKeepingEdits({
+      saveDraft: () => flush(qKey(id)),
+      deleteOnServer: () =>
+        deleteQuestion.mutateAsync({ id, force: test.hasAttempts }),
+      discardDraft: () => autosave.discard(qKey(id)),
+    });
     const remaining = questions.filter((q) => q.id !== id);
     patchCache((old) => ({
       ...old,
@@ -655,8 +702,6 @@ function Builder({ test }: { test: BuilderTest }) {
   const saveIndicator = (
     <SaveIndicator state={autosave.state} onRetry={() => void flush()} />
   );
-  const deletingQuestion =
-    questions.find((q) => q.id === deleteQuestionId) ?? null;
   const copyingQuestion =
     questions.find((q) => q.id === copyQuestionId) ?? null;
   const settingsHasIssue = validation.errors.some(
@@ -906,6 +951,7 @@ function Builder({ test }: { test: BuilderTest }) {
               adding={createQuestion.isPending}
               settingsTitle={settings.title}
               settingsHasIssue={settingsHasIssue}
+              errorCount={validation.errors.length}
             />
           </div>
         </aside>
@@ -966,6 +1012,7 @@ function Builder({ test }: { test: BuilderTest }) {
               value={settings}
               onChange={editSettings}
               status={saveIndicator}
+              headingRef={settingsHeadingRef}
             />
           ) : selectedQuestion ? (
             <QuestionEditor
@@ -983,6 +1030,8 @@ function Builder({ test }: { test: BuilderTest }) {
               }}
               number={selectedIndex + 1}
               total={questions.length}
+              titleRef={titleInputRef}
+              headingRef={editorHeadingRef}
               issues={validation.byQuestion[selectedQuestion.id] ?? []}
               onChange={(patch) => editQuestion(selectedQuestion, patch)}
               onFlush={() => flush(qKey(selectedQuestion.id))}
@@ -1027,9 +1076,7 @@ function Builder({ test }: { test: BuilderTest }) {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onSelect={() =>
-                          setDeleteQuestionId(selectedQuestion.id)
-                        }
+                        onSelect={() => askDeleteQuestion(selectedQuestion)}
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 aria-hidden="true" />
@@ -1111,19 +1158,18 @@ function Builder({ test }: { test: BuilderTest }) {
       />
 
       <ConfirmDialog
-        open={deleteQuestionId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteQuestionId(null);
-        }}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
         destructive
-        title={`Vraag ${questions.findIndex((q) => q.id === deleteQuestionId) + 1} verwijderen?`}
+        title={`Vraag ${deleteTarget?.number ?? ""} verwijderen?`}
         description={
           test.hasAttempts
-            ? `“${deletingQuestion?.title ?? ""}” wordt verwijderd, inclusief de antwoorden die leerlingen al op deze vraag gaven. Dit kan niet ongedaan worden gemaakt.`
-            : `“${deletingQuestion?.title ?? ""}” wordt definitief verwijderd.`
+            ? `“${deleteTarget?.title || "Naamloze vraag"}” wordt verwijderd, inclusief de antwoorden die leerlingen al op deze vraag gaven. Dit kan niet ongedaan worden gemaakt.`
+            : `“${deleteTarget?.title || "Naamloze vraag"}” wordt definitief verwijderd.`
         }
         confirmLabel="Verwijderen"
         onConfirm={confirmDeleteQuestion}
+        returnFocusRef={afterDeleteFocus}
       />
 
       <ConfirmDialog

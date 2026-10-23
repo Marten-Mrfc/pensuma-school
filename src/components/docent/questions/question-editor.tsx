@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, type Ref, useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
 import { Input } from "@/components/ui/input";
 import {
@@ -60,6 +60,13 @@ export interface QuestionEditorProps {
   status?: ReactNode;
   /** Topics used elsewhere, offered as suggestions. */
   tagSuggestions?: string[];
+  /** The Titel field (the builder focuses it after adding a question). */
+  titleRef?: Ref<HTMLInputElement>;
+  /**
+   * The "Vraag 2 van 5 · …" heading, focusable from script (tabIndex -1):
+   * where focus goes after the previous question was deleted.
+   */
+  headingRef?: Ref<HTMLDivElement>;
 }
 
 export function QuestionEditor({
@@ -73,6 +80,8 @@ export function QuestionEditor({
   actions,
   status,
   tagSuggestions,
+  titleRef,
+  headingRef,
 }: QuestionEditorProps) {
   const id = useId();
   const TypeIcon = QUESTION_TYPE_ICONS[question.type];
@@ -101,7 +110,11 @@ export function QuestionEditor({
           >
             <TypeIcon className="size-5" aria-hidden="true" />
           </span>
-          <div className="flex min-w-0 flex-col">
+          <div
+            ref={headingRef}
+            tabIndex={-1}
+            className="flex min-w-0 flex-col rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <span className="text-xs font-medium text-muted-foreground">
               Vraag {number} van {total} · {QUESTION_TYPE_LABELS[question.type]}
             </span>
@@ -139,6 +152,7 @@ export function QuestionEditor({
           <div className="flex flex-col gap-2">
             <FieldLabel htmlFor={`${id}-title`}>Titel</FieldLabel>
             <Input
+              ref={titleRef}
               id={`${id}-title`}
               value={question.title}
               onChange={(e) => onChange({ title: e.target.value })}

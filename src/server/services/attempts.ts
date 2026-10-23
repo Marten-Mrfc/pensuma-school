@@ -13,6 +13,7 @@ import {
   questions,
   studentAccommodations,
 } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
 import {
   computeAttemptDeadline,
   DEADLINE_GRACE_MS,
@@ -285,9 +286,12 @@ export async function regradeStalePendingAttempts(
       nextAt: now + STALE_PENDING_MS * 2 ** (count - 1),
     });
     if (count === MAX_SWEEP_REGRADES)
-      console.warn(
-        `[grading] attempt ${id} is still pending after ${count} sweeps; leaving it for the teacher`,
-      );
+      sweepLog({
+        level: "warn",
+        msg: "attempt_sweep_gave_up",
+        attemptId: id,
+        sweeps: count,
+      });
   }
   if (ids.length > 0) void gradeAttemptsInBackground(ids, 2);
   return ids;
@@ -329,7 +333,7 @@ export async function runAttemptSweep(): Promise<{
 
 function sweepLog(entry: Record<string, unknown>): void {
   const line = JSON.stringify({ ts: new Date().toISOString(), ...entry });
-  if (entry.level === "error") console.error(line);
+  if (entry.level === "warn") console.warn(line);
   else console.log(line);
 }
 
@@ -358,11 +362,8 @@ export function startAttemptSweeper(): void {
         });
       }
     } catch (error) {
-      sweepLog({
-        level: "error",
-        msg: "attempt_sweep_failed",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      // Never the raw message: a failed query quotes its parameters.
+      logServerError("attempt_sweep_failed", error);
     }
   };
   const schedule = (delayMs: number) => {

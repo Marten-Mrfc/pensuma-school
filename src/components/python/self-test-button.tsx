@@ -60,6 +60,7 @@ export function SelfTestButton({
   const nothingToTest = visibleTests.length === 0 && checks.length === 0;
 
   const runTests = async () => {
+    if (running) return;
     setRunning(true);
     setResult(null);
     try {
@@ -83,20 +84,28 @@ export function SelfTestButton({
   };
 
   const openAndRun = () => {
+    if (running) return;
     setOpen(true);
     if (!nothingToTest) void runTests();
   };
 
   return (
     <>
+      {/* While the tests run the button is aria-disabled, not disabled: a
+          disabled button drops keyboard focus to <body>, and focus must come
+          back here when the results sheet closes. */}
       <Button
         type="button"
         variant="secondary"
         onClick={openAndRun}
         onMouseEnter={runner.preload}
         onFocus={runner.preload}
-        disabled={disabled || running}
-        className={className}
+        disabled={disabled}
+        aria-disabled={running || undefined}
+        className={cn(
+          "aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+          className,
+        )}
       >
         {running ? (
           <Spinner
@@ -148,7 +157,8 @@ export function SelfTestButton({
                 type="button"
                 variant="outline"
                 onClick={runTests}
-                disabled={running}
+                aria-disabled={running || undefined}
+                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
               >
                 <RotateCcw aria-hidden="true" />
                 Opnieuw testen

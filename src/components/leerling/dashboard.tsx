@@ -26,7 +26,11 @@ import { claimLocalData, pruneAttemptBackups } from "@/lib/local-data";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
-import { finishedEmptyCopy, inProgressAttemptIds } from "./dashboard-logic";
+import {
+  backupKeepKey,
+  finishedEmptyCopy,
+  keepKeyIds,
+} from "./dashboard-logic";
 import {
   formatGrade,
   formatLongDate,
@@ -38,6 +42,7 @@ import {
   pluralize,
 } from "./format";
 import { ModeBadge } from "./mode-badge";
+import { ROW_LINK_CLASS, ROW_LIST_CLASS } from "./row-list";
 
 type DashboardItem = RouterOutputs["portal"]["dashboard"]["open"][number];
 
@@ -304,7 +309,9 @@ function FinishedRow({ item }: { item: DashboardItem }) {
             </span>
           ) : (
             <span className="text-sm text-muted-foreground">
-              {last.resultsVisible ? "Wordt nagekeken…" : hiddenResultLabel(last)}
+              {last.resultsVisible
+                ? "Wordt nagekeken…"
+                : hiddenResultLabel(last)}
             </span>
           )
         ) : null}
@@ -322,7 +329,7 @@ function FinishedRow({ item }: { item: DashboardItem }) {
       {last ? (
         <Link
           href={routes.leerling.result(last.attemptId)}
-          className="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 transition-colors outline-none hover:bg-accent/50 focus-visible:bg-accent/60"
+          className={ROW_LINK_CLASS}
         >
           {content}
         </Link>
@@ -371,15 +378,10 @@ export function StudentDashboard() {
   useEffect(() => {
     claimLocalData(user.id);
   }, [user.id]);
-  const fresh = query.isFetchedAfterMount ? query.data : undefined;
-  const keepKey = fresh
-    ? inProgressAttemptIds([fresh.open, fresh.upcoming, fresh.finished])
-        .sort()
-        .join(",")
-    : null;
+  const keepKey = backupKeepKey(query);
   useEffect(() => {
     if (keepKey == null) return;
-    pruneAttemptBackups(keepKey ? keepKey.split(",") : []);
+    pruneAttemptBackups(keepKeyIds(keepKey));
   }, [keepKey]);
 
   const greeting = (
@@ -466,7 +468,7 @@ export function StudentDashboard() {
 
       <Section title="Afgerond">
         {finished.length ? (
-          <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-xs">
+          <ul className={ROW_LIST_CLASS}>
             {finished.map((item) => (
               <FinishedRow key={item.id} item={item} />
             ))}

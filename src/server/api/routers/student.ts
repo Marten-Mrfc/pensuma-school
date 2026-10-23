@@ -23,7 +23,6 @@ import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import { studentEmail } from "@/server/auth";
 import type { DB } from "@/server/db";
 import {
-  account,
   assignments,
   attempts,
   classes,
@@ -48,6 +47,7 @@ import {
   getStudentPin,
   resetStudentPin,
 } from "@/server/services/accounts";
+import { attemptDisplayNumberSql } from "@/server/services/attempt-number";
 import {
   type AuditEntry,
   auditFromCtx,
@@ -151,41 +151,27 @@ async function mapLimit<T, R>(
 const ACCOUNT_CONCURRENCY = 4;
 
 /**
- * Create a student account and never leave a half-created user behind: if
- * any step after inserting the user fails, the user row is removed again.
- * Callers must have checked up front that the number/email are free; a
- * number taken meanwhile (two teachers at once) is a CONFLICT.
+ * Create a student account and never leave a half-created user behind:
+ * `createStudentAccount` removes the user row it inserted itself when a
+ * later step fails (and only that row: when two teachers add the same
+ * leerlingnummer at once, the one who loses never deletes the winner's
+ * account while it is still being set up). Callers must have checked up
+ * front that the number/email are free; a number taken meanwhile is a
+ * CONFLICT.
  *
  * A failure is an INTERNAL_SERVER_ERROR without the leerlingnummer in its
  * message, with the original error as cause: the tRPC error log then keeps
  * only the database error code and constraint (never Drizzle's message with
  * the query parameters), and the teacher sees the same error code.
  */
-async function createStudentSafely(
-  db: DB,
-  input: { studentNumber: string; name: string; pin?: string },
-) {
-  const startedAt = new Date(Date.now() - 1000);
+async function createStudentSafely(input: {
+  studentNumber: string;
+  name: string;
+  pin?: string;
+}) {
   try {
     return await createStudentAccount(input);
   } catch (error) {
-    const email = studentEmail(input.studentNumber);
-    const [partial] = await db
-      .select({
-        id: user.id,
-        createdAt: user.createdAt,
-        hasAccount: sql<boolean>`exists(select 1 from ${account} ac where ac.user_id = ${user}.id)`,
-        hasPin,
-      })
-      .from(user)
-      .where(eq(user.email, email));
-    if (
-      partial &&
-      partial.createdAt >= startedAt &&
-      !(partial.hasAccount && partial.hasPin)
-    ) {
-      await db.delete(user).where(eq(user.id, partial.id));
-    }
     if (databaseErrorOf(error)?.code === UNIQUE_VIOLATION) {
       throw new TRPCError({
         code: "CONFLICT",
@@ -424,7 +410,8 @@ export const studentRouter = createTRPCRouter({
           .select({
             id: attempts.id,
             assignmentId: attempts.assignmentId,
-            attemptNumber: attempts.attemptNumber,
+            // "Poging X" (see attempt-number.ts).
+            attemptNumber: attemptDisplayNumberSql,
             status: attempts.status,
             gradingStatus: attempts.gradingStatus,
             score: attempts.score,
@@ -540,7 +527,7 @@ export const studentRouter = createTRPCRouter({
           message: conflictMessage(input.studentNumber, existing.role),
         });
       }
-      const { user: created, pin } = await createStudentSafely(ctx.db, input);
+      const { user: created, pin } = await createStudentSafely(input);
       if (input.classId) {
         await ctx.db
           .insert(classMembers)
@@ -650,7 +637,7 @@ export const studentRouter = createTRPCRouter({
       }[] = [];
       await mapLimit(toCreate, ACCOUNT_CONCURRENCY, async (r) => {
         try {
-          const res = await createStudentSafely(ctx.db, {
+          const res = await createStudentSafely({
             studentNumber: r.studentNumber,
             name: r.name,
           });

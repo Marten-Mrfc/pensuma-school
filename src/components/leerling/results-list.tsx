@@ -15,6 +15,7 @@ import {
   hiddenResultLabel,
 } from "./format";
 import { ModeBadge } from "./mode-badge";
+import { ROW_LINK_CLASS, ROW_LIST_CLASS } from "./row-list";
 
 type Row = RouterOutputs["portal"]["myResults"][number];
 
@@ -109,12 +110,12 @@ export function ResultsList() {
               </div>
             </div>
           ) : null}
-          <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-xs">
+          <ul className={ROW_LIST_CLASS}>
             {rows.map((row) => (
               <li key={row.attemptId}>
                 <Link
                   href={routes.leerling.result(row.attemptId)}
-                  className="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 transition-colors outline-none hover:bg-accent/50 focus-visible:bg-accent/60"
+                  className={ROW_LINK_CLASS}
                 >
                   <div className="flex min-w-0 flex-1 basis-[14rem] flex-col gap-1">
                     <span className="flex flex-wrap items-center gap-2">

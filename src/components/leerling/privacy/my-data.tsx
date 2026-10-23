@@ -22,7 +22,12 @@ import { Button } from "@/components/ui/button";
 import { formatExtraTime } from "@/lib/accommodations";
 import { downloadTextFile } from "@/lib/export/download";
 import { myExportFileName } from "@/lib/privacy/export-format";
-import { formatDays, formatMonths } from "@/lib/privacy/retention";
+import { FACILITY_LABELS } from "@/lib/privacy/register";
+import {
+  autoDeleteNotice,
+  formatDays,
+  formatMonths,
+} from "@/lib/privacy/retention";
 import { routes } from "@/lib/routes";
 import { useTRPC } from "@/trpc/react";
 import { formatMoment } from "../format";
@@ -69,6 +74,104 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
       </dt>
       <dd className="font-medium text-foreground">{children}</dd>
     </div>
+  );
+}
+
+/** "50% verlengde tijd · plakken toegestaan", with the register's labels. */
+export function facilitiesText(acc: {
+  extraTimePercent: number;
+  allowPaste: boolean;
+  ignoreFocusEvents: boolean;
+}): string {
+  return [
+    acc.extraTimePercent > 0 ? formatExtraTime(acc.extraTimePercent) : null,
+    acc.allowPaste ? FACILITY_LABELS.allowPaste : null,
+    acc.ignoreFocusEvents ? FACILITY_LABELS.ignoreFocusEvents : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * What the exam log records, in line with /privacy ("Het logboek tijdens
+ * toetsen") and src/lib/privacy/event-details.ts: code runs and self-tests
+ * always; leaving the window, leaving fullscreen and paste attempts only
+ * when the toets asks for it; copying never.
+ */
+export function ExamLogSection() {
+  return (
+    <Section icon={Eye} title="Wat we bijhouden tijdens toetsen">
+      <p>
+        Bij elke toets, ook een oefentoets van je docent, houdt Pensuma bij
+        wanneer je je code uitvoert of test: bij welke vraag, hoe lang het
+        duurde, welke soort fout er was en hoeveel tests slaagden. Je code zelf
+        staat daar niet in; die zit in je antwoord. Op de vrije oefenplek
+        (Oefenen) komt niets in het logboek.
+      </p>
+      <p>
+        Bij sommige toetsen houdt Pensuma daarnaast bij wanneer je het
+        toetsvenster of tabblad verlaat, het volledige scherm verlaat of
+        probeert te plakken (niet wát je plakt). Dat zie je altijd op het
+        startscherm, voordat je begint.
+      </p>
+      <p>
+        We houden nooit je toetsaanslagen, je scherm, camera of microfoon, wat
+        je kopieert of wat je in andere tabbladen doet bij.
+      </p>
+      <p>
+        <Link href={`${routes.privacy}#logboek`} className={linkClass}>
+          Lees meer over het logboek tijdens toetsen
+        </Link>
+      </p>
+    </Section>
+  );
+}
+
+/** How long Pensuma keeps the student's data, with the school's caveat. */
+export function RetentionSection({
+  retention: r,
+}: {
+  retention: {
+    attemptsMonths: number;
+    attemptEventsDays: number;
+    inactiveStudentMonths: number;
+    confirmed: boolean;
+    autoDeleteAttempts: boolean;
+  };
+}) {
+  const notice = autoDeleteNotice(r);
+  return (
+    <Section icon={Clock} title="Hoe lang we dit bewaren">
+      <ul className="ml-5 list-disc space-y-1.5 marker:text-primary">
+        <li>
+          Je antwoorden en resultaten:{" "}
+          <strong className="text-foreground">
+            {formatMonths(r.attemptsMonths)}
+          </strong>{" "}
+          na het sluiten van de toets.
+        </li>
+        <li>
+          Het logboek tijdens toetsen:{" "}
+          <strong className="text-foreground">
+            {formatDays(r.attemptEventsDays)}
+          </strong>{" "}
+          na het inleveren.
+        </li>
+        <li>
+          Je account: zolang je in een klas zit, daarna nog{" "}
+          <strong className="text-foreground">
+            {formatMonths(r.inactiveStudentMonths)}
+          </strong>{" "}
+          na de laatste keer inloggen.
+        </li>
+      </ul>
+      {notice ? <p className="text-sm">{notice}</p> : null}
+      <p>
+        <Link href={routes.privacy} className={linkClass}>
+          Lees de hele privacyverklaring
+        </Link>
+      </p>
+    </Section>
   );
 }
 
@@ -159,17 +262,7 @@ export function MyData() {
                 : "Onbekend"}
             </Fact>
             {acc ? (
-              <Fact label="Faciliteiten">
-                {[
-                  acc.extraTimePercent > 0
-                    ? formatExtraTime(acc.extraTimePercent)
-                    : null,
-                  acc.allowPaste ? "plakken toegestaan" : null,
-                  acc.ignoreFocusEvents ? "geen logboek" : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </Fact>
+              <Fact label="Faciliteiten">{facilitiesText(acc)}</Fact>
             ) : null}
           </dl>
         </Section>
@@ -199,55 +292,9 @@ export function MyData() {
           </div>
         </Section>
 
-        <Section icon={Eye} title="Wat we bijhouden tijdens toetsen">
-          <p>
-            Bij sommige toetsen houdt Pensuma bij wanneer je het toetsvenster
-            verlaat, het volledige scherm verlaat of probeert te plakken. Dat
-            zie je altijd vóórdat je begint. We houden nooit je toetsaanslagen,
-            je scherm, je camera of wat je plakt bij.
-          </p>
-          <p>
-            <Link href={`${routes.privacy}#logboek`} className={linkClass}>
-              Lees meer over het logboek tijdens toetsen
-            </Link>
-          </p>
-        </Section>
+        <ExamLogSection />
 
-        <Section icon={Clock} title="Hoe lang we dit bewaren">
-          <ul className="ml-5 list-disc space-y-1.5 marker:text-primary">
-            <li>
-              Je antwoorden en resultaten:{" "}
-              <strong className="text-foreground">
-                {formatMonths(r.attemptsMonths)}
-              </strong>{" "}
-              na het sluiten van de toets.
-            </li>
-            <li>
-              Het logboek tijdens toetsen:{" "}
-              <strong className="text-foreground">
-                {formatDays(r.attemptEventsDays)}
-              </strong>{" "}
-              na het inleveren.
-            </li>
-            <li>
-              Je account: zolang je in een klas zit, daarna nog{" "}
-              <strong className="text-foreground">
-                {formatMonths(r.inactiveStudentMonths)}
-              </strong>{" "}
-              na de laatste keer inloggen.
-            </li>
-          </ul>
-          {!r.confirmed ? (
-            <p className="text-sm">
-              Je school stelt deze termijnen nog definitief vast.
-            </p>
-          ) : null}
-          <p>
-            <Link href={routes.privacy} className={linkClass}>
-              Lees de hele privacyverklaring
-            </Link>
-          </p>
-        </Section>
+        <RetentionSection retention={r} />
       </div>
 
       <p className="rounded-2xl border border-primary/20 bg-primary/[0.04] px-5 py-4 text-[0.95rem] text-foreground">

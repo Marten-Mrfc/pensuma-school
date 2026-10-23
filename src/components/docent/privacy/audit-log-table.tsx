@@ -27,6 +27,8 @@ import {
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { useResultAnnouncement } from "../a11y/result-announcement";
+import { auditRowsMessage } from "../a11y/result-messages";
 import { formatDateTime } from "../students/format";
 import { type PickedStudent, StudentPicker } from "./student-picker";
 
@@ -86,6 +88,13 @@ export function AuditLogTable() {
   const exportLog = useMutation(trpc.privacy.exportAuditLog.mutationOptions());
   const rows = log.data?.pages.flatMap((p) => p.rows) ?? [];
   const filtered = !!actorId || !!student || !!kind || !!from || !!to;
+  // Read the result aloud after a filter change or "Meer laden", also when
+  // nothing was found (the polite region used to render only with rows).
+  useResultAnnouncement({
+    key: `${JSON.stringify(filters)}|${log.data?.pages.length ?? 0}`,
+    ready: log.isSuccess && !log.isFetching,
+    message: auditRowsMessage(rows.length, filtered),
+  });
   const grouped = actionsByCategory();
 
   function clearFilters() {
@@ -264,9 +273,6 @@ export function AuditLogTable() {
         />
       ) : (
         <>
-          <p className="sr-only" aria-live="polite">
-            {rows.length} regels getoond.
-          </p>
           <AuditRows rows={rows} />
           {log.hasNextPage ? (
             <div className="flex justify-center">

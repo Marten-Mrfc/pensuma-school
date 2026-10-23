@@ -184,12 +184,7 @@ function StudentForm({
           />
         </FormField>
 
-        <FormField
-          label="Naam"
-          htmlFor={ids.name}
-          required
-          error={errors.name}
-        >
+        <FormField label="Naam" htmlFor={ids.name} required error={errors.name}>
           <Input
             id={ids.name}
             autoComplete="off"

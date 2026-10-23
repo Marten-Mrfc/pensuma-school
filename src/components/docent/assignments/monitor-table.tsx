@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { focusInvalidField } from "../a11y/invalid-field-focus";
 import { useResultAnnouncement } from "../a11y/result-announcement";
+import { selectionMessage } from "../a11y/result-messages";
 import { formatGrade, formatNumber, formatRemaining } from "./format";
 import {
   MINUTES_ERROR,
@@ -68,14 +69,6 @@ const INACTIVE_MS = 90_000;
 function rowState(row: StudentRow) {
   if (!row.attempt) return "not_started" as const;
   return row.attempt.status;
-}
-
-/** Status message after searching or filtering the live overview. */
-export function selectionMessage(count: number): string {
-  if (count === 0) return "Geen leerlingen in deze selectie.";
-  return count === 1
-    ? "1 leerling in deze selectie."
-    : `${count} leerlingen in deze selectie.`;
 }
 
 /** Help text for the focus-loss column. */

@@ -18,13 +18,16 @@ export function normalizeTypedAccessCode(value: string): string {
 }
 
 /**
- * Smaller letters and spacing for longer codes, so a 20-character code
- * still fits on a phone (and in the 22rem side panel on a laptop).
+ * Smaller letters and spacing for longer codes, so every code a teacher can
+ * choose stays fully visible: from a 320px phone (and 400% zoom) up to the
+ * 22rem side panel on a laptop. At 320px the field has about 210px for
+ * text; a monospace letter is 0.6em wide plus its tracking.
  */
 export function accessCodeSizeClass(length: number): string {
-  if (length <= 8) return "text-3xl tracking-[0.35em]";
-  if (length <= 12) return "text-2xl tracking-[0.2em]";
-  return "text-lg tracking-[0.08em]";
+  if (length <= 7) return "text-3xl tracking-[0.35em]";
+  if (length <= 10) return "text-2xl tracking-[0.2em]";
+  if (length <= 14) return "text-xl tracking-[0.12em]";
+  return "text-base tracking-[0.04em] min-[360px]:text-lg min-[360px]:tracking-[0.08em]";
 }
 
 /** The big "Toegangscode" field on the start screen. */

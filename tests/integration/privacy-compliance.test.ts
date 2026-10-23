@@ -739,7 +739,8 @@ describe("inzage export: hints, holds and targeted afnames", () => {
 
     const caller = callerFor(teacher);
     const data = await caller.privacy.exportStudent({ userId: s.id });
-    expect(data.schemaVersion).toBe(2);
+    expect(data.schemaVersion).toBe(3);
+    expect(data.uitleg.codes.mode.practice).toBe("oefentoets");
     expect(data.attempts[0]?.answers[0]?.hintsUsed).toEqual([
       { hintNumber: 1, at: "2026-10-01T09:15:00.000Z", penalty: 0.25 },
     ]);

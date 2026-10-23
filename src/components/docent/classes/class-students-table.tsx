@@ -17,9 +17,22 @@ import { ExtraTimeDialog } from "../students/extra-time-dialog";
 import { formatDateTime } from "../students/format";
 import { PinReveal } from "../students/pin-reveal";
 import { StudentActionsMenu } from "../students/student-actions-menu";
-import { LoginLockBadge, StudentStatus } from "../students/student-status";
+import {
+  LoginLockBadge,
+  RestrictedBadge,
+  StudentStatus,
+} from "../students/student-status";
 
 type Member = RouterOutputs["class"]["get"]["members"][number];
+
+/**
+ * Query input for the class members whose processing may be restricted
+ * (AVG art. 18). A restriction always deactivates the account, so only the
+ * deactivated members need checking; `class.get` doesn't say it itself.
+ */
+export function restrictedMembersInput(classId: string) {
+  return { classId, status: "inactive" as const, pageSize: 100 };
+}
 
 export interface ClassStudentsTableProps {
   classId: string;
@@ -40,6 +53,15 @@ export function ClassStudentsTable({
   );
   const extraTime = (userId: string) =>
     accommodations.data?.[userId]?.extraTimePercent ?? 0;
+  const inactiveMembers = useQuery({
+    ...trpc.student.list.queryOptions(restrictedMembersInput(classId)),
+    enabled: members.some((m) => m.banned),
+  });
+  const restrictedIds = new Set(
+    (inactiveMembers.data?.rows ?? [])
+      .filter((r) => r.restricted)
+      .map((r) => r.id),
+  );
   const memberIds = new Set(members.map((m) => m.id));
   const selection = selected.filter((x) => memberIds.has(x));
   const term = filter.trim().toLowerCase();
@@ -124,6 +146,10 @@ export function ClassStudentsTable({
             lockedUntil={m.loginLockedUntil}
             className="mt-1 sm:hidden"
           />
+          <RestrictedBadge
+            restricted={restrictedIds.has(m.id)}
+            className="mt-1 sm:hidden"
+          />
         </div>
       ),
     },
@@ -136,6 +162,7 @@ export function ClassStudentsTable({
         <span className="flex flex-wrap items-center gap-1.5">
           <StudentStatus banned={m.banned} />
           <LoginLockBadge lockedUntil={m.loginLockedUntil} />
+          <RestrictedBadge restricted={restrictedIds.has(m.id)} />
         </span>
       ),
     },

@@ -27,6 +27,8 @@ export type FakeRunFn = (input: RunInput) => RunResult | Promise<RunResult>;
 
 /** Every input the fake grader received, in order (for assertions). */
 export const gradeCalls: GradeInput[] = [];
+/** The options of every gradeCodeBatch call (interactive or background). */
+export const gradeBatchOptions: unknown[] = [];
 /** Every input the fake runner received, in order. */
 export const runCalls: RunInput[] = [];
 
@@ -115,6 +117,7 @@ export function resetFakeGrader(): void {
   gradeImpl = defaultGrade;
   runImpl = defaultRun;
   gradeCalls.length = 0;
+  gradeBatchOptions.length = 0;
   runCalls.length = 0;
 }
 
@@ -127,7 +130,9 @@ export async function gradeCode(input: GradeInput): Promise<CodeGradingResult> {
 
 export async function gradeCodeBatch(
   items: GradeInput[],
+  options?: unknown,
 ): Promise<CodeGradingResult[]> {
+  gradeBatchOptions.push(options);
   const results: CodeGradingResult[] = [];
   for (const item of items) results.push(await gradeCode(item));
   return results;

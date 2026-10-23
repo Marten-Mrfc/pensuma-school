@@ -9,6 +9,7 @@ import {
   Pencil,
   Printer,
   School,
+  ShieldAlert,
   UserMinus,
 } from "lucide-react";
 import Link from "next/link";
@@ -37,7 +38,11 @@ import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
 import { StudentActionsMenu } from "./student-actions-menu";
 import { StudentFormDialog } from "./student-form-dialog";
-import { LoginLockBadge, StudentStatus } from "./student-status";
+import {
+  LoginLockBadge,
+  RestrictedBadge,
+  StudentStatus,
+} from "./student-status";
 
 type Student = RouterOutputs["student"]["get"];
 type Attempt = Student["attempts"][number];
@@ -124,6 +129,7 @@ export function StudentDetailPage({
           <span className="flex flex-wrap items-center gap-1.5">
             <StudentStatus banned={s.banned} />
             <LoginLockBadge lockedUntil={s.loginLockedUntil} />
+            <RestrictedBadge restricted={s.restricted} />
           </span>
         }
         backHref={routes.docent.students}
@@ -156,7 +162,33 @@ export function StudentDetailPage({
         }
       />
 
-      {s.banned ? (
+      {s.restricted ? (
+        <div
+          role="note"
+          className="flex items-start gap-3 rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm"
+        >
+          <ShieldAlert
+            className="mt-0.5 size-4 shrink-0 text-warning-ink"
+            aria-hidden="true"
+          />
+          <p className="text-pretty">
+            <span className="font-medium text-warning-ink">
+              De verwerking van de gegevens van deze leerling is beperkt (AVG
+              art. 18).
+            </span>{" "}
+            De gegevens worden alleen nog bewaard: het account is geblokkeerd en
+            naam, leerlingnummer, faciliteiten, klassen en scores kun je niet
+            wijzigen. De beperking beheer je via{" "}
+            <Link
+              href={routes.docent.privacy}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Privacy &amp; gegevens
+            </Link>
+            .
+          </p>
+        </div>
+      ) : s.banned ? (
         <p className="rounded-lg border border-destructive/20 bg-destructive/[0.05] px-4 py-3 text-sm text-destructive-ink">
           Dit account is gedeactiveerd: de leerling kan niet inloggen. Activeer
           het via het menu met de drie puntjes.
@@ -242,6 +274,7 @@ export function StudentDetailPage({
             key={JSON.stringify(s.accommodation)}
             userId={s.id}
             value={s.accommodation}
+            restricted={s.restricted}
           />
 
           <Panel title="Klassen" icon={<School className="size-4" />}>

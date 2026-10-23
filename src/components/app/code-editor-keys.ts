@@ -25,5 +25,7 @@ export const toggleTabFocus: Command = (view) => {
  * applies there too), ahead of the default keymap.
  */
 export const exitEditorKeymap: Extension = Prec.high(
-  keymap.of([{ key: EXIT_EDITOR_KEY, run: toggleTabFocus, preventDefault: true }]),
+  keymap.of([
+    { key: EXIT_EDITOR_KEY, run: toggleTabFocus, preventDefault: true },
+  ]),
 );

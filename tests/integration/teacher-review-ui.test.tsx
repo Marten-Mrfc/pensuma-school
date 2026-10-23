@@ -8,9 +8,18 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import {
+  regradeDescription,
+  regradeToast,
+} from "@/components/docent/review/copy";
+import {
   identicalAnswers,
   pendingReviewTotal,
+  regradeCount,
 } from "@/components/docent/review/grading-logic";
+import {
+  QuestionGrader,
+  QuestionPicker,
+} from "@/components/docent/review/grading-view";
 import { ResultsContent } from "@/components/docent/review/results-view";
 import {
   createTestTrpc,
@@ -20,7 +29,7 @@ import {
 import { db } from "@/server/db";
 import { answers, attempts } from "@/server/db/schema";
 import { callerFor } from "../support/caller";
-import { resetDatabase } from "../support/db";
+import { drainGrading, resetDatabase } from "../support/db";
 import {
   addToClass,
   createBasicWorld,
@@ -153,6 +162,40 @@ describe("Resultaten: the matrix and the export (A05, A40, A41)", () => {
   });
 });
 
+describe("Resultaten: 'Opnieuw nakijken' never undercounts (A40)", () => {
+  test("two hand-ins of one student: no number from the page", async () => {
+    const w = await createBasicWorld({
+      settings: { showResults: "immediately", maxAttempts: 3 },
+    });
+    await handIn(w, w.s1, "Eerste uitleg");
+    await handIn(w, w.s1, "Tweede uitleg");
+    const t = callerFor(w.teacher);
+    const results = await t.review.results({ assignmentId: w.assignment.id });
+    // One row per student, but the server regrades both attempts.
+    expect(results.stats.submitted).toBe(1);
+    expect(regradeCount(results.rows, results.stats.submitted)).toBeNull();
+    expect(regradeDescription(null)).not.toContain("De ingeleverde poging");
+    const res = await t.review.regradeAssignment({
+      assignmentId: w.assignment.id,
+    });
+    expect(res.scheduled).toBe(2);
+    expect(regradeToast(res.scheduled)).toBe(
+      "2 pogingen worden opnieuw nagekeken",
+    );
+    // Let the background regrade finish before the next test resets the DB.
+    await drainGrading();
+  });
+
+  test("one hand-in per student: the exact number", async () => {
+    const w = await createBasicWorld();
+    await handIn(w, w.s1, "Mijn uitleg");
+    const results = await callerFor(w.teacher).review.results({
+      assignmentId: w.assignment.id,
+    });
+    expect(regradeCount(results.rows, results.stats.submitted)).toBe(1);
+  });
+});
+
 describe("Nakijken: grading identical answers together (X09)", () => {
   test("answers that already have a manual score are left out", async () => {
     const w = await createBasicWorld();
@@ -185,6 +228,36 @@ describe("Nakijken: grading identical answers together (X09)", () => {
     expect(targets.ungraded).toEqual([a3.answerId]);
     expect(targets.graded).toEqual([a2.answerId]);
 
+    // The grading screen offers only the identical answer without a manual
+    // score (whichever of a1/a3 comes first, the other is the one target).
+    const overview = await t.review.gradingQueue({
+      assignmentId: w.assignment.id,
+      includeGraded: true,
+    });
+    const question = overview.questions.find(
+      (q) => q.id === w.questions.open.id,
+    );
+    if (!question) throw new Error("open question missing from the queue");
+    const input = {
+      assignmentId: w.assignment.id,
+      questionId: w.questions.open.id,
+    };
+    const { queryClient, trpc, render } = createTestTrpc();
+    queryClient.setQueryData(
+      trpc.review.gradingQueue.queryKey({ ...input, includeGraded: true }),
+      queue,
+    );
+    queryClient.setQueryData(trpc.feedback.groups.queryKey(input), groups);
+    const screen = textOf(
+      render(
+        <QuestionGrader assignmentId={w.assignment.id} question={question} />,
+      ),
+    );
+    expect(screen).toContain(
+      "Ook toepassen op 1 gelijk antwoord zonder handmatige score",
+    );
+    expect(screen).not.toContain("2 gelijke antwoorden");
+
     // What "Opslaan" sends with "Ook toepassen op …" ticked.
     await t.feedback.gradeMany({
       answerIds: [a1.answerId, ...targets.ungraded],
@@ -196,5 +269,59 @@ describe("Nakijken: grading identical answers together (X09)", () => {
     expect(score(a1.answerId)).toBe(1);
     expect(score(a3.answerId)).toBe(1);
     expect(score(a2.answerId)).toBe(2);
+  });
+});
+
+describe("Nakijken: focus target and question tabs (A02, A40)", () => {
+  test("the student's name is a heading that can take focus", async () => {
+    const w = await createBasicWorld();
+    await handIn(w, w.s1, "Mijn uitleg");
+    const t = callerFor(w.teacher);
+    const input = {
+      assignmentId: w.assignment.id,
+      questionId: w.questions.open.id,
+    };
+    const [overview, queue, groups] = await Promise.all([
+      t.review.gradingQueue({
+        assignmentId: w.assignment.id,
+        includeGraded: true,
+      }),
+      t.review.gradingQueue({ ...input, includeGraded: true }),
+      t.feedback.groups(input),
+    ]);
+    const question = overview.questions.find(
+      (q) => q.id === w.questions.open.id,
+    );
+    if (!question) throw new Error("open question missing from the queue");
+    const { queryClient, trpc, render } = createTestTrpc();
+    queryClient.setQueryData(
+      trpc.review.gradingQueue.queryKey({ ...input, includeGraded: true }),
+      queue,
+    );
+    queryClient.setQueryData(trpc.feedback.groups.queryKey(input), groups);
+
+    const html = render(
+      <QuestionGrader assignmentId={w.assignment.id} question={question} />,
+    );
+    // After "Opslaan en volgende" focus moves here (see grading-logic).
+    const [heading] = tagsMatching(html, /^<h2[^>]*tabindex="-1"/);
+    expect(heading).toBeDefined();
+    const headingHtml = html.slice(html.indexOf(heading));
+    expect(textOf(headingHtml.slice(0, headingHtml.indexOf("</h2>")))).toBe(
+      `${w.s1.name} , antwoord 1 van 1`,
+    );
+
+    // The question tab: "1 antwoord", not "1 antwoorden".
+    const tabs = textOf(
+      render(
+        <QuestionPicker
+          questions={overview.questions}
+          active={question.id}
+          onSelect={() => {}}
+        />,
+      ),
+    );
+    expect(tabs).toContain("1 te beoordelen · 1 antwoord");
+    expect(tabs).not.toContain("1 antwoorden");
   });
 });

@@ -77,10 +77,9 @@ function JumpGroup({
         {icon}
         {title}
       </p>
-      <div
-        role="group"
+      <fieldset
         aria-labelledby={headingId}
-        className="flex flex-wrap gap-1.5"
+        className="flex min-w-0 flex-wrap gap-1.5"
       >
         {questions.map((q) => {
           const i = allQuestions.indexOf(q);
@@ -97,7 +96,7 @@ function JumpGroup({
             </button>
           );
         })}
-      </div>
+      </fieldset>
       {footnote ? <p className="text-xs">{footnote}</p> : null}
     </div>
   );

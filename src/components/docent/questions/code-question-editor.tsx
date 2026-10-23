@@ -42,6 +42,7 @@ import { HintsEditor } from "./hints-editor";
 import { IssueList } from "./issue-list";
 import { CodeRunPanel, TestResultsList, usePythonRunner } from "./python";
 import { TestCaseEditor } from "./test-case-editor";
+import { CODE_QUESTION_VISIBILITY_NOTE } from "./visibility-notes";
 
 export interface CodeQuestionEditorProps {
   questionId: string;
@@ -184,7 +185,7 @@ export function CodeQuestionEditor({
     <div className="flex flex-col gap-5">
       <EditorSection
         title="Code"
-        description="De startcode ziet de leerling in de editor. De modeloplossing krijgen leerlingen nooit te zien."
+        description={CODE_QUESTION_VISIBILITY_NOTE}
         icon={<Code2 />}
       >
         <div className="flex flex-col gap-2">

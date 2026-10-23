@@ -23,7 +23,8 @@ import { NativeSelect } from "@/components/ui/select";
 import { routes } from "@/lib/routes";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { useResultAnnouncement } from "../a11y/result-announcement";
-import { formatDateTime, plural } from "./format";
+import { studentsFoundMessage } from "../a11y/result-messages";
+import { formatDateTime } from "./format";
 import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
 import { StudentActionsMenu } from "./student-actions-menu";
@@ -38,14 +39,6 @@ type Row = RouterOutputs["student"]["list"]["rows"][number];
 type Status = "all" | "active" | "inactive";
 
 const PAGE_SIZE = 25;
-
-/** The result count in the header (and read aloud after a search). */
-export function studentsFoundMessage(total: number, filtered: boolean): string {
-  if (!filtered) return `${plural(total, "leerling", "leerlingen")} in Pensuma.`;
-  return total === 0
-    ? "Geen leerlingen gevonden."
-    : `${plural(total, "leerling", "leerlingen")} gevonden.`;
-}
 
 /** /docent/leerlingen: all students, searchable and paginated. */
 export function StudentsPage() {

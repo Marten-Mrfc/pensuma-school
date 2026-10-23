@@ -74,6 +74,10 @@ import {
   stillWorkingByAssignment,
 } from "@/server/services/assignment-targets";
 import {
+  attemptDisplayNumberOf,
+  attemptDisplayNumberSql,
+} from "@/server/services/attempt-number";
+import {
   AttemptStartError,
   autoSubmitIfExpired,
   createOrResumeAttempt,
@@ -407,7 +411,10 @@ export const portalRouter = createTRPCRouter({
           lastAttempt: last
             ? {
                 attemptId: last.id,
-                attemptNumber: last.attemptNumber,
+                // "Poging X" counts the attempts that still exist.
+                attemptNumber: mine.filter(
+                  (t) => t.attemptNumber <= last.attemptNumber,
+                ).length,
                 submittedAt: last.submittedAt,
                 resultsVisible: visible,
                 gradingStatus: visible ? last.gradingStatus : null,
@@ -687,7 +694,8 @@ export const portalRouter = createTRPCRouter({
         attempt: {
           id: attempt.id,
           assignmentId: attempt.assignmentId,
-          attemptNumber: attempt.attemptNumber,
+          /** "Poging X" (see attempt-number.ts). */
+          attemptNumber: await attemptDisplayNumberOf(db, attempt),
           status: attempt.status,
           startedAt: attempt.startedAt,
           deadlineAt: attempt.deadlineAt,
@@ -949,7 +957,10 @@ export const portalRouter = createTRPCRouter({
       const status = effectiveAssignmentStatus(a, now);
 
       const mine = await db
-        .select({ status: attempts.status })
+        .select({
+          status: attempts.status,
+          attemptNumber: attempts.attemptNumber,
+        })
         .from(attempts)
         .where(
           and(
@@ -964,7 +975,13 @@ export const portalRouter = createTRPCRouter({
         assignmentId: a.id,
         title: assignmentTitle(a, row.testTitle),
         mode: a.mode,
-        attemptNumber: attempt.attemptNumber,
+        /**
+         * "Poging X van maxAttempts": the position among the attempts that
+         * still exist, so a reset attempt never leaves a gap.
+         */
+        attemptNumber:
+          mine.filter((t) => t.attemptNumber <= attempt.attemptNumber).length ||
+          attempt.attemptNumber,
         attemptStatus: attempt.status,
         startedAt: attempt.startedAt,
         submittedAt: attempt.submittedAt,
@@ -1207,7 +1224,7 @@ export const portalRouter = createTRPCRouter({
       .select({
         attempt: {
           id: attempts.id,
-          attemptNumber: attempts.attemptNumber,
+          attemptNumber: attemptDisplayNumberSql,
           submittedAt: attempts.submittedAt,
           autoSubmitted: attempts.autoSubmitted,
           score: attempts.score,

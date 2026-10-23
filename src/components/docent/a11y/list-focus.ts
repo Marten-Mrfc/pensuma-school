@@ -18,7 +18,5 @@ export function neighbourAfterRemoval(
   removedIndex: number,
 ): string | null {
   if (removedIndex < 0 || removedIndex >= items.length) return null;
-  return (
-    items[removedIndex + 1]?.id ?? items[removedIndex - 1]?.id ?? null
-  );
+  return items[removedIndex + 1]?.id ?? items[removedIndex - 1]?.id ?? null;
 }

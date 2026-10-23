@@ -25,6 +25,7 @@ import {
   insertTeacher,
   q,
 } from "../support/factories";
+import { settleGrading } from "../support/wait";
 
 beforeEach(resetDatabase);
 
@@ -418,6 +419,7 @@ describe("grading", () => {
     });
     const t = callerFor(w.teacher);
     await t.review.regradeAssignment({ assignmentId: a.id });
+    await settleGrading();
     const openAnswer = async () =>
       (
         await db
@@ -439,6 +441,7 @@ describe("grading", () => {
     });
     expect((await openAnswer()).maxScore).toBe(0);
     await t.review.regradeAssignment({ assignmentId: a.id });
+    await settleGrading();
     expect((await openAnswer()).maxScore).toBe(0);
     const [dropped] = await db
       .select()
@@ -493,6 +496,7 @@ describe("grading", () => {
     });
     const t = callerFor(w.teacher);
     await t.review.regradeAssignment({ assignmentId: a.id });
+    await settleGrading();
     const before = await t.review.results({ assignmentId: a.id });
     const linear = before.rows.find((r) => r.attempt)?.attempt?.grade;
     // 1 of 5 points: linear 1 + 9 × 0.2 = 2.8
@@ -639,6 +643,7 @@ print("De som is", ${total})
     });
     const t = callerFor(w.teacher);
     await t.review.regradeAssignment({ assignmentId: a.id });
+    await settleGrading();
     const res = await t.analysis.assignment({ assignmentId: a.id });
     expect(res.test.n).toBe(3);
     expect(res.test.smallSample).toBe(true);

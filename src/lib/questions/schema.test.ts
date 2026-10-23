@@ -289,7 +289,8 @@ describe("redactCodeResultForStudent", () => {
       weight: 2,
       passed: false,
       timedOut: false,
-      durationMs: 40,
+      // No timing side channel: a hidden test's run time is never shown.
+      durationMs: 0,
     });
     expect(redacted.tests[2]).toEqual({
       testId: "geheim-fn",
@@ -299,9 +300,20 @@ describe("redactCodeResultForStudent", () => {
       weight: 1,
       passed: true,
       timedOut: true,
-      durationMs: 5000,
+      durationMs: 0,
     });
     expect(JSON.stringify(redacted)).not.toContain("CANARY_HIDDEN");
+  });
+
+  test("hidden tests report no run time (timing side channel)", () => {
+    const redacted = redactCodeResultForStudent(full);
+    const hidden = redacted.tests.filter((t) => t.hidden);
+    expect(hidden.length).toBe(2);
+    for (const t of hidden) expect(t.durationMs).toBe(0);
+    // The visible test keeps its time; the shape stays valid.
+    expect(redacted.tests[0]?.durationMs).toBe(12);
+    expect(JSON.stringify(redacted)).not.toContain('"durationMs":40');
+    expect(JSON.stringify(redacted)).not.toContain('"durationMs":5000');
   });
 
   test("visible tests, checks and totals are unchanged", () => {

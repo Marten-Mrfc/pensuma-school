@@ -1,3 +1,4 @@
+import { ATTEMPT_BACKUP_PREFIX } from "@/lib/local-data";
 import type {
   AnswerResponse,
   StudentCodeQuestionData,
@@ -46,29 +47,14 @@ export function isAnswered(
   }
 }
 
-/** Every local key of an attempt starts with this prefix. */
-export const ATTEMPT_STORAGE_PREFIX = "pensuma:poging:";
+/**
+ * Every local key of an attempt starts with this prefix (the same one
+ * src/lib/local-data.ts prunes on the dashboard and clears on sign-out).
+ */
+export const ATTEMPT_STORAGE_PREFIX = ATTEMPT_BACKUP_PREFIX;
 
 export function storageKey(attemptId: string, suffix = "answers") {
   return `${ATTEMPT_STORAGE_PREFIX}${attemptId}:${suffix}`;
-}
-
-/**
- * Remove the local copies of every attempt (answers backup, flags,
- * position) from this browser: shared school PCs keep nothing behind.
- */
-export function clearAllAttemptBackups() {
-  try {
-    const storage = window.localStorage;
-    const keys: string[] = [];
-    for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (key?.startsWith(ATTEMPT_STORAGE_PREFIX)) keys.push(key);
-    }
-    for (const key of keys) storage.removeItem(key);
-  } catch {
-    // Storage blocked: nothing was stored either.
-  }
 }
 
 export function readStorage<T>(key: string): T | null {

@@ -25,7 +25,7 @@ import { callerFor, type TestUser } from "../support/caller";
 import { drainGrading, resetDatabase } from "../support/db";
 import { createAssignment, createBasicWorld } from "../support/factories";
 import { defaultGrade, setFakeGrader } from "../support/fake-grader";
-import { waitFor, waitForGrading } from "../support/wait";
+import { settleGrading, waitFor, waitForGrading } from "../support/wait";
 
 beforeEach(resetDatabase);
 afterEach(() => setGradingRetryDelaysForTests(null));
@@ -163,11 +163,19 @@ describe("incomplete grading is reported", () => {
     expect((err as { reason: string }).reason).toBe("internal_error");
     expect((await codeAnswer(w, attemptId)).status).toBe("needs_review");
 
-    // The teacher's "Alles opnieuw nakijken" counts it as failed.
+    // The teacher's "Alles opnieuw nakijken" runs in the background; the
+    // answer that could not be graded waits for the teacher again.
     const summary = await callerFor(w.teacher).review.regradeAssignment({
       assignmentId: w.assignment.id,
     });
-    expect(summary.failed).toBeGreaterThanOrEqual(1);
+    expect(summary).toMatchObject({ total: 1, scheduled: 1 });
+    await settleGrading();
+    expect((await codeAnswer(w, attemptId)).status).toBe("needs_review");
+    const [attempt] = await db
+      .select()
+      .from(attempts)
+      .where(eq(attempts.id, attemptId));
+    expect(attempt.gradingStatus).toBe("needs_review");
   });
 });
 

@@ -2,6 +2,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { attempts } from "@/server/db/schema";
+import { isGradingInFlight } from "@/server/services/grading";
 import { drainGrading } from "./db";
 
 export async function waitFor<T>(
@@ -46,4 +47,24 @@ export async function waitForGrading(
       message: `waitForGrading: attempt ${attemptId} still pending after ${timeoutMs} ms`,
     },
   );
+}
+
+/**
+ * Wait until no attempt is being graded in the background any more
+ * (scheduled, running or waiting for a retry), e.g. after
+ * review.regradeAssignment, which returns before the grading is done.
+ */
+export async function settleGrading(timeoutMs = 5_000): Promise<void> {
+  const rows = await db.select({ id: attempts.id }).from(attempts);
+  await waitFor(
+    async () => {
+      await drainGrading();
+      return rows.every((r) => !isGradingInFlight(r.id));
+    },
+    {
+      timeoutMs,
+      message: `settleGrading: still grading after ${timeoutMs} ms`,
+    },
+  );
+  await drainGrading();
 }

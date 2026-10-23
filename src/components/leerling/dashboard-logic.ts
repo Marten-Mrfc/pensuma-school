@@ -21,6 +21,31 @@ export function inProgressAttemptIds(
   return ids;
 }
 
+/**
+ * Which answer backups the dashboard keeps, as a stable key for an effect:
+ * the sorted ids of the running attempts ("" when none), or null when the
+ * data is not fresh. Only data fetched since the page opened counts:
+ * cached data could miss an attempt started a moment ago, and pruning on
+ * it would drop that attempt's backup.
+ */
+export function backupKeepKey(query: {
+  isFetchedAfterMount: boolean;
+  data?: {
+    open: readonly DashboardItemLike[];
+    upcoming: readonly DashboardItemLike[];
+    finished: readonly DashboardItemLike[];
+  };
+}): string | null {
+  if (!query.isFetchedAfterMount || !query.data) return null;
+  const { open, upcoming, finished } = query.data;
+  return inProgressAttemptIds([open, upcoming, finished]).sort().join(",");
+}
+
+/** The attempt ids in a `backupKeepKey`. */
+export function keepKeyIds(key: string): string[] {
+  return key ? key.split(",") : [];
+}
+
 export type FinishedEmptyCopy = {
   title: string;
   description: string;

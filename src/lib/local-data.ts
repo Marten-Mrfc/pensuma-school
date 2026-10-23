@@ -64,10 +64,14 @@ function storageOf(name: "localStorage" | "sessionStorage"): Storage | null {
 /**
  * Remove every "pensuma:" key except the owner marker and the keys that
  * name `userId` as one of their segments ("pensuma:prefs:<id>",
- * "pensuma:oefenen:<id>:code"): those are this user's own. Returns how many
- * keys were removed.
+ * "pensuma:oefenen:<id>:code"): those are this user's own. With
+ * `keepAttemptBackups` the answer backups ("pensuma:poging:…") stay too.
+ * Returns how many keys were removed.
  */
-function clearAllExceptOwn(userId: string): number {
+function clearAllExceptOwn(
+  userId: string,
+  keepAttemptBackups: boolean,
+): number {
   let removed = 0;
   for (const name of ["localStorage", "sessionStorage"] as const) {
     try {
@@ -79,6 +83,9 @@ function clearAllExceptOwn(userId: string): number {
         if (!key?.startsWith(LOCAL_DATA_PREFIX)) continue;
         if (key === LOCAL_DATA_OWNER_KEY) continue;
         if (key.split(":").includes(userId)) continue;
+        if (keepAttemptBackups && key.startsWith(ATTEMPT_BACKUP_PREFIX)) {
+          continue;
+        }
         keys.push(key);
       }
       for (const key of keys) storage.removeItem(key);
@@ -99,6 +106,13 @@ function clearAllExceptOwn(userId: string): number {
  * browser before. Data of the same owner is kept, so a student who reopens
  * the browser can still recover an unsaved answer backup. Call it before
  * reading any other key. Never throws; returns whether data was cleared.
+ *
+ * Answer backups without a known owner are kept: they were stored before
+ * the owner marker existed, e.g. by a student who is taking a test while
+ * Pensuma is updated, and may hold answers that never reached the server.
+ * A backup is only ever restored into its own attempt (which the server
+ * opens for that attempt's student only), and the student dashboard prunes
+ * every backup that isn't one of this student's running attempts.
  */
 export function claimLocalData(userId: string): boolean {
   if (!userId) return false;
@@ -110,7 +124,7 @@ export function claimLocalData(userId: string): boolean {
     return false;
   }
   if (owner === userId) return false;
-  const cleared = clearAllExceptOwn(userId) > 0;
+  const cleared = clearAllExceptOwn(userId, owner === null) > 0;
   try {
     local?.setItem(LOCAL_DATA_OWNER_KEY, userId);
   } catch {

@@ -13,10 +13,16 @@
  * resulting penalty (hints lower the automatic score), retention holds on
  * the student (with their reason) or on an afname they took part in, and
  * the afnames that were set for this student only (inhaal, herkansing).
+ *
+ * schemaVersion 3 added `uitleg`: a Dutch explanation of every section and
+ * of every code that can appear (mode, status, event types, …), so a
+ * student of 14 can read the file. The field names and codes themselves
+ * stay English and stable (data portability, AVG art. 20).
  */
 import { computeGrade, LINEAR_SCALE } from "@/lib/grading/grade-scale";
 import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
 import {
+  type ASSIGNMENT_EVENT_TYPES,
   assignmentSettingsSchema,
   gradingResultSchema,
   redactCodeResultForStudent,
@@ -24,7 +30,7 @@ import {
 import { resultsVisible } from "@/server/services/assignment-status";
 import { AUDIT_ACTIONS } from "./audit-actions";
 import { MONITORING_EVENT_TYPES, sanitizeEventDetails } from "./event-details";
-import type { RetentionHoldKind } from "./retention";
+import { HOLD_KIND_LABELS, type RetentionHoldKind } from "./retention";
 import type { PrivacySettings } from "./settings";
 
 export type ExportAudience = "admin" | "student";
@@ -180,10 +186,36 @@ export interface StudentExportAttempt {
   }[];
 }
 
+/** The Dutch explanation at the top of the export (`uitleg`). */
+export interface StudentExportGuide {
+  /** What the file is and how to read it. */
+  overDitBestand: string;
+  /** Tijden: ISO 8601 in UTC. */
+  tijden: string;
+  /** Per section (by its field name): what it holds. */
+  onderdelen: Record<string, string>;
+  /** Per field that holds a code: what each code means. */
+  codes: {
+    audience: Record<ExportAudience, string>;
+    mode: Record<StudentExportAttempt["mode"], string>;
+    status: Record<StudentExportAttempt["status"], string>;
+    answerType: Record<StudentExportAnswer["type"], string>;
+    resultStatus: Record<string, string>;
+    eventType: Record<(typeof ASSIGNMENT_EVENT_TYPES)[number], string>;
+    actorRole: Record<"admin" | "student" | "system", string>;
+    holdKind: Record<RetentionHoldKind, string>;
+    holdAppliesTo: Record<"student" | "afname", string>;
+  };
+  /** Field names inside attempts[].events[].details. */
+  eventDetails: Record<string, string>;
+}
+
 export interface StudentExport {
-  schemaVersion: 2;
+  schemaVersion: 3;
   generatedAt: string;
   audience: ExportAudience;
+  /** Dutch explanation of the sections and codes (schemaVersion 3). */
+  uitleg: StudentExportGuide;
   controller: {
     school: string;
     authority: string;
@@ -239,6 +271,122 @@ export interface StudentExport {
     autoDeleteAttempts: boolean;
   };
 }
+
+/* --------------------------------- Uitleg -------------------------------- */
+
+/**
+ * The Dutch guide in every export. Written for the student (the school
+ * hands its own export to the student or their parents too). Every code
+ * that can appear in the file has an entry; export-format.test.ts checks
+ * that against the code lists.
+ */
+export const EXPORT_GUIDE: StudentExportGuide = {
+  overDitBestand:
+    "Dit bestand bevat alle gegevens die Pensuma over jou bewaart. Het is een JSON-bestand: een vorm die vooral voor computers bedoeld is, zodat je je gegevens bijvoorbeeld in een ander programma kunt gebruiken. De namen van de onderdelen en de codes zijn Engels en veranderen niet. In dit onderdeel (uitleg) lees je wat elk onderdeel betekent en wat de codes betekenen. Op de pagina 'Mijn gegevens' in Pensuma zie je dezelfde gegevens in gewone taal.",
+  tijden:
+    "Datums en tijden staan in de vorm 2026-01-15T07:04:00.000Z. De Z betekent dat de tijd in UTC staat: in Nederland is het dan 1 uur later (wintertijd) of 2 uur later (zomertijd). Dit voorbeeld is dus 15 januari 2026 om 08:04.",
+  onderdelen: {
+    schemaVersion:
+      "Versienummer van de opbouw van dit bestand. Verandert de opbouw, dan gaat dit nummer omhoog.",
+    generatedAt: "Wanneer dit bestand is gemaakt.",
+    audience:
+      "Voor wie dit bestand is gemaakt (zie codes.audience). Een bestand dat jij zelf downloadt, bevat alleen ingeleverde toetsen waarvan je de resultaten al mag zien.",
+    controller:
+      "De school die verantwoordelijk is voor je gegevens, met het e-mailadres voor vragen over privacy en de functionaris gegevensbescherming (dpo): degene die binnen de school toeziet op je privacy.",
+    student:
+      "Je account: je naam, je leerlingnummer, wanneer het account is gemaakt, of het actief is (active) en wanneer je voor het laatst hebt ingelogd (lastSignInAt).",
+    classes:
+      "De klassen waar je in zit of zat. memberSince is de datum waarop je aan de klas bent toegevoegd, archived betekent dat de klas niet meer wordt gebruikt.",
+    accommodation:
+      "Je faciliteiten, als je die hebt: verlengde tijd in procenten (extraTimePercent), of je tekst mag plakken (allowPaste) en of het verlaten van het venster niet wordt bijgehouden (ignoreFocusEvents). Staat er null, dan heb je geen faciliteiten.",
+    preferences:
+      "Hoe je Pensuma hebt ingesteld, zoals licht of donker thema en de lettergrootte.",
+    attempts:
+      "Je pogingen bij toetsen en oefentoetsen: de toets (assignmentTitle, testTitle), het soort toets (mode), het nummer van de poging (attemptNumber), of hij is ingeleverd (status), wanneer je begon en inleverde, je score (score van maxScore), je cijfer (grade), je antwoorden (answers) en het logboek van de poging (events). Heeft je docent een poging gewist, dan wordt dat nummer niet opnieuw gebruikt: attemptNumber kan dan hoger zijn dan het nummer in Pensuma, waar je pogingen gewoon 1, 2, 3 enzovoort heten.",
+    "attempts.answers":
+      "Per vraag: de titel, het soort vraag (type), je antwoord (response), de punten die automatisch zijn gegeven (autoScore), de punten die je docent heeft gegeven als die zijn aangepast (manualScore), het maximum (maxScore), de feedback van je docent, de uitkomst van het nakijken (result) en de hints die je hebt bekeken (hintsUsed). hintPenalty is het deel van de punten dat de hints kostten (0,25 = een kwart).",
+    "attempts.answers.result":
+      "De uitkomst van het automatisch nakijken. Bij programmeervragen: per test of hij is gelukt (passed); bij verborgen tests zie je alleen of ze gelukt zijn. fraction is het deel van de punten dat je hebt gehaald (1 = alles goed). status staat uitgelegd bij codes.resultStatus.",
+    "attempts.events":
+      "Wat er tijdens het maken van de poging is vastgelegd, met het tijdstip (at). Wat elk type betekent, staat bij codes.eventType; de extra gegevens (details) staan uitgelegd bij eventDetails. Wat je typte of plakte staat er nooit in.",
+    accessLog:
+      "Wanneer jouw gegevens zijn bekeken of veranderd, en door wie (actorRole, zie codes.actorRole). Namen van docenten staan er niet in. action beschrijft wat er gebeurde.",
+    holds:
+      "Gegevens die voorlopig niet automatisch worden verwijderd (een bewaarblokkade), bijvoorbeeld omdat er bezwaar is gemaakt tegen een cijfer. kind is de reden (zie codes.holdKind), appliesTo zegt of het om jouw gegevens of om een hele toets gaat, until is tot wanneer.",
+    targetedAssignments:
+      "Toetsen die alleen voor jou (en eventueel een paar anderen) zijn klaargezet, zoals een inhaaltoets of een herkansing.",
+    retention:
+      "Hoe lang Pensuma je gegevens bewaart: het logboek tijdens toetsen attemptEventsDays dagen, je pogingen attemptsMonths maanden, je account na je laatste gebruik inactiveStudentMonths maanden, het logboek van docenten auditLogMonths maanden en back-ups backupDays dagen. autoDeleteAttempts zegt of oude pogingen automatisch worden verwijderd.",
+  },
+  codes: {
+    audience: {
+      student: "je hebt dit bestand zelf gedownload in Pensuma",
+      admin:
+        "je school heeft dit bestand voor je gemaakt, bijvoorbeeld omdat je om inzage hebt gevraagd",
+    },
+    mode: { exam: "toets", practice: "oefentoets" },
+    status: { submitted: "ingeleverd", in_progress: "nog bezig" },
+    answerType: {
+      code: "programmeervraag",
+      multiple_choice: "meerkeuzevraag",
+      open: "open vraag",
+    },
+    resultStatus: {
+      ok: "je programma is uitgevoerd en getest",
+      syntax_error:
+        "je code bevat een fout waardoor hij niet kon starten (syntaxfout)",
+      timeout: "je programma deed er te lang over en is gestopt",
+      runtime_error: "je programma stopte met een foutmelding",
+      internal_error:
+        "er ging iets mis bij het nakijken (niet jouw fout); je docent kijkt het antwoord zelf na",
+    },
+    eventType: {
+      started: "je bent aan de poging begonnen",
+      resumed:
+        "je bent verdergegaan met de poging, bijvoorbeeld na het herladen van de pagina",
+      submitted:
+        "de poging is ingeleverd: door jou, automatisch toen de tijd om was, of toen de toets werd gesloten",
+      focus_lost: "je hebt het venster met de toets verlaten",
+      focus_gained: "je bent teruggekomen in het venster met de toets",
+      visibility_hidden: "het tabblad met de toets was niet meer te zien",
+      visibility_visible: "het tabblad met de toets was weer te zien",
+      fullscreen_enter: "volledig scherm is aangezet",
+      fullscreen_exit: "je hebt volledig scherm verlaten",
+      paste: "je probeerde iets te plakken",
+      copy: "je hebt iets gekopieerd (wordt niet meer bijgehouden; staat alleen nog in oudere logboeken)",
+      code_run: "je hebt je code uitgevoerd",
+      self_test: "je hebt je code zelf getest",
+      time_extended: "je docent heeft je extra tijd gegeven",
+      reopened: "je docent heeft de poging weer opengezet",
+      hint_revealed: "je hebt een hint bekeken",
+    },
+    actorRole: {
+      admin: "een docent",
+      student: "jij",
+      system: "Pensuma zelf (automatisch)",
+    },
+    holdKind: HOLD_KIND_LABELS,
+    holdAppliesTo: {
+      student: "het gaat om jouw gegevens",
+      afname: "het gaat om een hele toets waar jij aan hebt meegedaan",
+    },
+  },
+  eventDetails: {
+    durationMs:
+      "hoe lang het duurde, in milliseconden (1000 milliseconden = 1 seconde)",
+    afterEscapeKey: "of het gebeurde doordat je op de Esc-toets drukte",
+    length: "hoeveel tekens het waren (de tekst zelf wordt nooit bewaard)",
+    blocked: "of Pensuma het heeft tegengehouden",
+    auto: "of het automatisch gebeurde (bijvoorbeeld omdat de tijd om was)",
+    questionId: "bij welke vraag het gebeurde (een interne code van de vraag)",
+    minutes: "hoeveel minuten",
+    totalExtraMinutes: "hoeveel minuten extra tijd je in totaal kreeg",
+    penalty: "welk deel van de punten de hint kost (0,25 = een kwart)",
+    attemptNumber:
+      "het nummer dat de poging kreeg toen je begon (zie onderdelen.attempts)",
+    accommodationMinutes: "hoeveel minuten verlengde tijd je kreeg",
+  },
+};
 
 /* -------------------------------- Helpers -------------------------------- */
 
@@ -438,9 +586,10 @@ export function buildStudentExport(
     title?.trim() || testTitle;
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: iso(now),
     audience: options.audience,
+    uitleg: EXPORT_GUIDE,
     controller: {
       school: settings.school.name,
       authority: settings.school.authority,
