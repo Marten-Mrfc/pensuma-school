@@ -16,6 +16,8 @@ export function getErrorMessage(
       message?: unknown;
       data?: {
         code?: string;
+        /** Set by the server's error formatter for internal errors. */
+        errorId?: string | null;
         zodError?: {
           formErrors?: string[];
           fieldErrors?: Record<string, string[] | undefined>;
@@ -53,8 +55,15 @@ export function getErrorMessage(
         return message || "Je hebt hier geen toegang toe.";
       case "NOT_FOUND":
         return message || "Dit bestaat niet (meer).";
-      case "INTERNAL_SERVER_ERROR":
+      case "INTERNAL_SERVER_ERROR": {
+        // The server masks unexpected errors as "… (Foutcode: ab12cd34)".
+        // Keep that code visible so a teacher can quote it.
+        if (/foutcode/i.test(message)) return message;
+        const errorId =
+          typeof e.data.errorId === "string" ? e.data.errorId.trim() : "";
+        if (errorId) return `${message || fallback} (Foutcode: ${errorId})`;
         return fallback;
+      }
     }
 
     if (message) return message;

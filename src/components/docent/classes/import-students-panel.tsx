@@ -283,7 +283,7 @@ export function ImportStudentsPanel({
               spellCheck={false}
               placeholder={`Bijvoorbeeld:\n${EXAMPLE.replaceAll("\t", "  ")}`}
               className={cn(
-                "block min-h-36 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "block min-h-36 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
                 dragging && "border-primary ring-[3px] ring-primary/40",
               )}
             />

@@ -130,7 +130,7 @@ export function BankFilters({
                     aria-pressed={on}
                     onClick={() => toggleTag(tag)}
                     className={cn(
-                      "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       on
                         ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
                         : "bg-background text-foreground hover:bg-accent",
@@ -169,7 +169,7 @@ export function BankFilters({
             <button
               type="button"
               onClick={() => onChange(EMPTY_BANK_FILTERS)}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="size-3.5" aria-hidden="true" />
               Wis filters

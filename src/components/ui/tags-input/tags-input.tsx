@@ -23,6 +23,16 @@ export interface TagsInputProps extends Omit<React.HTMLAttributes<HTMLDivElement
   unique?: boolean
   /** Maximum number of tags allowed. */
   max?: number
+  /**
+   * `id` and the ARIA naming/description props go to the inner <input> (the
+   * focusable element), so `<label htmlFor>` and error texts work.
+   */
+  id?: string
+  'aria-label'?: string
+  'aria-labelledby'?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: boolean | 'true' | 'false'
+  'aria-required'?: boolean | 'true' | 'false'
 }
 
 const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
@@ -39,6 +49,12 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
       delimiter,
       unique = true,
       max,
+      id,
+      'aria-label': ariaLabel,
+      'aria-labelledby': ariaLabelledBy,
+      'aria-describedby': ariaDescribedBy,
+      'aria-invalid': ariaInvalid,
+      'aria-required': ariaRequired,
       ...props
     },
     ref,
@@ -50,6 +66,7 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
     const [draft, setDraft] = React.useState('')
     const inputRef = React.useRef<HTMLInputElement | null>(null)
     const atMax = max !== undefined && tags.length >= max
+    const invalid = ariaInvalid === true || ariaInvalid === 'true'
 
     function commit(next: string[]) {
       const capped = max !== undefined ? next.slice(0, max) : next
@@ -111,10 +128,11 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
         ref={ref}
         data-uipkge=""
         data-slot="tags-input"
+        data-invalid={invalid ? 'true' : undefined}
         className={cn(
           'border-input bg-background flex flex-wrap items-center gap-2 rounded-md border px-2 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none',
           'focus-within:border-ring focus-within:ring-ring focus-within:ring-[3px]',
-          'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
+          'data-[invalid=true]:ring-destructive data-[invalid=true]:border-destructive',
           disabled && 'pointer-events-none opacity-50',
           className,
         )}
@@ -153,6 +171,12 @@ const TagsInput = React.forwardRef<HTMLDivElement, TagsInputProps>(
         {!disabled && (
           <input
             ref={inputRef}
+            id={id}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
+            aria-describedby={ariaDescribedBy}
+            aria-invalid={invalid || undefined}
+            aria-required={ariaRequired}
             data-slot="tags-input-input"
             value={draft}
             placeholder={atMax ? undefined : placeholder}

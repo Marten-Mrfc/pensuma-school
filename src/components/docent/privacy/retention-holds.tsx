@@ -318,7 +318,7 @@ function CreateHoldForm({ onDone }: { onDone: () => void }) {
             id={`${id}-target`}
             value={assignmentId}
             onChange={(e) => setAssignmentId(e.target.value)}
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring dark:bg-input/30"
           >
             <option value="">
               {assignments.isPending ? "Afnames laden…" : "Kies een afname"}
@@ -337,7 +337,7 @@ function CreateHoldForm({ onDone }: { onDone: () => void }) {
           id={`${id}-kind`}
           value={kind}
           onChange={(e) => setKind(e.target.value as typeof kind)}
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring dark:bg-input/30"
         >
           <option value="dispute">{HOLD_KIND_LABELS.dispute}</option>
           <option value="exam_dossier">{HOLD_KIND_LABELS.exam_dossier}</option>
@@ -358,7 +358,7 @@ function CreateHoldForm({ onDone }: { onDone: () => void }) {
           rows={3}
           onChange={(e) => setReason(e.target.value)}
           aria-required="true"
-          className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive dark:bg-input/30"
+          className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring aria-invalid:border-destructive dark:bg-input/30"
         />
       </FormField>
 

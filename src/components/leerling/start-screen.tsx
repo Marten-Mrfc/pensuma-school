@@ -286,7 +286,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${hintId} ${errorId}` : hintId}
             className={cn(
-              "h-16 w-full rounded-xl border-2 border-input bg-background px-4 text-center font-mono text-3xl font-semibold tracking-[0.35em] uppercase shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
+              "h-16 w-full rounded-xl border-2 border-input bg-background px-4 text-center font-mono text-3xl font-semibold tracking-[0.35em] uppercase shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
               error &&
                 "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
             )}

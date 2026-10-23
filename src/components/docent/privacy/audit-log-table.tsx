@@ -43,7 +43,7 @@ const CATEGORY_TONES: Record<AuditCategory, string> = {
 };
 
 const selectClass =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
+  "h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring dark:bg-input/30";
 
 /** "category:auth" or "action:student.viewed" in the select. */
 function parseKind(value: string) {

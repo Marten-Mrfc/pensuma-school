@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/app/logo";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { routes } from "@/lib/routes";
 
 /** Top bar for public pages (landing, 404). */
 export function PublicHeader() {
@@ -29,7 +30,7 @@ export function PublicHeader() {
         <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggle />
           <Button asChild size="sm" className="ml-1">
-            <Link href="/inloggen">Inloggen</Link>
+            <Link href={routes.login}>Inloggen</Link>
           </Button>
         </div>
       </div>

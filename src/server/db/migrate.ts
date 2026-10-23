@@ -7,7 +7,8 @@ import { Pool } from "pg";
 export async function runMigrations() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");
-  const migrationsFolder = process.env.MIGRATIONS_DIR ?? path.join(process.cwd(), "drizzle");
+  const migrationsFolder =
+    process.env.MIGRATIONS_DIR ?? path.join(process.cwd(), "drizzle");
   const pool = new Pool({ connectionString, max: 1 });
   try {
     console.log(`[db] Applying migrations from ${migrationsFolder}…`);

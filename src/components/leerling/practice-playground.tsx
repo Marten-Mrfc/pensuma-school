@@ -7,9 +7,18 @@ import {
   Eraser,
   Lightbulb,
 } from "lucide-react";
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
-import { CodeEditor } from "@/components/app/code-editor";
+import {
+  CodeEditor,
+  type CodeEditorHandle,
+} from "@/components/app/code-editor";
 import { PageHeader } from "@/components/app/page-header";
 import { LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -93,8 +102,10 @@ export function PracticePlayground() {
     () => false,
   );
   const tipsTitleId = useId();
+  const outputTitleId = useId();
   const [code, setCode] = useState<string>(loadCode);
   const [runHandle, setRunHandle] = useState<RunHandle | null>(null);
+  const editorRef = useRef<CodeEditorHandle>(null);
 
   // Persist (debounced) in this browser.
   useEffect(() => {
@@ -205,6 +216,7 @@ export function PracticePlayground() {
             }}
           >
             <CodeEditor
+              ref={editorRef}
               value={code}
               onChange={setCode}
               minHeight={380}
@@ -222,12 +234,18 @@ export function PracticePlayground() {
 
         <section
           className="flex min-h-80 min-w-0 flex-col gap-3"
-          aria-label="Uitvoer"
+          aria-labelledby={outputTitleId}
         >
+          {/* Keeps the heading order intact: the run panel's error card is
+              an h3 ("Foutmelding: …") and the page title is the h1. */}
+          <h2 id={outputTitleId} className="sr-only">
+            Uitvoer
+          </h2>
           <CodeRunTab
             code={code}
             timeLimitMs={10_000}
             onHandle={setRunHandle}
+            onGoToLine={(line) => editorRef.current?.goToLine(line)}
           />
         </section>
       </div>

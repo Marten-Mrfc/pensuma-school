@@ -469,7 +469,7 @@ function LiveCard({ a }: { a: Active }) {
   return (
     <Link
       href={routes.docent.assignment(a.id)}
-      className="group flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs transition-all outline-none hover:border-primary/40 hover:shadow-sm focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="group flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs transition-all outline-none hover:border-primary/40 hover:shadow-sm focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
@@ -537,7 +537,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
         <Icon className="size-5" aria-hidden="true" />

@@ -183,7 +183,7 @@ export function MultipleChoiceEditor({
                 <label
                   key={value}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-lg border bg-background/60 px-3.5 py-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50",
+                    "flex cursor-pointer items-start gap-3 rounded-lg border bg-background/60 px-3.5 py-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
                     active && "border-primary/50 bg-primary/[0.05]",
                     !data.multiple && "cursor-not-allowed opacity-60",
                   )}
@@ -312,7 +312,7 @@ function OptionRow({
               aria-label={`Optie ${letter} is ${correct ? "goed" : "fout"}. Klik om te wisselen.`}
               onClick={onToggle}
               className={cn(
-                "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 correct
                   ? "border-success/40 bg-success/15 text-success-ink"
                   : "text-muted-foreground hover:border-foreground/30 hover:text-foreground",

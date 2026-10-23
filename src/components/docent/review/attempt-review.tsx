@@ -55,6 +55,7 @@ import {
 import { useShortcut } from "@/lib/a11y/shortcuts";
 import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
+import type { RubricCriterion } from "@/lib/grading/rubric";
 import {
   type CodeGradingResult,
   type MultipleChoiceData,
@@ -368,7 +369,7 @@ function AttemptContent({
               <li key={item.question.id}>
                 <a
                   href={`#${questionDomId(item.question.id)}`}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring"
                 >
                   <span className="w-5 shrink-0 text-xs font-semibold text-muted-foreground tabular-nums">
                     {item.number}
@@ -505,7 +506,7 @@ function QuestionCard({
                 type="button"
                 aria-expanded={promptOpen}
                 onClick={() => setPromptOpen((o) => !o)}
-                className="w-fit rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="w-fit rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring"
               >
                 {promptOpen ? "Opdracht inklappen" : "Hele opdracht tonen"}
               </button>
@@ -517,8 +518,11 @@ function QuestionCard({
 
         {a ? (
           <ScoreBox
-            key={`${a.id}:${a.manualScore}:${a.feedback ?? ""}:${a.autoScore}`}
-            answer={a}
+            key={`${a.id}:${a.manualScore}:${a.feedback ?? ""}:${a.autoScore}:${(a.rubricChecked ?? []).join(",")}`}
+            answer={{ ...a, rubricChecked: a.rubricChecked ?? null }}
+            questionId={q.id}
+            questionNumber={item.number}
+            rubricItems={rubricItemsOf(q)}
             disabled={!attemptSubmitted}
             disabledReason="De leerling is nog bezig. Je kunt beoordelen zodra de poging is ingeleverd."
           />
@@ -531,6 +535,13 @@ function QuestionCard({
       </div>
     </article>
   );
+}
+
+/** The rubric criteria of an open question (none for other types). */
+function rubricItemsOf(q: Item["question"]): RubricCriterion[] {
+  if (q.type !== "open") return [];
+  const items = (q.data as Partial<OpenQuestionData>).rubricItems;
+  return Array.isArray(items) ? items : [];
 }
 
 function AnswerView({ item }: { item: Item }) {
@@ -591,7 +602,11 @@ function AnswerView({ item }: { item: Item }) {
               </span>
             </summary>
             <div className="border-t p-3">
-              <HighlightedCode code={data.solution} language="python" />
+              <HighlightedCode
+                code={data.solution}
+                language="python"
+                label="Modeloplossing"
+              />
             </div>
           </details>
         ) : null}
@@ -706,7 +721,9 @@ function AnswerView({ item }: { item: Item }) {
         </div>
         {data.rubric ? (
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Beoordelingsmodel</span>
+            <span className="text-sm font-medium">
+              Toelichting voor het nakijken
+            </span>
             <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
               <Markdown>{data.rubric}</Markdown>
             </div>

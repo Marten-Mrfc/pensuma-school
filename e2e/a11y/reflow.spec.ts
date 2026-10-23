@@ -32,7 +32,12 @@ async function overflowing(page: Page) {
     for (const el of document.body.querySelectorAll<HTMLElement>("*")) {
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 || rect.right <= limit) continue;
-      if (el.closest('[role="region"][tabindex="0"], .cm-editor')) continue;
+      if (
+        el.closest(
+          '[role="region"][tabindex="0"], section[aria-label][tabindex="0"], figure[tabindex="0"], .cm-editor',
+        )
+      )
+        continue;
       if (getComputedStyle(el).position === "fixed") continue;
       offenders.push(
         `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}.${[...el.classList].slice(0, 3).join(".")}`,

@@ -342,7 +342,7 @@ function RestrictDialog({
               rows={3}
               onChange={(e) => setReason(e.target.value)}
               aria-required="true"
-              className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive dark:bg-input/30"
+              className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring aria-invalid:border-destructive dark:bg-input/30"
             />
           </FormField>
           <DialogFooter>

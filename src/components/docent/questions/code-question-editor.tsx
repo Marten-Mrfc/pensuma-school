@@ -14,9 +14,12 @@ import {
   ShieldCheck,
   Timer,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CodeEditor } from "@/components/app/code-editor";
+import {
+  CodeEditor,
+  type CodeEditorHandle,
+} from "@/components/app/code-editor";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
 import type {
@@ -68,6 +71,7 @@ export function CodeQuestionEditor({
   onSolutionChecked,
 }: CodeQuestionEditorProps) {
   const id = useId();
+  const solutionEditor = useRef<CodeEditorHandle>(null);
   const trpc = useTRPC();
   const runner = usePythonRunner();
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
@@ -197,6 +201,7 @@ export function CodeQuestionEditor({
         <div className="flex flex-col gap-2">
           <FieldLabel id={`${id}-solution-label`}>Modeloplossing</FieldLabel>
           <CodeEditor
+            ref={solutionEditor}
             aria-labelledby={`${id}-solution-label`}
             value={data.solution}
             onChange={(solution) => set({ solution })}
@@ -217,6 +222,7 @@ export function CodeQuestionEditor({
             code={data.solution}
             timeLimitMs={data.timeLimitMs}
             disabled={!data.solution.trim()}
+            onGoToLine={(line) => solutionEditor.current?.goToLine(line)}
           />
         </div>
       </EditorSection>
@@ -317,7 +323,12 @@ export function CodeQuestionEditor({
               {lastRun.source === "server" ? "server" : "in je browser"})
               {fresh ? "" : " — let op: de vraag is daarna gewijzigd"}
             </p>
-            <TestResultsList result={lastRun.result} audience="teacher" />
+            {/* Inside an EditorSection (h2): the summary heading is h3. */}
+            <TestResultsList
+              result={lastRun.result}
+              audience="teacher"
+              headingLevel={3}
+            />
           </div>
         ) : null}
       </EditorSection>

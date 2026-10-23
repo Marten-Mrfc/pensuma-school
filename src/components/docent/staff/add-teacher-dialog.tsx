@@ -243,7 +243,7 @@ function AddTeacherForm({
                 onClick={() => setMode(value)}
                 onKeyDown={onModeKeyDown}
                 className={cn(
-                  "flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
                   mode === value
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
                     : "hover:bg-muted/50",

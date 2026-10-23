@@ -122,7 +122,7 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
               if (file) void readFile(file);
             }}
             className={cn(
-              "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.03] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50",
+              "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.03] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
               dragging && "border-primary bg-primary/[0.05]",
             )}
           >
@@ -160,7 +160,7 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
               }}
               rows={6}
               spellCheck={false}
-              className="mt-2 block w-full resize-y rounded-md border border-input bg-[var(--code-bg)] px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="mt-2 block w-full resize-y rounded-md border border-input bg-[var(--code-bg)] px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring"
             />
           </details>
 

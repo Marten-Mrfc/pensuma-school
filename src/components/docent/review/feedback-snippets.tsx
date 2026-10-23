@@ -152,7 +152,7 @@ export function FeedbackSnippets({
                 rows={4}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Bijvoorbeeld: Let op: input() geeft altijd tekst terug."
-                className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring"
               />
               {questionId ? (
                 <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export function FeedbackSnippets({
                 onClick={() => insert(snippet)}
                 title={snippet.text}
                 className={cn(
-                  "inline-flex h-7 max-w-full items-center rounded-full border px-2.5 text-xs transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50",
+                  "inline-flex h-7 max-w-full items-center rounded-full border px-2.5 text-xs transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
                   snippet.questionId
                     ? "border-primary/30 bg-primary/[0.06]"
                     : "bg-background",
@@ -233,7 +233,7 @@ export function FeedbackSnippets({
                 <button
                   type="button"
                   disabled={disabled}
-                  className="inline-flex h-7 items-center rounded-full px-2.5 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="inline-flex h-7 items-center rounded-full px-2.5 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Meer…
                 </button>
@@ -272,7 +272,7 @@ export function FeedbackSnippets({
                             insert(snippet);
                             setMoreOpen(false);
                           }}
-                          className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                          className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <span className="line-clamp-3 whitespace-pre-line">
                             {snippet.text}

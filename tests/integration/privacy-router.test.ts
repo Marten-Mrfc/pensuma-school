@@ -293,6 +293,59 @@ describe("erasure", () => {
     expect(await countRows("retention_hold")).toBe(0);
   });
 
+  test("student.setActive cannot reactivate a restricted student", async () => {
+    const s = await insertStudent();
+    const caller = callerFor(teacher);
+    await caller.privacy.setRestriction({
+      userId: s.id,
+      restricted: true,
+      reason: "Ouder betwist een score",
+    });
+
+    await expect(
+      caller.student.setActive({ id: s.id, active: true }),
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message:
+        "Voor deze leerling is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
+    });
+    const [still] = await db.select().from(user).where(eq(user.id, s.id));
+    expect(still?.banned).toBe(true);
+    const reactivated = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(eq(auditLog.action, "student.reactivated"));
+    expect(reactivated).toHaveLength(0);
+
+    // Deactivating is still allowed while restricted.
+    await expect(
+      caller.student.setActive({ id: s.id, active: false }),
+    ).resolves.toMatchObject({ active: false });
+
+    // An expired restriction no longer blocks reactivation.
+    await db
+      .update(retentionHolds)
+      .set({ until: new Date(Date.now() - 60_000) })
+      .where(eq(retentionHolds.userId, s.id));
+    await expect(
+      caller.student.setActive({ id: s.id, active: true }),
+    ).resolves.toMatchObject({ active: true });
+
+    // Other hold kinds do not block reactivation.
+    await caller.student.setActive({ id: s.id, active: false });
+    await db.delete(retentionHolds).where(eq(retentionHolds.userId, s.id));
+    await caller.privacy.createHold({
+      userId: s.id,
+      kind: "dispute",
+      reason: "Bezwaarprocedure",
+    });
+    await expect(
+      caller.student.setActive({ id: s.id, active: true }),
+    ).resolves.toMatchObject({ active: true });
+    const [active] = await db.select().from(user).where(eq(user.id, s.id));
+    expect(active?.banned).toBe(false);
+  });
+
   test("holds: create and remove are audited", async () => {
     const s = await insertStudent();
     const caller = callerFor(teacher);

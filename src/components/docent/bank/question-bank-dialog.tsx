@@ -458,7 +458,7 @@ function BankRow({
             type="button"
             onClick={onPreview}
             aria-pressed={previewing}
-            className="min-w-0 flex-1 rounded text-left text-sm leading-snug font-semibold outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="min-w-0 flex-1 rounded text-left text-sm leading-snug font-semibold outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             {item.title || "Naamloze vraag"}
             <span className="sr-only">: voorbeeld bekijken</span>

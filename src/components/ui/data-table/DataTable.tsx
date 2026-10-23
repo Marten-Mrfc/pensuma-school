@@ -1115,7 +1115,7 @@ function DataTableInner<TData, TValue>(
                           className={
                             [
                               onRowClick ? 'cursor-pointer' : '',
-                              focusedRowIndex === idx ? 'ring-primary/60 bg-muted/40 ring-1 ring-inset' : '',
+                              focusedRowIndex === idx ? 'ring-ring bg-muted/40 ring-2 ring-inset' : '',
                             ]
                               .filter(Boolean)
                               .join(' ') || undefined

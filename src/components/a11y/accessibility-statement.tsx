@@ -96,7 +96,7 @@ export function AccessibilityStatement() {
   return (
     <article className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-5 py-12 text-[1.02rem] leading-relaxed text-foreground sm:px-8 sm:py-16">
       <header className="flex flex-col gap-4">
-        <h1 className="font-display-wide text-3xl font-extrabold tracking-tight text-balance sm:text-4xl">
+        <h1 className="font-display-wide text-[1.625rem]/[1.2] font-extrabold tracking-tight text-balance break-words hyphens-auto min-[360px]:text-3xl sm:text-4xl">
           Toegankelijkheid
         </h1>
         <p className="text-lg text-muted-foreground">

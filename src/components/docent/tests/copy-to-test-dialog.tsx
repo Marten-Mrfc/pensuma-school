@@ -140,7 +140,7 @@ export function CopyToTestDialog({
                       aria-pressed={selected}
                       onClick={() => setTarget(t.id)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+                        "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                         selected &&
                           "border-primary/60 bg-primary/[0.06] ring-1 ring-primary/30",
                       )}

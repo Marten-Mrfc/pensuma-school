@@ -141,7 +141,7 @@ export function MonitorTable({
               aria-pressed={filter === f.value}
               onClick={() => setFilter(f.value)}
               className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
                 filter === f.value &&
                   "border-primary bg-primary/10 text-primary hover:bg-primary/15",
               )}
@@ -380,7 +380,7 @@ function ExtraTimeBadge({ percent }: { percent: number }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-5 shrink-0 cursor-default items-center gap-0.5 rounded-full bg-info/10 px-1.5 text-[11px] font-semibold text-info-ink tabular-nums outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="inline-flex h-5 shrink-0 cursor-default items-center gap-0.5 rounded-full bg-info/10 px-1.5 text-[11px] font-semibold text-info-ink tabular-nums outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
         >
           <Clock className="size-3" aria-hidden="true" />+{percent}%
           <span className="sr-only"> verlengde tijd (faciliteit)</span>
@@ -515,7 +515,7 @@ function RemainingCell({
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="cursor-default rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="cursor-default rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
         >
           {content}
           <span className="sr-only"> ({help})</span>

@@ -96,7 +96,7 @@ export function QuestionList({
         onClick={() => onSelect({ kind: "settings" })}
         aria-current={selection.kind === "settings" ? "true" : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left shadow-xs transition-colors outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50",
+          "flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left shadow-xs transition-colors outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
           selection.kind === "settings" &&
             "border-primary/50 bg-primary/[0.06] ring-1 ring-primary/25",
         )}
@@ -210,7 +210,7 @@ export function QuestionList({
                       type="button"
                       onClick={() => onSelect({ kind: "question", id: q.id })}
                       aria-current={selected ? "true" : undefined}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-2 pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:pl-0.5"
+                      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-2 pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring lg:pl-0.5"
                     >
                       <span
                         className={cn(

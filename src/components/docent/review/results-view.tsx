@@ -637,7 +637,7 @@ function ResultRow({ row, data }: { row: Row; data: Results }) {
         {attemptHref ? (
           <Link
             href={attemptHref}
-            className="flex flex-col rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="flex flex-col rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
           >
             <span className="font-medium text-foreground hover:text-primary">
               {row.student.name}
@@ -705,7 +705,7 @@ function ResultRow({ row, data }: { row: Row; data: Results }) {
                 href={href}
                 title={`${q.title}: ${formatNumber(cell.score)} van ${formatNumber(cell.maxScore)}${extra.length ? ` (${extra.join(", ")})` : ""}`}
                 className={cn(
-                  "relative inline-flex h-8 w-full min-w-12 items-center justify-center rounded-md px-1 text-xs font-semibold whitespace-nowrap tabular-nums transition-all outline-none hover:brightness-95 hover:ring-2 hover:ring-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "relative inline-flex h-8 w-full min-w-12 items-center justify-center rounded-md px-1 text-xs font-semibold whitespace-nowrap tabular-nums transition-all outline-none hover:brightness-95 hover:ring-2 hover:ring-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring",
                   scoreTone(cell),
                   !cell.answered && !review && "font-normal",
                 )}
@@ -808,7 +808,7 @@ function SortButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex w-full items-center gap-1 rounded-sm whitespace-nowrap outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "inline-flex w-full items-center gap-1 rounded-sm whitespace-nowrap outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring",
         active && "text-foreground",
         className,
       )}

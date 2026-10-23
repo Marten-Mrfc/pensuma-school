@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 import {
   ROLES,
@@ -28,6 +39,7 @@ import {
   attempts,
   classes,
   classMembers,
+  retentionHolds,
   session,
   studentPins,
   tests,
@@ -108,6 +120,22 @@ async function getStudentOrThrow(db: DB, id: string) {
     });
   }
   return row;
+}
+
+/** An active AVG art. 18 restriction (retention hold of kind "restriction"). */
+async function hasActiveRestriction(db: DB, userId: string) {
+  const [row] = await db
+    .select({ id: retentionHolds.id })
+    .from(retentionHolds)
+    .where(
+      and(
+        eq(retentionHolds.userId, userId),
+        eq(retentionHolds.kind, "restriction"),
+        or(isNull(retentionHolds.until), gt(retentionHolds.until, sql`now()`)),
+      ),
+    )
+    .limit(1);
+  return !!row;
 }
 
 /** Run `fn` over `items` with limited concurrency, keeping order. */
@@ -892,6 +920,15 @@ export const studentRouter = createTRPCRouter({
     .input(z.object({ id: userIdSchema, active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const student = await getStudentOrThrow(ctx.db, input.id);
+      // AVG art. 18: a restricted account stays blocked until the
+      // restriction itself is lifted (privacy.setRestriction).
+      if (input.active && (await hasActiveRestriction(ctx.db, student.id))) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Voor deze leerling is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
+        });
+      }
       await ctx.db
         .update(user)
         .set(

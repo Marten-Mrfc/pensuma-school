@@ -669,7 +669,7 @@ function Builder({ test }: { test: BuilderTest }) {
       <header className="flex flex-col gap-3">
         <Link
           href={routes.docent.tests}
-          className="-ml-1 inline-flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="-ml-1 inline-flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
           Toetsen
@@ -700,7 +700,7 @@ function Builder({ test }: { test: BuilderTest }) {
                 maxLength={200}
                 placeholder="Titel van de toets"
                 className={cn(
-                  "-ml-2 max-w-full min-w-48 resize-none overflow-hidden rounded-md border text-balance [field-sizing:content] border-transparent bg-transparent px-2 py-0.5 font-display text-2xl leading-tight font-bold tracking-tight text-foreground transition-colors outline-none placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:text-[1.75rem]",
+                  "-ml-2 max-w-full min-w-48 resize-none overflow-hidden rounded-md border text-balance [field-sizing:content] border-transparent bg-transparent px-2 py-0.5 font-display text-2xl leading-tight font-bold tracking-tight text-foreground transition-colors outline-none placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring sm:text-[1.75rem]",
                   !settings.title.trim() && "border-destructive/50",
                 )}
               />
@@ -862,7 +862,7 @@ function Builder({ test }: { test: BuilderTest }) {
             type="button"
             aria-expanded={listOpen}
             onClick={() => setListOpen((o) => !o)}
-            className="flex items-center gap-3 rounded-xl border bg-card px-3.5 py-3 text-left shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
+            className="flex items-center gap-3 rounded-xl border bg-card px-3.5 py-3 text-left shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
           >
             <ListOrdered
               className="size-4 shrink-0 text-muted-foreground"

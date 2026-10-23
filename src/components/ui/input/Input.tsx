@@ -112,9 +112,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       borderless: 'border-transparent bg-transparent shadow-none',
     }
     const statusMap: Record<Status, string> = {
-      error:
-        'border-destructive focus-within:border-destructive focus-within:ring-destructive/20 dark:focus-within:ring-destructive/40',
-      warning: 'border-warning focus-within:border-warning focus-within:ring-warning/20',
+      error: 'border-destructive focus-within:border-destructive focus-within:ring-destructive',
+      warning: 'border-warning focus-within:border-warning focus-within:ring-warning-ink',
     }
 
     const wrapperClasses = cn(
@@ -124,7 +123,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       status ? statusMap[status] : '',
       !status ? 'focus-within:border-ring focus-within:ring-ring focus-within:ring-[3px]' : '',
       disabled ? 'pointer-events-none opacity-50 cursor-not-allowed bg-muted/30' : '',
-      'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
+      'aria-invalid:ring-destructive aria-invalid:border-destructive',
       wrapperRounded,
       className,
     )

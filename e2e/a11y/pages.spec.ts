@@ -1,6 +1,6 @@
 /**
  * axe (WCAG 2.2 AA) + structure checks on every page, in the desktop, dark
- * and mobile projects. A route that answers 404 is marked fixme.
+ * and mobile projects. Every route listed here exists, so a 404 fails.
  */
 import { expect, type Page, type Response, test } from "@playwright/test";
 import {
@@ -53,7 +53,6 @@ test.afterAll(async () => {
 
 async function open(page: Page, path: string) {
   const response: Response | null = await page.goto(path);
-  test.fixme(response?.status() === 404, `${path} does not exist yet`);
   expect(response?.status(), `status of ${path}`).toBeLessThan(400);
 }
 

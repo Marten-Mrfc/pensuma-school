@@ -181,9 +181,9 @@ const sizeClassMap: Record<PinInputSize, string> = {
 }
 
 const statusClassMap: Record<PinInputStatus, string> = {
-  error: 'border-destructive focus-within:border-destructive focus-within:ring-destructive/40 text-destructive-ink',
-  warning: 'border-warning focus-within:border-warning focus-within:ring-warning/40 text-warning-ink',
-  success: 'border-success focus-within:border-success focus-within:ring-success/40 text-success-ink',
+  error: 'border-destructive focus-within:border-destructive focus-within:ring-destructive text-destructive-ink',
+  warning: 'border-warning focus-within:border-warning focus-within:ring-warning-ink text-warning-ink',
+  success: 'border-success focus-within:border-success focus-within:ring-success text-success-ink',
   default: '',
 }
 

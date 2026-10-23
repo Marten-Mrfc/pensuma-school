@@ -24,7 +24,7 @@ export function ScrollRegion({
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be focusable for keyboard scrolling
       tabIndex={0}
       className={cn(
-        "overflow-auto rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "relative overflow-auto rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
     >

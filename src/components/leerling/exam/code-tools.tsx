@@ -4,6 +4,7 @@ import { ListChecks } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   CodeRunPanel,
+  type CodeRunPanelHandle,
   SelfTestButton,
   TestResultsList,
 } from "@/components/python";
@@ -27,6 +28,7 @@ export function CodeRunTab({
   disabled,
   onRun,
   onHandle,
+  onGoToLine,
   consoleMaxHeight,
 }: {
   code: string;
@@ -34,31 +36,28 @@ export function CodeRunTab({
   disabled?: boolean;
   onRun?: () => void;
   onHandle?: (handle: RunHandle | null) => void;
+  /** "Ga naar regel {n}" on a Python error: move the editor's cursor there. */
+  onGoToLine?: (line: number) => void;
   consoleMaxHeight?: string;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const panel = useRef<CodeRunPanelHandle>(null);
 
   useEffect(() => {
     if (!onHandle) return;
-    onHandle({
-      run: () => {
-        // The panel owns its run state; press its "Uitvoeren" button.
-        const button = Array.from(
-          ref.current?.querySelectorAll("button") ?? [],
-        ).find((b) => b.textContent?.trim() === "Uitvoeren" && !b.disabled);
-        button?.click();
-      },
-    });
+    // The panel owns its run state; run() is a no-op while running.
+    onHandle({ run: () => panel.current?.run() });
     return () => onHandle(null);
   }, [onHandle]);
 
   return (
-    <div ref={ref} className="h-full min-h-0 overflow-y-auto">
+    <div className="h-full min-h-0 overflow-y-auto">
       <CodeRunPanel
+        ref={panel}
         code={code}
         timeLimitMs={timeLimitMs}
         disabled={disabled}
         onRun={() => onRun?.()}
+        onGoToLine={onGoToLine}
         consoleMaxHeight={consoleMaxHeight}
       />
     </div>
@@ -165,7 +164,7 @@ export function CodeTestTab({
           aria-label="Laatste testresultaat"
         >
           <h3 className="text-sm font-semibold">Laatste test</h3>
-          <TestResultsList result={last} compact />
+          <TestResultsList result={last} compact headingLevel={4} />
         </section>
       ) : null}
 

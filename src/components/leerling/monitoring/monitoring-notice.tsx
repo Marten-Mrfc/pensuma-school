@@ -87,7 +87,7 @@ export function MonitoringNotice({
           href={`${routes.privacy}#logboek`}
           className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
         >
-          Lees meer in de privacyverklaring
+          Lees meer over het logboek
         </Link>
       </p>
     </section>

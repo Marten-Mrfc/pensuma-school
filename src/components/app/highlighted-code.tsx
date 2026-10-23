@@ -106,6 +106,11 @@ export interface HighlightedCodeProps {
   showHeader?: boolean;
   /** Show line numbers. Default: when the code has more than 3 lines. */
   showLineNumbers?: boolean;
+  /**
+   * Accessible name of the (keyboard-scrollable) code area, e.g.
+   * "Modeloplossing". Default "Python-code" (the language name).
+   */
+  label?: string;
   className?: string;
 }
 
@@ -115,6 +120,7 @@ export function HighlightedCode({
   language,
   showHeader = true,
   showLineNumbers,
+  label: labelProp,
   className,
 }: HighlightedCodeProps) {
   const lang = normalizeLanguage(language);
@@ -166,9 +172,11 @@ export function HighlightedCode({
           <CopyButton value={source} size="icon-xs" successMessage={null} />
         </div>
       ) : null}
-      {/* Long lines scroll sideways: keyboard users can focus and arrow. */}
-      <section
-        aria-label={label === "Code" ? "Code" : `${label}-code`}
+      {/* Long lines scroll sideways: keyboard users can focus and arrow.
+          A figure, not a region landmark: a page can show many code blocks
+          and landmarks must have unique names (axe landmark-unique). */}
+      <figure
+        aria-label={labelProp ?? (lang ? `${label}-code` : "Code")}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be focusable for keyboard scrolling
         tabIndex={0}
         className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
@@ -219,7 +227,7 @@ export function HighlightedCode({
                 ))}
           </code>
         </pre>
-      </section>
+      </figure>
     </div>
   );
 }

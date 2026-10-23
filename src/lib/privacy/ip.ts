@@ -2,9 +2,11 @@
  * IP address minimisation for the audit log: only a network prefix is
  * stored (/24 for IPv4, /48 for IPv6), never the full address.
  * Pure module.
+ *
+ * Which address to truncate is not decided here: use `clientIp()` from
+ * src/server/security/client-ip.ts, which honours TRUSTED_PROXIES. The
+ * left-most X-Forwarded-For entry is set by the client and can be forged.
  */
-
-type HeaderSource = { get(name: string): string | null };
 
 function parseIpv4(value: string): number[] | null {
   const parts = value.split(".");
@@ -89,15 +91,4 @@ export function truncateIp(ip: string | null | undefined): string | null {
     .slice(0, 3)
     .map((h) => h.toString(16))
     .join(":")}::/48`;
-}
-
-/** The client IP as reported by the reverse proxy (first X-Forwarded-For). */
-export function clientIpFromHeaders(headers: HeaderSource): string | null {
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = headers.get("x-real-ip")?.trim();
-  return realIp || null;
 }

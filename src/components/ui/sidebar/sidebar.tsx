@@ -175,21 +175,42 @@ export interface SidebarProps extends React.ComponentProps<'div'> {
   collapsible?: 'offcanvas' | 'icon' | 'none'
 }
 
-const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
-  ({ side = 'left', variant = 'sidebar', collapsible = 'offcanvas', className, children, ...props }, ref) => {
+/**
+ * The sidebar is an <aside> landmark ("Zijbalk", override with aria-label),
+ * so the logo link and account menu in its header and footer sit inside a
+ * landmark too (axe `region`). On desktop it stays the `peer` element that
+ * SidebarInset's `peer-data-*` styles look at.
+ */
+const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
+  (
+    {
+      side = 'left',
+      variant = 'sidebar',
+      collapsible = 'offcanvas',
+      className,
+      children,
+      'aria-label': ariaLabel = 'Zijbalk',
+      ...props
+    },
+    ref,
+  ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    // Mobile sheet: it is opened by a button outside it (no SheetTrigger), so
+    // Radix has nowhere to return focus to on close (WCAG 2.4.3).
+    const openedFrom = React.useRef<HTMLElement | null>(null)
 
     if (collapsible === 'none') {
       return (
-        <div
+        <aside
           ref={ref}
+          aria-label={ariaLabel}
           data-uipkge=""
           data-slot="sidebar"
           className={cn('bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col', className)}
           {...props}
         >
           {children}
-        </div>
+        </aside>
       )
     }
 
@@ -203,6 +224,24 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
             data-mobile="true"
             side={side}
             className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+            onOpenAutoFocus={() => {
+              const active = document.activeElement
+              openedFrom.current = active instanceof HTMLElement && active !== document.body ? active : null
+            }}
+            onCloseAutoFocus={(event) => {
+              const opener = openedFrom.current
+              openedFrom.current = null
+              // Focus was already moved on purpose (runs after the close animation).
+              const active = document.activeElement
+              if (active instanceof HTMLElement && active !== document.body && active.isConnected) {
+                event.preventDefault()
+                return
+              }
+              if (opener?.isConnected) {
+                event.preventDefault()
+                opener.focus()
+              }
+            }}
             style={
               {
                 '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
@@ -213,15 +252,18 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
               <SheetTitle>Menu</SheetTitle>
               <SheetDescription>Navigatie van Pensuma</SheetDescription>
             </SheetHeader>
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <aside aria-label={ariaLabel} className="flex h-full w-full flex-col">
+              {children}
+            </aside>
           </SheetContent>
         </Sheet>
       )
     }
 
     return (
-      <div
+      <aside
         ref={ref}
+        aria-label={ariaLabel}
         className="group peer text-sidebar-foreground hidden md:block"
         data-uipkge=""
         data-slot="sidebar"
@@ -262,7 +304,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
             {children}
           </div>
         </div>
-      </div>
+      </aside>
     )
   },
 )

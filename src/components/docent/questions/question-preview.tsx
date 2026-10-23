@@ -60,7 +60,7 @@ export function ChoiceOptionsView({
           <label
             key={option.id}
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border bg-card px-3.5 py-3 text-sm transition-colors hover:border-primary/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50",
+              "flex cursor-pointer items-start gap-3 rounded-lg border bg-card px-3.5 py-3 text-sm transition-colors hover:border-primary/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
               isSelected &&
                 "border-primary bg-primary/[0.06] ring-1 ring-primary/30",
               reveal && option.correct && "border-success/60 bg-success/[0.07]",
@@ -265,7 +265,7 @@ function OpenAnswerPreview({ data }: { data: OpenQuestionData }) {
         onChange={(e) => setText(e.target.value)}
         rows={8}
         placeholder="Typ hier je antwoord…"
-        className="w-full resize-y rounded-lg border border-input bg-card px-3.5 py-3 text-sm leading-6 shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="w-full resize-y rounded-lg border border-input bg-card px-3.5 py-3 text-sm leading-6 shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring"
       />
       <p className="text-right text-xs text-muted-foreground tabular-nums">
         {max ? `${text.length} / ${max} tekens` : `${text.length} tekens`}

@@ -12,8 +12,12 @@ import {
 } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { tags as t } from "@lezer/highlight";
-import CodeMirror, { EditorView, type Extension } from "@uiw/react-codemirror";
-import { useEffect, useId, useMemo, useRef } from "react";
+import CodeMirror, {
+  EditorView,
+  type Extension,
+  type ReactCodeMirrorRef,
+} from "@uiw/react-codemirror";
+import { useEffect, useId, useImperativeHandle, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { CodeEditorProps } from "./code-editor";
 
@@ -201,8 +205,30 @@ export function CodeEditorView({
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
   escapeHint = "escape",
+  ref,
 }: CodeEditorProps) {
   const hintId = useId();
+  const cmRef = useRef<ReactCodeMirrorRef>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => cmRef.current?.view?.focus(),
+      goToLine: (line: number) => {
+        const view = cmRef.current?.view;
+        if (!view) return;
+        const { doc } = view.state;
+        const n = Math.min(Math.max(1, Math.floor(line) || 1), doc.lines);
+        const pos = doc.line(n).from;
+        view.dispatch({
+          selection: { anchor: pos },
+          effects: EditorView.scrollIntoView(pos, { y: "center" }),
+        });
+        view.focus();
+      },
+    }),
+    [],
+  );
   const onPasteRef = useRef(onPaste);
   useEffect(() => {
     onPasteRef.current = onPaste;
@@ -223,6 +249,11 @@ export function CodeEditorView({
         "aria-describedby": [ariaDescribedBy, hintId].filter(Boolean).join(" "),
         ...(ariaInvalid ? { "aria-invalid": "true" } : {}),
         ...(readOnly ? { "aria-readonly": "true" } : {}),
+        // The content is already focusable (contenteditable); an explicit
+        // tabindex lets checkers see that the scroll area (.cm-scroller)
+        // holds focusable content (axe scrollable-region-focusable), also
+        // in the read-only view.
+        tabindex: "0",
         translate: "no",
         spellcheck: "false",
         autocorrect: "off",
@@ -276,6 +307,7 @@ export function CodeEditorView({
       )}
     >
       <CodeMirror
+        ref={cmRef}
         value={value}
         onChange={readOnly ? undefined : (next) => onChange?.(next)}
         // Stay editable (focusable, selectable, scrollable by keyboard) and

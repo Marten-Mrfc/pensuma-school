@@ -223,9 +223,9 @@ const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
 
     const inputStatusClasses = !isRight
       ? status === 'error'
-        ? 'border-destructive focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 aria-invalid:border-destructive'
+        ? 'border-destructive focus-visible:ring-destructive aria-invalid:border-destructive'
         : status === 'warning'
-          ? 'border-warning focus-visible:ring-warning/20'
+          ? 'border-warning focus-visible:ring-warning-ink'
           : ''
       : ''
 

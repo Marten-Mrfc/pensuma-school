@@ -138,7 +138,7 @@ function ProblemGroup({
               type="button"
               onClick={() => onSelect(item.questionId ?? null)}
               className={cn(
-                "group flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "group flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 severity === "error"
                   ? "bg-destructive/[0.06] text-destructive-ink hover:bg-destructive/10"
                   : "bg-warning/10 text-warning-ink hover:bg-warning/15",

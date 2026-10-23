@@ -42,6 +42,22 @@ export interface ConfirmDialogProps {
   returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
+/**
+ * The element focus should return to: the active element, or for an item in
+ * a (Radix) dropdown menu the menu's trigger, because the item disappears
+ * when the menu closes. Menu content is labelled by its trigger.
+ */
+function returnTarget(active: Element | null): HTMLElement | null {
+  let el = active;
+  for (let depth = 0; el && depth < 5; depth++) {
+    const menu = el.closest('[role="menu"]');
+    if (!menu) break;
+    const triggerId = menu.getAttribute("aria-labelledby");
+    el = triggerId ? document.getElementById(triggerId) : null;
+  }
+  return el instanceof HTMLElement && el !== document.body ? el : null;
+}
+
 /** "Weet je het zeker?" dialog with async confirm handling. */
 export function ConfirmDialog({
   trigger,
@@ -96,13 +112,31 @@ export function ConfirmDialog({
         onInteractOutside={(e) => e.preventDefault()}
         onOpenAutoFocus={() => {
           // Still the element that opened the dialog at this point.
-          openedFrom.current =
-            document.activeElement instanceof HTMLElement
-              ? document.activeElement
-              : null;
+          openedFrom.current = returnTarget(document.activeElement);
         }}
         onCloseAutoFocus={(e) => {
-          if (openedFrom.current?.isConnected) return;
+          // Radix only returns focus to a <DialogTrigger>. Without one
+          // (controlled dialogs opened by a button or shortcut elsewhere),
+          // send focus back to the element that opened it (WCAG 2.4.3).
+          const opener = openedFrom.current;
+          openedFrom.current = null;
+          // This runs after the close animation. If the page has already
+          // moved focus on purpose in the meantime (e.g. to the question a
+          // button in the dialog jumped to), leave it there.
+          const active = document.activeElement;
+          if (
+            active instanceof HTMLElement &&
+            active !== document.body &&
+            active.isConnected
+          ) {
+            e.preventDefault();
+            return;
+          }
+          if (opener?.isConnected) {
+            e.preventDefault();
+            opener.focus();
+            return;
+          }
           const fallback = returnFocusRef?.current;
           if (fallback?.isConnected) {
             e.preventDefault();

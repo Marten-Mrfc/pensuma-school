@@ -10,20 +10,38 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { appRouter } from "@/server/api/root";
 import { setupRouter } from "@/server/api/routers/setup";
-import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  publicProcedure,
+  type TRPCMeta,
+} from "@/server/api/trpc";
 import { type Caller, callerFor, type TestUser } from "../support/caller";
 import { resetDatabase } from "../support/db";
 import { insertStudent, insertTeacher } from "../support/factories";
 import {
   type Access,
   classify,
+  PENDING_PASSWORD_CHANGE_ALLOWED,
   staleExactEntries,
+  stalePendingPasswordEntries,
   unclassifiedPaths,
 } from "./access-policy";
 
 const PATHS = Object.keys(appRouter._def.procedures).sort();
 
 type Outcome = { code: string | null; message?: string };
+
+type ProcedureWithMeta = { _def: { meta?: TRPCMeta } };
+
+/** Procedures whose meta lets a teacher in with a temporary password. */
+const PENDING_PASSWORD_META = PATHS.filter((path) => {
+  // _def.procedures is the flat "a.b" → procedure map, typed as the router.
+  const flat = appRouter._def.procedures as unknown as Record<
+    string,
+    ProcedureWithMeta | undefined
+  >;
+  return flat[path]?._def.meta?.allowWithPendingPasswordChange === true;
+});
 
 async function call(caller: Caller, path: string): Promise<Outcome> {
   let target: unknown = caller;
@@ -87,6 +105,16 @@ describe("access policy", () => {
 
   test("exact entries point at existing procedures", () => {
     expect(staleExactEntries(PATHS)).toEqual([]);
+    expect(stalePendingPasswordEntries(PATHS)).toEqual([]);
+  });
+
+  test("pending-password-change exemptions match the procedure meta", () => {
+    expect(PENDING_PASSWORD_META).toEqual(
+      [...PENDING_PASSWORD_CHANGE_ALLOWED].sort(),
+    );
+    for (const path of PENDING_PASSWORD_CHANGE_ALLOWED) {
+      expect(classify(path)).toBe("admin");
+    }
   });
 });
 
@@ -128,6 +156,30 @@ describe("authorization matrix", () => {
           wrong.push(`${path}: allowed but got ${out.code} (${out.message})`);
       } else if (out.code !== "FORBIDDEN") {
         wrong.push(`${path}: expected FORBIDDEN, got ${out.code}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  test("a teacher with a temporary password only reaches the exempt procedures", async () => {
+    const wrong: string[] = [];
+    const caller = callerFor(teacher, undefined, {
+      userOverrides: { passwordChangeRequired: true },
+    });
+    const exempt = new Set(PENDING_PASSWORD_CHANGE_ALLOWED);
+    for (const path of PATHS) {
+      if (classify(path) !== "admin") continue;
+      const out = await call(caller, path);
+      if (exempt.has(path)) {
+        if (out.code === "UNAUTHORIZED" || out.code === "FORBIDDEN")
+          wrong.push(`${path}: exempt but got ${out.code} (${out.message})`);
+      } else if (
+        out.code !== "FORBIDDEN" ||
+        out.message !== "Wijzig eerst je tijdelijke wachtwoord."
+      ) {
+        wrong.push(
+          `${path}: expected the password-change FORBIDDEN, got ${out.code} (${out.message})`,
+        );
       }
     }
     expect(wrong).toEqual([]);

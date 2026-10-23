@@ -146,7 +146,7 @@ export function TestsPage() {
               aria-checked={status === f.value}
               onClick={() => changeStatus(f.value)}
               className={cn(
-                "h-8 shrink-0 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+                "h-8 shrink-0 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 status === f.value && "bg-background text-foreground shadow-xs",
               )}
             >
@@ -306,7 +306,7 @@ function TestCard({ test }: { test: TestRow }) {
   const hasAttempts = test.attemptCount > 0;
 
   return (
-    <li className="group relative flex flex-col rounded-xl border bg-card text-card-foreground shadow-xs transition-[box-shadow,border-color] focus-within:ring-2 focus-within:ring-ring/40 hover:border-primary/30 hover:shadow-md">
+    <li className="group relative flex flex-col rounded-xl border bg-card text-card-foreground shadow-xs transition-[box-shadow,border-color] focus-within:ring-2 focus-within:ring-ring hover:border-primary/30 hover:shadow-md">
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">

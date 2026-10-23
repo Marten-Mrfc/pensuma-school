@@ -502,7 +502,7 @@ function QuestionReview({
             ) : (
               <div className="flex flex-col gap-2">
                 <h4 className="text-sm font-semibold">Testresultaten</h4>
-                <TestResultsList result={q.codeResult} />
+                <TestResultsList result={q.codeResult} headingLevel={5} />
               </div>
             )
           ) : null}

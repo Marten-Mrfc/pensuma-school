@@ -19,7 +19,11 @@ export default function SetupPage() {
         <Logo size="sm" />
         <ThemeToggle />
       </header>
-      <main className="flex flex-1 items-start justify-center px-5 py-10 sm:px-8 sm:py-16">
+      <main
+        id="inhoud"
+        tabIndex={-1}
+        className="flex flex-1 items-start justify-center px-5 py-10 outline-none sm:px-8 sm:py-16"
+      >
         <div className="w-full max-w-lg">
           <SetupForm />
         </div>

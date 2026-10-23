@@ -79,7 +79,7 @@ export function OpenQuestion({
         placeholder="Typ hier je antwoord…"
         spellCheck
         aria-describedby={maxLength ? `${hintId} ${counterId}` : hintId}
-        className="min-h-56 w-full resize-y rounded-xl border border-input bg-card px-4 py-3 text-base leading-relaxed shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-60"
+        className="min-h-56 w-full resize-y rounded-xl border border-input bg-card px-4 py-3 text-base leading-relaxed shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring disabled:opacity-60"
       />
       <div className="flex justify-between gap-3 text-xs text-muted-foreground">
         <span id={hintId}>

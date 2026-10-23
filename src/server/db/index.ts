@@ -9,7 +9,8 @@ import * as schema from "./schema";
 const globalForDb = globalThis as unknown as { pgPool?: Pool };
 
 const pool =
-  globalForDb.pgPool ?? new Pool({ connectionString: env.DATABASE_URL, max: 10 });
+  globalForDb.pgPool ??
+  new Pool({ connectionString: env.DATABASE_URL, max: 10 });
 if (env.NODE_ENV !== "production") globalForDb.pgPool = pool;
 
 export const db = drizzle(pool, { schema });

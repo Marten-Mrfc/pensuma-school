@@ -1,7 +1,14 @@
 "use client";
 
-import { lazy, Suspense, useSyncExternalStore } from "react";
+import { lazy, type Ref, Suspense, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
+
+/** Imperative handle, e.g. for "Ga naar regel 3" on a Python error. */
+export interface CodeEditorHandle {
+  /** Move the cursor to the start of a line (1-based), scroll to it and focus. */
+  goToLine: (line: number) => void;
+  focus: () => void;
+}
 
 export interface CodeEditorProps {
   value: string;
@@ -33,6 +40,11 @@ export interface CodeEditorProps {
    * Escape would also exit fullscreen.
    */
   escapeHint?: "escape" | "ctrl-m";
+  /**
+   * Imperative handle (React 19: `ref` is a normal prop). Set once the
+   * editor bundle has loaded.
+   */
+  ref?: Ref<CodeEditorHandle>;
 }
 
 const CodeEditorView = lazy(() =>

@@ -71,7 +71,7 @@ export function TopicTagsField({
       <div
         className={cn(
           "flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1 shadow-xs transition-[color,box-shadow]",
-          "focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50",
+          "focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring",
         )}
       >
         {value.length > 0 ? (
@@ -86,7 +86,7 @@ export function TopicTagsField({
                   type="button"
                   onClick={() => remove(tag)}
                   aria-label={`Onderwerp ${tag} verwijderen`}
-                  className="grid size-6 place-items-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="grid size-6 place-items-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <X className="size-3.5" aria-hidden="true" />
                 </button>
@@ -149,7 +149,7 @@ export function TopicTagsField({
                 <button
                   type="button"
                   onClick={() => add(tag)}
-                  className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs text-muted-foreground transition-colors outline-none hover:border-solid hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs text-muted-foreground transition-colors outline-none hover:border-solid hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Plus className="size-3" aria-hidden="true" />
                   {tag}

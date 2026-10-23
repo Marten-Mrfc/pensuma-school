@@ -17,8 +17,6 @@ import path from "node:path";
 import {
   type CodeQuestionData,
   codeQuestionDataSchema,
-  multipleChoiceDataSchema,
-  openQuestionDataSchema,
 } from "@/lib/questions/schema";
 import { DEMO_QUESTIONS } from "@/server/demo/questions";
 import { graderConfig } from "@/server/grader/config";

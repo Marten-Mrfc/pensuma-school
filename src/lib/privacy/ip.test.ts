@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { clientIpFromHeaders, truncateIp } from "./ip";
+import { truncateIp } from "./ip";
 
 describe("truncateIp", () => {
   test("IPv4 → /24", () => {
@@ -46,25 +46,5 @@ describe("truncateIp", () => {
     }
     expect(truncateIp(null)).toBeNull();
     expect(truncateIp(undefined)).toBeNull();
-  });
-});
-
-describe("clientIpFromHeaders", () => {
-  test("first X-Forwarded-For entry wins", () => {
-    const h = new Headers({
-      "x-forwarded-for": " 203.0.113.9 , 10.0.0.1",
-      "x-real-ip": "10.0.0.2",
-    });
-    expect(clientIpFromHeaders(h)).toBe("203.0.113.9");
-  });
-
-  test("falls back to X-Real-IP, then null", () => {
-    expect(clientIpFromHeaders(new Headers({ "x-real-ip": "10.0.0.2" }))).toBe(
-      "10.0.0.2",
-    );
-    expect(clientIpFromHeaders(new Headers({ "x-forwarded-for": " " }))).toBe(
-      null,
-    );
-    expect(clientIpFromHeaders(new Headers())).toBeNull();
   });
 });

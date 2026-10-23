@@ -113,7 +113,6 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "drizzle-kit": "^0.31.11",
-    "shadcn": "4.22.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

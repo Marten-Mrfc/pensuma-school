@@ -187,7 +187,7 @@ function ExampleCard({
           aria-expanded={showQuestions}
           aria-controls={`${id}-questions`}
           onClick={() => setShowQuestions((s) => !s)}
-          className="inline-flex w-fit items-center gap-1 rounded text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="inline-flex w-fit items-center gap-1 rounded text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronDown
             className={cn(

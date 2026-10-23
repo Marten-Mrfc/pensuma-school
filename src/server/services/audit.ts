@@ -2,13 +2,14 @@ import "server-only";
 
 import { after } from "next/server";
 import type { AuditAction } from "@/lib/privacy/audit-actions";
-import { clientIpFromHeaders, truncateIp } from "@/lib/privacy/ip";
+import { truncateIp } from "@/lib/privacy/ip";
 import {
   type AuditActor,
   type AuditDb,
   type AuditEntry,
   writeAudit,
 } from "@/server/privacy/audit-writer";
+import { clientIp } from "@/server/security/client-ip";
 
 export {
   type AuditActor,
@@ -46,7 +47,9 @@ export type AuditContext = {
 
 /**
  * The actor of a request: teachers get a name snapshot and a truncated IP;
- * students never get an IP. No user → "system".
+ * students never get an IP. No user → "system". The IP comes from
+ * `clientIp()` (TRUSTED_PROXIES-aware), never from the left-most
+ * X-Forwarded-For entry, which the client controls.
  */
 export function actorFromCtx(ctx: AuditContext): AuditActor {
   const user = ctx.user ?? null;
@@ -56,7 +59,7 @@ export function actorFromCtx(ctx: AuditContext): AuditActor {
     actorRole: !user ? "system" : isAdmin ? "admin" : "student",
     actorName: isAdmin ? user.name : null,
     impersonatorId: ctx.session?.session.impersonatedBy ?? null,
-    ipPrefix: isAdmin ? truncateIp(clientIpFromHeaders(ctx.headers)) : null,
+    ipPrefix: isAdmin ? truncateIp(clientIp(ctx.headers)) : null,
   };
 }
 

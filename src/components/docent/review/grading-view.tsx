@@ -166,7 +166,7 @@ function QuestionPicker({
             aria-current={q.id === active ? "true" : undefined}
             onClick={() => onSelect(q.id)}
             className={cn(
-              "flex min-w-52 shrink-0 flex-col gap-1 rounded-xl border bg-card p-3 text-left shadow-xs transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              "flex min-w-52 shrink-0 flex-col gap-1 rounded-xl border bg-card p-3 text-left shadow-xs transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring",
               q.id === active && "border-primary ring-1 ring-primary",
             )}
           >

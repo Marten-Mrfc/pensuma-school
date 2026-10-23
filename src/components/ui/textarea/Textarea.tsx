@@ -399,8 +399,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>((props, fo
         return cn(
           base,
           'border-2 rounded-lg',
-          focused ? 'border-primary ring-2 ring-primary/20' : 'border-input',
-          hasError && 'border-destructive focus:border-destructive focus:ring-destructive/20',
+          focused ? 'border-primary ring-2 ring-ring' : 'border-input',
+          hasError && 'border-destructive focus:border-destructive focus:ring-destructive',
         )
       case 'filled':
         return cn(

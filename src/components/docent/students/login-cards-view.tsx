@@ -194,15 +194,16 @@ function Shell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
       <Button variant="ghost" size="sm" asChild className="w-fit">
         <Link href={backHref}>
           <ArrowLeft aria-hidden="true" />
           Terug
         </Link>
       </Button>
+      <h1 className="sr-only">Inlogkaarten</h1>
       {children}
-    </div>
+    </main>
   );
 }
 

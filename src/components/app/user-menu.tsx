@@ -169,7 +169,10 @@ export function UserMenu({
 
   return (
     <>
-      <DropdownMenu>
+      {/* Non-modal: a modal menu sets aria-hidden on the rest of the page
+          while focusable controls stay in it (axe aria-hidden-focus). The
+          menu still closes on Escape, outside click and focus leaving it. */}
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
         <DropdownMenuContent
           align={variant === "sidebar" ? "start" : "end"}

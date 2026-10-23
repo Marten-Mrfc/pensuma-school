@@ -1,19 +1,26 @@
-# Version control, local builds and dependencies (installed in the image)
+# Version control, CI, local builds and dependencies (installed in the image)
 .git
+.github
 .next
 .next-*
 node_modules
 public/pyodide
+*.tsbuildinfo
 
 # Secrets: set them in Dokploy, never bake them into the image
 .env
 .env.*
 !.env.example
 
-# Tests, reports and documentation are not needed at runtime
+# Tests, reports and documentation are not needed at runtime. Keep this in
+# step with tests/security/build-context.test.ts: nothing that `next build`
+# type-checks may import from these paths. (playwright.config.ts imports
+# e2e/ and is excluded in tsconfig.json for that reason.)
 tests
 e2e
+playwright.config.ts
 playwright-report
+blob-report
 test-results
 coverage
 **/*.test.ts

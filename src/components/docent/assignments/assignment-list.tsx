@@ -193,7 +193,7 @@ function AssignmentRow({ row }: { row: Row }) {
         </div>
         <Link
           href={href}
-          className="w-fit text-base font-semibold text-foreground outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] hover:text-primary focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+          className="w-fit text-base font-semibold text-foreground outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] hover:text-primary focus-visible:after:ring-[3px] focus-visible:after:ring-ring"
         >
           {row.title}
         </Link>

@@ -433,7 +433,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                     aria-checked={active}
                     onClick={() => choosePreset(p)}
                     className={cn(
-                      "relative flex flex-col gap-3 rounded-xl border bg-background p-4 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                      "relative flex flex-col gap-3 rounded-xl border bg-background p-4 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring",
                       p === "selfstudy" && "md:col-span-2 2xl:col-span-1",
                       active &&
                         "border-primary bg-primary/[0.04] ring-1 ring-primary",
@@ -629,7 +629,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                         aria-pressed={limitMinutes === m}
                         onClick={() => set("timeLimit", String(m))}
                         className={cn(
-                          "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                          "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
                           limitMinutes === m &&
                             "border-primary bg-primary/10 text-primary",
                         )}
@@ -920,7 +920,7 @@ function ChoiceButton({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        "flex items-start gap-2.5 rounded-lg border bg-background p-3 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "flex items-start gap-2.5 rounded-lg border bg-background p-3 text-left transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring",
         active && "border-primary bg-primary/[0.04] ring-1 ring-primary",
       )}
     >

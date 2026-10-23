@@ -15,7 +15,7 @@ export function ClassCard({ klas }: { klas: ClassListItem }) {
       href={routes.docent.class(klas.id)}
       data-slot="card"
       className={cn(
-        "group relative flex flex-col gap-4 overflow-hidden rounded-xl border bg-card p-5 text-card-foreground shadow-xs transition-[box-shadow,transform,border-color] duration-150 outline-none hover:border-primary/30 focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "group relative flex flex-col gap-4 overflow-hidden rounded-xl border bg-card p-5 text-card-foreground shadow-xs transition-[box-shadow,transform,border-color] duration-150 outline-none hover:border-primary/30 focus-visible:ring-[3px] focus-visible:ring-ring",
         klas.archived && "bg-card/60",
       )}
     >

@@ -6,9 +6,12 @@ import {
   RotateCcw,
   SquareTerminal,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAnnounce } from "@/components/a11y/live-announcer";
-import { CodeEditor } from "@/components/app/code-editor";
+import {
+  CodeEditor,
+  type CodeEditorHandle,
+} from "@/components/app/code-editor";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Markdown } from "@/components/app/markdown";
 import { Button } from "@/components/ui/button";
@@ -42,6 +45,7 @@ export function CodeQuestion(props: QuestionViewProps) {
   const [resetOpen, setResetOpen] = useState(false);
   const [pasteBlockedAt, setPasteBlockedAt] = useState<number | null>(null);
   const [runHandle, setRunHandle] = useState<RunHandle | null>(null);
+  const editorRef = useRef<CodeEditorHandle>(null);
   const hasTools = settings.allowCodeRun || settings.allowSelfTest;
 
   const onPaste = () => {
@@ -133,6 +137,7 @@ export function CodeQuestion(props: QuestionViewProps) {
       }}
     >
       <CodeEditor
+        ref={editorRef}
         value={code}
         onChange={(next) => onChange({ code: next })}
         readOnly={disabled}
@@ -187,6 +192,7 @@ export function CodeQuestion(props: QuestionViewProps) {
             disabled={disabled}
             onRun={() => onLog("code_run", { questionId: question.id })}
             onHandle={setRunHandle}
+            onGoToLine={(line) => editorRef.current?.goToLine(line)}
           />
         </TabsContent>
       ) : null}

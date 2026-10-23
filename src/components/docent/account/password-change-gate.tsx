@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, LogOut } from "lucide-react";
 import { useState } from "react";
+import { resetPreferences } from "@/components/preferences/preferences-store";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { signOut } from "@/lib/auth-client";
 import { ROUTES } from "@/lib/auth-shared";
+import { clearLocalUserData } from "@/lib/local-data";
 import { useTRPC } from "@/trpc/react";
 import { ChangePasswordForm } from "./change-password-form";
 
@@ -35,6 +37,7 @@ export function PasswordChangeGate({
   name,
 }: PasswordChangeGateProps) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const me = useQuery(trpc.staff.me.queryOptions());
   const [signingOut, setSigningOut] = useState(false);
   const required = me.data ? me.data.passwordChangeRequired : initialRequired;
@@ -42,6 +45,10 @@ export function PasswordChangeGate({
   async function leave() {
     setSigningOut(true);
     await signOut().catch(() => undefined);
+    // Shared school computers: same clean-up as the account menu.
+    resetPreferences();
+    clearLocalUserData();
+    queryClient.clear();
     window.location.assign(`${ROUTES.login}?rol=docent`);
   }
 

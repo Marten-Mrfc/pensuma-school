@@ -1,9 +1,15 @@
 import "server-only";
 
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomInt,
+} from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { ROLES } from "@/lib/auth-shared";
 import { env } from "@/env";
+import { ROLES } from "@/lib/auth-shared";
 import { auth, studentEmail } from "@/server/auth";
 import { db } from "@/server/db";
 import { account, session, studentPins, user } from "@/server/db/schema";
@@ -13,7 +19,14 @@ import { account, session, studentPins, user } from "@/server/db/schema";
  * created here, using better-auth's own password hashing so sign-in works.
  */
 
-const WEAK_PINS = new Set(["000000", "111111", "123456", "654321", "123123", "112233"]);
+const WEAK_PINS = new Set([
+  "000000",
+  "111111",
+  "123456",
+  "654321",
+  "123123",
+  "112233",
+]);
 
 /** Random 6-digit PIN (never a trivially guessable one). */
 export function generatePin(): string {
@@ -30,15 +43,21 @@ export function encryptPin(pin: string): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", pinKey(), iv);
   const enc = Buffer.concat([cipher.update(pin, "utf8"), cipher.final()]);
-  return [iv, cipher.getAuthTag(), enc].map((b) => b.toString("base64url")).join(".");
+  return [iv, cipher.getAuthTag(), enc]
+    .map((b) => b.toString("base64url"))
+    .join(".");
 }
 
 export function decryptPin(payload: string): string | null {
   try {
-    const [iv, tag, enc] = payload.split(".").map((p) => Buffer.from(p, "base64url"));
+    const [iv, tag, enc] = payload
+      .split(".")
+      .map((p) => Buffer.from(p, "base64url"));
     const decipher = createDecipheriv("aes-256-gcm", pinKey(), iv);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
+    return Buffer.concat([decipher.update(enc), decipher.final()]).toString(
+      "utf8",
+    );
   } catch {
     return null;
   }
@@ -57,13 +76,18 @@ async function createCredentialUser(input: {
   username?: string;
 }) {
   const ctx = await auth.$context;
-  const created = await ctx.internalAdapter.createUser({
-    name: input.name,
-    email: input.email.toLowerCase(),
-    emailVerified: true,
-    role: input.role,
-    ...(input.username ? { username: input.username, displayUsername: input.username } : {}),
-  }, { method: "admin" });
+  const created = await ctx.internalAdapter.createUser(
+    {
+      name: input.name,
+      email: input.email.toLowerCase(),
+      emailVerified: true,
+      role: input.role,
+      ...(input.username
+        ? { username: input.username, displayUsername: input.username }
+        : {}),
+    },
+    { method: "admin" },
+  );
   await ctx.internalAdapter.linkAccount({
     userId: created.id,
     providerId: "credential",
@@ -74,7 +98,11 @@ async function createCredentialUser(input: {
 }
 
 /** Create a teacher (admin) account. */
-export async function createAdminAccount(input: { name: string; email: string; password: string }) {
+export async function createAdminAccount(input: {
+  name: string;
+  email: string;
+  password: string;
+}) {
   return createCredentialUser({ ...input, role: ROLES.admin });
 }
 
@@ -82,7 +110,11 @@ export async function createAdminAccount(input: { name: string; email: string; p
  * Create a student account with a fresh PIN.
  * Returns the plaintext PIN so it can be shown / printed.
  */
-export async function createStudentAccount(input: { studentNumber: string; name: string; pin?: string }) {
+export async function createStudentAccount(input: {
+  studentNumber: string;
+  name: string;
+  pin?: string;
+}) {
   const studentNumber = input.studentNumber.trim();
   const pin = input.pin ?? generatePin();
   const created = await createCredentialUser({
@@ -95,7 +127,10 @@ export async function createStudentAccount(input: { studentNumber: string; name:
   await db
     .insert(studentPins)
     .values({ userId: created.id, pinEncrypted: encryptPin(pin) })
-    .onConflictDoUpdate({ target: studentPins.userId, set: { pinEncrypted: encryptPin(pin) } });
+    .onConflictDoUpdate({
+      target: studentPins.userId,
+      set: { pinEncrypted: encryptPin(pin) },
+    });
   return { user: created, pin };
 }
 
@@ -105,11 +140,18 @@ export async function setAccountPassword(userId: string, password: string) {
   const updated = await db
     .update(account)
     .set({ password: hash })
-    .where(and(eq(account.userId, userId), eq(account.providerId, "credential")))
+    .where(
+      and(eq(account.userId, userId), eq(account.providerId, "credential")),
+    )
     .returning({ id: account.id });
   if (updated.length === 0) {
     const ctx = await auth.$context;
-    await ctx.internalAdapter.linkAccount({ userId, providerId: "credential", accountId: userId, password: hash });
+    await ctx.internalAdapter.linkAccount({
+      userId,
+      providerId: "credential",
+      accountId: userId,
+      password: hash,
+    });
   }
   await db.delete(session).where(eq(session.userId, userId));
 }
@@ -120,13 +162,19 @@ export async function resetStudentPin(userId: string, pin = generatePin()) {
   await db
     .insert(studentPins)
     .values({ userId, pinEncrypted: encryptPin(pin) })
-    .onConflictDoUpdate({ target: studentPins.userId, set: { pinEncrypted: encryptPin(pin) } });
+    .onConflictDoUpdate({
+      target: studentPins.userId,
+      set: { pinEncrypted: encryptPin(pin) },
+    });
   return pin;
 }
 
 /** Current PIN of a student (decrypted), or null if unknown. */
 export async function getStudentPin(userId: string): Promise<string | null> {
-  const [row] = await db.select().from(studentPins).where(eq(studentPins.userId, userId));
+  const [row] = await db
+    .select()
+    .from(studentPins)
+    .where(eq(studentPins.userId, userId));
   return row ? decryptPin(row.pinEncrypted) : null;
 }
 
@@ -135,6 +183,11 @@ export async function findStudentByNumber(studentNumber: string) {
   const [row] = await db
     .select()
     .from(user)
-    .where(and(eq(user.username, studentNumber.trim().toLowerCase()), eq(user.role, ROLES.student)));
+    .where(
+      and(
+        eq(user.username, studentNumber.trim().toLowerCase()),
+        eq(user.role, ROLES.student),
+      ),
+    );
   return row ?? null;
 }

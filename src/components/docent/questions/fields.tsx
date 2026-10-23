@@ -263,7 +263,7 @@ export function HelpPopover({
         <button
           type="button"
           aria-label={label}
-          className="inline-grid size-5 place-items-center rounded-full text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="inline-grid size-5 place-items-center rounded-full text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <CircleHelp className="size-4" aria-hidden="true" />
         </button>
@@ -353,7 +353,7 @@ export function AutoTextarea({
       onChange={(e) => onValueChange(e.target.value)}
       spellCheck={mono ? false : undefined}
       className={cn(
-        "block w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30",
+        "block w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30",
         mono &&
           "bg-[var(--code-bg)] font-mono text-[0.8rem] leading-6 dark:bg-[var(--code-bg)]",
         className,

@@ -121,7 +121,7 @@ function TestRow({ test: t, index }: { test: TestResult; index: number }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className={cn(
-          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
           t.passed ? "bg-success/6" : "bg-destructive/6",
         )}
       >

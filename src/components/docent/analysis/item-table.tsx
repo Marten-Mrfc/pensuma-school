@@ -249,7 +249,7 @@ function StatsHelp() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-grid size-5 place-items-center rounded-full text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="inline-grid size-5 place-items-center rounded-full text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring"
           aria-label="Uitleg over p-waarde en Rir"
         >
           <CircleHelp className="size-3.5" aria-hidden="true" />

@@ -6,6 +6,13 @@
  * - Single-role routers have a router-level default.
  * - Mixed routers (setup, privacy) need exact entries; privacy.* defaults
  *   to admin, setup.* has no default at all.
+ * - A teacher with a temporary password (passwordChangeRequired) may only
+ *   call the admin procedures in PENDING_PASSWORD_CHANGE_ALLOWED; the list
+ *   must match the procedures' `allowWithPendingPasswordChange` meta.
+ *
+ * The matrix enumerates appRouter automatically and checks every decision
+ * for real (anonymous, student, teacher), so a router default can never
+ * hide a procedure that is more open than its router.
  */
 export type Access =
   /** Anyone, signed in or not. */
@@ -48,6 +55,16 @@ export const EXACT_POLICY: Readonly<Record<string, Access>> = {
   "privacy.exportMyData": "student",
 };
 
+/**
+ * Admin procedures a teacher may still call while a password change is
+ * pending (after a reset to a temporary password). Everything else under
+ * adminProcedure answers FORBIDDEN until the password has been changed.
+ */
+export const PENDING_PASSWORD_CHANGE_ALLOWED: readonly string[] = [
+  "staff.changeMyPassword",
+  "staff.me",
+];
+
 /** Defaults for the remaining procedures of mixed routers. */
 export const MIXED_ROUTER_DEFAULTS: Readonly<Record<string, Access>> = {
   privacy: "admin",
@@ -72,4 +89,12 @@ export function staleExactEntries(paths: readonly string[]): string[] {
   return Object.keys(EXACT_POLICY)
     .filter((p) => !known.has(p))
     .sort();
+}
+
+/** Pending-password-change exemptions that no longer match a procedure. */
+export function stalePendingPasswordEntries(
+  paths: readonly string[],
+): string[] {
+  const known = new Set(paths);
+  return PENDING_PASSWORD_CHANGE_ALLOWED.filter((p) => !known.has(p)).sort();
 }
