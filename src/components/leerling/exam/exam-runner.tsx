@@ -62,7 +62,7 @@ import {
   type ClientEventType,
   type EventDetails,
 } from "./activity-logger";
-import { AnswerSaver, type SaveState } from "./answer-saver";
+import { AnswerSaver, REMOVED_STATUS, type SaveState } from "./answer-saver";
 import { focusAfterDialogs } from "./focus-after-dialogs";
 import { QuestionNavigator } from "./question-navigator";
 import { QuestionView } from "./question-view";
@@ -301,7 +301,10 @@ function ExamRunner({
   const finishingRef = useRef(false);
   const offsetRef = useRef(serverOffsetMs);
 
-  const handlers = useRef({ locked: (_err: unknown) => {} });
+  const handlers = useRef({
+    locked: (_err: unknown) => {},
+    saved: (_questionId: string, _status: string) => {},
+  });
   const indexRef = useRef(index);
 
   const [saver] = useState(
@@ -317,6 +320,8 @@ function ExamRunner({
         {
           serverOffsetMs: () => offsetRef.current,
           onLocked: (err) => handlers.current.locked(err),
+          onSaved: (questionId, status) =>
+            handlers.current.saved(questionId, status),
         },
       ),
   );
@@ -367,13 +372,6 @@ function ExamRunner({
     if (finishingRef.current) return;
     finishingRef.current = true;
     setFinishing(mode);
-    if (mode === "auto") {
-      announce("De tijd is om. Je antwoorden worden ingeleverd.", {
-        politeness: "assertive",
-        dedupeKey: "time-up",
-      });
-      toast.info("De tijd is om! We leveren je werk nu in…", TOAST);
-    }
     const flushed = await Promise.race([
       saver.flush(),
       new Promise<boolean>((r) => setTimeout(() => r(false), 8000)),
@@ -387,10 +385,27 @@ function ExamRunner({
     await logger.flush();
     for (let attempt = 0; ; attempt++) {
       try {
-        await trpcClient.portal.submitAttempt.mutate({
+        const sent = Date.now();
+        const res = await trpcClient.portal.submitAttempt.mutate({
           attemptId,
           auto: mode === "auto",
         });
+        if (res.notYet) {
+          // The teacher gave extra time that the heartbeat had not brought
+          // in yet: the server kept the attempt open. Carry on.
+          const next =
+            new Date(res.serverNow).getTime() - (sent + Date.now()) / 2;
+          offsetRef.current = next;
+          setOffset(next);
+          setDeadlineAt(new Date(res.deadlineAt));
+          finishingRef.current = false;
+          setFinishing(null);
+          toast.success(
+            "Je hebt extra tijd gekregen van je docent. Je kunt verder werken.",
+            TOAST,
+          );
+          return;
+        }
         break;
       } catch (err) {
         const code = (err as { data?: { code?: string } }).data?.code;
@@ -407,22 +422,68 @@ function ExamRunner({
         await new Promise((r) => setTimeout(r, 3000));
       }
     }
+    if (mode === "auto") {
+      // Only now that the server confirmed it (the time may have been
+      // extended at the last moment).
+      announce("De tijd is om. Je antwoorden zijn ingeleverd.", {
+        politeness: "assertive",
+        dedupeKey: "time-up",
+      });
+      toast.info("De tijd is om! Je werk is ingeleverd.", TOAST);
+    }
     logger.stop();
     goToResult();
   };
 
+  /** The attempt is gone or not the student's: back to the overview. */
+  const leaveAttempt = () => {
+    saver.clearBackup();
+    forgetAttempt(attemptId);
+    if (document.fullscreenElement)
+      void document.exitFullscreen().catch(() => {});
+    void queryClient.invalidateQueries({ queryKey: trpc.portal.pathKey() });
+    router.replace(routes.leerling.dashboard);
+  };
+
   useEffect(() => {
-    handlers.current.locked = () => {
+    handlers.current.locked = (err) => {
       if (finishingRef.current) return;
       finishingRef.current = true;
-      toast.info(
-        "Deze toets is ingeleverd. Je kunt niets meer wijzigen.",
-        TOAST,
-      );
       logger.stop();
-      goToResult();
+      const code = (err as { data?: { code?: string } } | null)?.data?.code;
+      // null: the heartbeat saw the attempt handed in.
+      if (err == null || code === "PRECONDITION_FAILED") {
+        toast.info(
+          "Deze toets is ingeleverd. Je kunt niets meer wijzigen.",
+          TOAST,
+        );
+        goToResult();
+      } else {
+        toast.error(
+          "Deze toets is niet meer beschikbaar. Vraag je docent wat er aan de hand is.",
+          TOAST,
+        );
+        leaveAttempt();
+      }
+    };
+    handlers.current.saved = (_questionId, status) => {
+      if (status !== REMOVED_STATUS) return;
+      // The teacher deleted a question during the test: reload the list.
+      toast.info(
+        "Je docent heeft een vraag uit de toets gehaald. Die hoef je niet meer te maken.",
+        { ...TOAST, id: "question-removed" },
+      );
+      void queryClient.invalidateQueries({
+        queryKey: trpc.portal.getAttempt.queryKey({ attemptId }),
+      });
     };
   });
+
+  // A question disappeared (deleted by the teacher): stay within the list.
+  useEffect(() => {
+    if (questions.length > 0 && index > questions.length - 1)
+      setIndex(questions.length - 1);
+  }, [questions.length, index]);
 
   // Push restored local changes to the server once.
   const restoredPushed = useRef(false);

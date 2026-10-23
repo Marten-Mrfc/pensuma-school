@@ -256,6 +256,9 @@ export function AssignmentMonitor({
           serverOffsetMs={serverOffsetMs}
           scale={a.settings.grading}
           logFocusEvents={a.settings.logFocusEvents}
+          resultsWaitForEveryone={
+            a.settings.showResults === "after_close" && !a.resultsReleased
+          }
         />
       )}
     </div>
@@ -539,6 +542,17 @@ function MonitorHeader({
                 ? "1 leerling met verlengde tijd werkt nog door tot de eigen eindtijd."
                 : `${inProgressWithAccommodation} leerlingen met verlengde tijd werken nog door tot hun eigen eindtijd.`}
             </p>
+            {a.settings.showResults === "after_close" &&
+            !a.resultsReleased &&
+            !submitAccommodated ? (
+              <p className="text-muted-foreground">
+                De klas ziet de resultaten en de juiste antwoorden pas als ook
+                {inProgressWithAccommodation === 1
+                  ? " deze leerling klaar is"
+                  : " deze leerlingen klaar zijn"}
+                .
+              </p>
+            ) : null}
             <Checkbox
               id={`${id}-submit-accommodated`}
               checked={submitAccommodated}
@@ -555,9 +569,13 @@ function MonitorHeader({
         description="Leerlingen die nog niet begonnen zijn, kunnen dan alsnog starten. Ingeleverde pogingen blijven ingeleverd; die kun je per leerling heropenen."
         confirmLabel="Heropenen"
         onConfirm={async () => {
-          await m.reopen.mutateAsync({ id: a.id });
+          const res = await m.reopen.mutateAsync({ id: a.id });
           await m.invalidate();
-          toast.success("De afname is weer open");
+          toast.success("De afname is weer open", {
+            description: res.restoredDeadlines
+              ? `${res.restoredDeadlines} ${res.restoredDeadlines === 1 ? "leerling die nog bezig was, krijgt" : "leerlingen die nog bezig waren, krijgen"} de eigen tijd weer terug.`
+              : undefined,
+          });
         }}
       />
       <ConfirmDialog

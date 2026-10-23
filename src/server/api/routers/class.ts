@@ -2,6 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ROLES } from "@/lib/auth-shared";
+import {
+  assertNoActiveHolds,
+  auditAttemptsDeleted,
+  studentsWithAttempts,
+} from "@/server/api/routers/assignment";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
 import {
@@ -350,13 +355,48 @@ export const classRouter = createTRPCRouter({
 
   /**
    * Delete a class. Cascades to its assignments (and their attempts/answers)
-   * and memberships; student accounts themselves are kept.
+   * and memberships; student accounts themselves are kept. Refused while a
+   * retention hold covers one of its afnames or one of the students with
+   * work in them; every affected student gets an audit row.
    */
   delete: adminProcedure
     .input(z.object({ id: classIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await getClassOrThrow(ctx.db, input.id);
-      await ctx.db.delete(classes).where(eq(classes.id, input.id));
+      await ctx.db.transaction(async (tx) => {
+        // Lock the class and its afnames: a hold created meanwhile waits
+        // for us (and then fails) instead of being removed by the cascade.
+        await tx
+          .select({ id: classes.id })
+          .from(classes)
+          .where(eq(classes.id, input.id))
+          .for("update");
+        const afnames = await tx
+          .select({ id: assignments.id })
+          .from(assignments)
+          .where(eq(assignments.classId, input.id))
+          .for("update");
+        const assignmentIds = afnames.map((a) => a.id);
+        const students = await studentsWithAttempts(tx, assignmentIds);
+        await assertNoActiveHolds(
+          tx,
+          { assignmentIds, userIds: students.map((s) => s.userId) },
+          {
+            afname: "een afname van deze klas",
+            consequence: "Je kunt de klas daarom niet verwijderen.",
+            remedy:
+              "Hef de blokkade eerst op onder Privacy › Bewaarblokkades, of archiveer de klas in plaats van hem te verwijderen.",
+          },
+        );
+        await auditAttemptsDeleted(ctx, tx, {
+          path: "class.delete",
+          subjectType: "class",
+          subjectId: input.id,
+          details: { classId: input.id, assignmentsCount: afnames.length },
+          students,
+        });
+        await tx.delete(classes).where(eq(classes.id, input.id));
+      });
       return { id: input.id };
     }),
 

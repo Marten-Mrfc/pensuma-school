@@ -13,7 +13,22 @@
  * Accounts lock for 15 minutes after 8 failures. After a lock has expired
  * the next failure sets the counter to 8 − 3, so a guesser gets three more
  * tries instead of a fresh eight (and a single typo does not re-lock at
- * once). IP addresses lock for 10 minutes at LOGIN_IP_MAX_FAILURES.
+ * once).
+ *
+ * The network counter never refuses anyone by itself: a whole school signs
+ * in from one NAT address, so one pupil must not be able to lock out every
+ * pupil and teacher. While an address has LOGIN_IP_MAX_FAILURES failures
+ * in its window (and for 10 minutes after the last one over the limit) it
+ * is "restricted": student accounts signing in from it lock after
+ * RESTRICTED_NETWORK_MAX_FAILURES failures instead of 8, which limits a
+ * spray over many leerlingnummers. Accounts without failures, and teachers
+ * (e-mail sign-in), sign in as usual; a teacher can lift a student's lock.
+ *
+ * Race-free counting: an attempt is reserved (counted) before the password
+ * check, in one atomic upsert per key, so parallel requests cannot all pass
+ * the lock check first. A success clears the account and gives the network
+ * slot back; any outcome other than a wrong password (a malformed request,
+ * a server error) gives both back, so only genuine 401s count.
  *
  * All times are compared in SQL (the columns have no time zone and are
  * written with now()). No server-only import: the retention CLI uses
@@ -34,9 +49,14 @@ export const IP_WINDOW_MINUTES = 10;
 export const IP_LOCK_MINUTES = 10;
 /** Failures after an expired lock: the counter restarts at this value. */
 export const FAILURES_AFTER_EXPIRED_LOCK = MAX_FAILURES - 3;
+/**
+ * Lock threshold for a student account while its network is restricted.
+ * Equal to the restart value, so after an expired lock every further wrong
+ * PIN from a restricted network re-locks at once (one guess per lock).
+ */
+export const RESTRICTED_NETWORK_MAX_FAILURES = FAILURES_AFTER_EXPIRED_LOCK;
 
 export const ACCOUNT_LOCKED_MESSAGE = `Te veel mislukte pogingen. Probeer het over ${LOCK_MINUTES} minuten opnieuw of vraag je docent om hulp.`;
-export const NETWORK_LOCKED_MESSAGE = `Te veel mislukte pogingen vanaf dit netwerk. Wacht ${IP_LOCK_MINUTES} minuten en probeer het opnieuw.`;
 
 export const SIGN_IN_PATHS: ReadonlySet<string> = new Set([
   "/sign-in/username",
@@ -128,64 +148,96 @@ export async function clearStudentLoginThrottle(
   return result.rowCount ?? 0;
 }
 
-/** Which of these keys are locked right now. */
-export async function lockedKeys(db: Db, keys: string[]): Promise<Set<string>> {
-  if (keys.length === 0) return new Set();
-  const rows = await db
-    .select({ key: loginThrottle.key })
-    .from(loginThrottle)
-    .where(
-      and(
-        inArray(loginThrottle.key, keys),
-        sql`${loginThrottle.lockedUntil} > now()`,
-      ),
-    );
-  return new Set(rows.map((r) => r.key));
-}
+const isLocked = sql<boolean>`coalesce(${loginThrottle.lockedUntil} > now(), false)`;
+
+/** One reserved attempt on an account key. */
+export type AccountReservation = {
+  key: string;
+  /** Failures counted on the key, this attempt included. */
+  failures: number;
+  /** This attempt set the lock: it was the last one allowed. */
+  lockedNow: boolean;
+  /** The threshold the attempt was counted against. */
+  maxFailures: number;
+};
+
+/** One reserved attempt in an address's window. */
+export type IpReservation = {
+  key: string;
+  /** Failures in the current window, this attempt included. */
+  failures: number;
+  /** The address is restricted (this attempt included). */
+  restricted: boolean;
+  /** This attempt reached the network threshold. */
+  reachedLimit: boolean;
+};
+
+export type SignInReservation = {
+  account: AccountReservation | null;
+  ip: IpReservation | null;
+};
 
 /**
- * Counts one failed sign-in for an account. `lockedNow` is true for the
- * failure that triggered the lock (for the audit log).
+ * Counts one attempt for an account before the password is checked, unless
+ * the account is locked (then null and nothing changes). One upsert, so
+ * parallel attempts queue on the row: at most `maxFailures` pass per lock.
  */
-export async function recordAccountFailure(
+export async function reserveAccountAttempt(
   db: Db,
   key: string,
-): Promise<{ failures: number; lockedNow: boolean }> {
+  maxFailures: number,
+): Promise<AccountReservation | null> {
   const t = loginThrottle;
   const expired = sql`(${t.lockedUntil} is not null and ${t.lockedUntil} <= now())`;
   const next = sql`(case when ${expired} then ${FAILURES_AFTER_EXPIRED_LOCK} else ${t.failures} + 1 end)`;
+  const lockUntil = sql`now() + make_interval(mins => ${LOCK_MINUTES})`;
   const [row] = await db
     .insert(t)
-    .values({ key, failures: 1, updatedAt: sql`now()` })
+    .values({
+      key,
+      failures: 1,
+      lockedUntil: maxFailures <= 1 ? lockUntil : null,
+      updatedAt: sql`now()`,
+    })
     .onConflictDoUpdate({
       target: t.key,
       set: {
         failures: next,
-        lockedUntil: sql`(case when ${next} >= ${MAX_FAILURES} then now() + make_interval(mins => ${LOCK_MINUTES}) when ${expired} then null else ${t.lockedUntil} end)`,
+        lockedUntil: sql`(case when ${next} >= ${maxFailures} then ${lockUntil} else null end)`,
         updatedAt: sql`now()`,
       },
+      // A locked row is left alone (no row returned): refused attempts
+      // neither count nor extend the lock.
+      setWhere: sql`not ${isLocked}`,
     })
-    .returning({ failures: t.failures });
-  const failures = row?.failures ?? 1;
-  return { failures, lockedNow: failures === MAX_FAILURES };
+    .returning({ failures: t.failures, locked: isLocked });
+  if (!row) return null;
+  return {
+    key,
+    failures: row.failures,
+    lockedNow: row.locked,
+    maxFailures,
+  };
 }
 
 /**
- * Counts one failed sign-in from an IP address in its 10-minute window.
- * `lockedNow` is true for the failure that locked the address.
+ * Counts one attempt in the address's 10-minute window before the password
+ * is checked. Reaching `maxFailures` restricts the address for 10 minutes
+ * (renewed by every attempt over the limit).
  */
-export async function recordIpFailure(
+export async function reserveIpAttempt(
   db: Db,
   ip: string,
   maxFailures: number,
-): Promise<{ failures: number; lockedNow: boolean }> {
+): Promise<IpReservation> {
   const t = loginThrottle;
+  const key = ipThrottleKey(ip);
   const fresh = sql`(${t.updatedAt} < now() - make_interval(mins => ${IP_WINDOW_MINUTES}))`;
   const next = sql`(case when ${fresh} then 1 else ${t.failures} + 1 end)`;
   const [row] = await db
     .insert(t)
     .values({
-      key: ipThrottleKey(ip),
+      key,
       failures: 1,
       lockedUntil:
         maxFailures <= 1
@@ -202,9 +254,120 @@ export async function recordIpFailure(
         updatedAt: sql`(case when ${fresh} then now() else ${t.updatedAt} end)`,
       },
     })
-    .returning({ failures: t.failures });
+    .returning({ failures: t.failures, restricted: isLocked });
   const failures = row?.failures ?? 1;
-  return { failures, lockedNow: failures === maxFailures };
+  return {
+    key,
+    failures,
+    restricted: row?.restricted ?? false,
+    reachedLimit: failures === maxFailures,
+  };
+}
+
+/**
+ * Gives an attempt back that turned out not to be a wrong password. A row
+ * that held only this attempt is removed; otherwise the count drops by one
+ * and the lock is lifted when it falls below the threshold the attempt was
+ * counted against (only this attempt can have set it).
+ */
+export async function releaseAccountAttempt(
+  db: Db,
+  reservation: AccountReservation,
+): Promise<void> {
+  const t = loginThrottle;
+  const removed = await db
+    .delete(t)
+    .where(and(eq(t.key, reservation.key), sql`${t.failures} <= 1`));
+  if ((removed.rowCount ?? 0) > 0) return;
+  await db
+    .update(t)
+    .set({
+      failures: sql`greatest(${t.failures} - 1, 0)`,
+      lockedUntil: sql`(case when ${t.failures} - 1 < ${reservation.maxFailures} then null else ${t.lockedUntil} end)`,
+      updatedAt: sql`${t.updatedAt}`,
+    })
+    .where(eq(t.key, reservation.key));
+}
+
+/**
+ * Gives a network slot back (a success, or not a wrong password), so a
+ * successful sign-in leaves no row behind. The window start and an active
+ * restriction stay as they are.
+ */
+export async function releaseIpAttempt(
+  db: Db,
+  reservation: IpReservation,
+): Promise<void> {
+  const t = loginThrottle;
+  const removed = await db
+    .delete(t)
+    .where(
+      and(
+        eq(t.key, reservation.key),
+        sql`${t.failures} <= 1`,
+        sql`not ${isLocked}`,
+      ),
+    );
+  if ((removed.rowCount ?? 0) > 0) return;
+  await db
+    .update(t)
+    .set({
+      failures: sql`greatest(${t.failures} - 1, 0)`,
+      updatedAt: sql`${t.updatedAt}`,
+    })
+    .where(eq(t.key, reservation.key));
+}
+
+export type ReserveSignInResult =
+  | { ok: true; reservation: SignInReservation }
+  | { ok: false; reason: "account_locked" };
+
+/**
+ * Before the password check of a sign-in: counts the attempt for the
+ * address and the account. Student accounts get the stricter threshold
+ * while the address is restricted; teachers (e-mail accounts) never do.
+ * A locked account is refused and nothing stays counted.
+ */
+export async function reserveSignInAttempt(
+  db: Db,
+  input: {
+    account: AccountKey | null;
+    ip: string | null;
+    ipMaxFailures: number;
+  },
+): Promise<ReserveSignInResult> {
+  const ip = input.ip
+    ? await reserveIpAttempt(db, input.ip, input.ipMaxFailures)
+    : null;
+  if (!input.account) return { ok: true, reservation: { account: null, ip } };
+  const maxFailures =
+    input.account.kind === "student" && ip?.restricted
+      ? RESTRICTED_NETWORK_MAX_FAILURES
+      : MAX_FAILURES;
+  try {
+    const account = await reserveAccountAttempt(
+      db,
+      input.account.key,
+      maxFailures,
+    );
+    if (account) return { ok: true, reservation: { account, ip } };
+  } catch (error) {
+    if (ip) await releaseIpAttempt(db, ip).catch(() => {});
+    throw error;
+  }
+  if (ip) await releaseIpAttempt(db, ip);
+  return { ok: false, reason: "account_locked" };
+}
+
+/** Gives every part of a reservation back. */
+export async function releaseSignInAttempt(
+  db: Db,
+  reservation: SignInReservation,
+): Promise<void> {
+  if (reservation.account) {
+    await releaseAccountAttempt(db, reservation.account);
+  }
+  if (reservation.ip) await releaseIpAttempt(db, reservation.ip);
 }
 
 /** Forget an account's failures after a successful sign-in. */

@@ -4,6 +4,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import * as schema from "@/server/db/schema";
 import {
   DATA_CATEGORIES,
+  FACILITY_LABELS,
   formatSubjects,
   registerAsMarkdown,
 } from "./register";
@@ -82,6 +83,70 @@ describe("DATA_CATEGORIES", () => {
     expect(results?.retention(off)).toContain("staat nog uit");
     expect(results?.retention(on)).toContain("18 maanden");
     expect(log?.retention(on)).toContain("30 dagen");
+  });
+});
+
+describe("texts match what Pensuma does", () => {
+  const byId = (id: string) => {
+    const c = DATA_CATEGORIES.find((x) => x.id === id);
+    if (!c) throw new Error(id);
+    return c;
+  };
+
+  test("confirmed with auto-delete off: 'staat uit', not 'until confirmation'", () => {
+    const confirmedOff = privacySettingsSchema.parse({
+      retention: {
+        autoDeleteAttempts: false,
+        confirmedAt: "2026-09-01T00:00:00.000Z",
+      },
+    });
+    const results = byId("results").retention(confirmedOff);
+    expect(results).toContain("staat uit");
+    expect(results).not.toContain("nog uit");
+    expect(results).not.toContain("vaststelt");
+    const account = byId("student-account").retention(confirmedOff);
+    expect(account).toContain("staat uit");
+    expect(account).not.toContain("nog uit");
+    // Unconfirmed keeps the "until confirmation" wording.
+    const unconfirmed = privacySettingsSchema.parse({});
+    expect(byId("student-account").retention(unconfirmed)).toContain(
+      "staat nog uit tot de school de bewaartermijnen vaststelt",
+    );
+  });
+
+  test("exam log: runs and tests always, window/fullscreen/paste only when enabled, no copying", () => {
+    const { examples } = byId("exam-log");
+    const [always, optIn] = examples.split("Alleen als de docent dit aanzet");
+    expect(always).toContain("Altijd");
+    expect(always).toContain("code uitvoert of test");
+    expect(optIn).toContain("toetsvenster of tabblad verlaat");
+    expect(optIn).toContain("volledige scherm");
+    expect(optIn).toContain("plakken");
+    expect(optIn).not.toContain("code uitvoert");
+    expect(examples).toContain("Kopiëren wordt niet bijgehouden");
+  });
+
+  test("facility label says what it switches off", () => {
+    expect(FACILITY_LABELS.ignoreFocusEvents).toBe(
+      "vensterwissels niet registreren",
+    );
+    const { examples } = byId("accommodations");
+    expect(examples).toContain("vensterwissels niet registreren");
+    expect(examples).not.toContain("geen logboek");
+  });
+
+  test("expired holds are removed automatically after a grace period", () => {
+    const text = byId("privacy-admin").retention(
+      privacySettingsSchema.parse({}),
+    );
+    expect(text).toContain("30 dagen na de einddatum");
+  });
+
+  test("audit log: views are named precisely; scores yes, answer content never", () => {
+    const { examples } = byId("audit-log");
+    expect(examples).toContain("een leerling, een poging of pincodes");
+    expect(examples).toContain("oude en nieuwe score");
+    expect(examples).toContain("Nooit de inhoud van antwoorden");
   });
 });
 

@@ -144,7 +144,10 @@ function SettingsForm({
       ...(!sameTime(newCloses, assignment.closesAt)
         ? { closesAt: newCloses }
         : {}),
-      timeLimitMinutes: limit,
+      // Only when it changed: the server recomputes running deadlines.
+      ...(limit !== assignment.timeLimitMinutes
+        ? { timeLimitMinutes: limit }
+        : {}),
       accessCode: normalizedCode,
       settings,
     });

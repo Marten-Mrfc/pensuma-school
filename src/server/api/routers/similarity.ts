@@ -2,6 +2,11 @@
  * Code vergelijken (similarity check) for teachers. Computed on demand from
  * the submitted answers: nothing is stored and nothing is shown to students
  * (no profiling). A high score is a signal for a conversation, not proof.
+ *
+ * Views are audited like other views of student work: the overview once per
+ * afname (`similarity.viewed`), a side-by-side comparison as
+ * `attempt.viewed` for each named student (via "similarity"), so it shows
+ * up in that student's access log.
  */
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
@@ -26,6 +31,7 @@ import {
   tests,
   user,
 } from "@/server/db/schema";
+import { auditRead } from "@/server/services/audit";
 
 const idSchema = z.uuid("Ongeldige id.");
 
@@ -257,6 +263,17 @@ export const similarityRouter = createTRPCRouter({
         };
       });
 
+      auditRead(ctx, {
+        action: "similarity.viewed",
+        subjectType: "assignment",
+        subjectId: a.id,
+        details: {
+          scope: input.scope,
+          questionId: input.questionId ?? null,
+          attemptsCount: chosen.length,
+        },
+      });
+
       return {
         assignment: {
           id: a.id,
@@ -348,6 +365,17 @@ export const similarityRouter = createTRPCRouter({
         .from(questions)
         .where(eq(questions.testId, left.testId))
         .orderBy(asc(questions.position), asc(questions.createdAt));
+      // Two named students' code side by side: log it for each of them.
+      for (const side of right ? [left, right] : [left]) {
+        auditRead(ctx, {
+          action: "attempt.viewed",
+          subjectType: "attempt",
+          subjectId: side.attemptId,
+          subjectUserId: side.studentId,
+          subjectLabel: side.studentNumber || null,
+          details: { via: "similarity", answerId: side.answerId },
+        });
+      }
       const sideOf = (r: typeof left) => ({
         answerId: r.answerId,
         attemptId: r.attemptId,

@@ -45,11 +45,11 @@ Deze indeling komt overeen met het verwerkingsregister in Pensuma zelf (Privacy 
 | Inlogcodes leerlingen | Leerlingen | Pincode, versleuteld met AES-256-GCM, om inlogkaarten opnieuw af te drukken |
 | Klassen en klasindeling | Leerlingen | Klasnaam, schooljaar, klaslidmaatschap |
 | Antwoorden en resultaten | Leerlingen | Ingeleverde code en antwoorden, testresultaten, scores, cijfers, feedback, start- en inlevertijd |
-| Logboek tijdens toetsen | Leerlingen | Alleen als de docent het aanzet: venster/tabblad verlaten, volledig scherm verlaten, plakpogingen (zonder inhoud), code uitvoeren en testen |
+| Logboek tijdens toetsen | Leerlingen | Altijd: code uitvoeren en testen (vraag, duur, soort fout, aantal geslaagde tests; nooit de code zelf). Alleen als de docent het aanzet: venster/tabblad verlaten, volledig scherm verlaten, plakpogingen (zonder inhoud). Kopiëren wordt niet bijgehouden |
 | Inlog- en beveiligingsgegevens | Leerlingen, docenten | Sessies met IP-adres en browser, tellers van mislukte inlogpogingen en verzoeken, laatste keer inloggen |
-| Logboek docenthandelingen | Docenten, leerlingen | Wie wanneer welke leerlinggegevens bekeek, wijzigde, exporteerde of verwijderde (zonder inhoud), met ingekort IP-adres; opschoonrapporten |
+| Logboek docenthandelingen | Docenten, leerlingen | Wie wanneer een leerling, een poging of pincodes bekeek, code vergeleek, en leerlinggegevens wijzigde, exporteerde of verwijderde, met ingekort IP-adres; nooit de inhoud van antwoorden, wel de oude en nieuwe score bij een scorewijziging; opschoonrapporten |
 | Privacy-instellingen en bewaarblokkades | Leerlingen, docenten | Contactgegevens, bewaartermijnen, bewaarblokkades met reden |
-| Faciliteiten bij toetsen | Leerlingen | Alleen een percentage verlengde tijd en twee schakelaars; nooit een reden of diagnose |
+| Faciliteiten bij toetsen | Leerlingen | Alleen een percentage verlengde tijd en twee schakelaars (plakken toegestaan, vensterwissels niet registreren); nooit een reden of diagnose |
 | Weergave-instellingen | Leerlingen, docenten | Thema, lettergrootte en andere weergavekeuzes |
 | Lesmateriaal en planning | Docenten, leerlingen | Toetsen, vragen, afnames, inhaaltoetsen per leerling, feedbackzinnen |
 
@@ -60,7 +60,8 @@ adres- of oudergegevens en geen foto's.
 
 1. Toetsen en oefenopdrachten afnemen in het vak informatica.
 2. Antwoorden nakijken (automatisch en door de docent) en terugkoppelen aan de leerling.
-3. Een eerlijke toetsafname ondersteunen (alleen als de docent het logboek aanzet).
+3. Een eerlijke toetsafname ondersteunen: vensterwissels, volledig scherm en plakpogingen alleen als de
+   docent dat aanzet; code uitvoeren en testen altijd (zonder de code zelf).
 4. Het systeem beveiligen en verantwoording afleggen over toegang tot leerlinggegevens.
 
 De gegevens worden niet gebruikt voor andere doelen: geen profilering, geen reclame, geen verkoop en
@@ -87,15 +88,18 @@ automatisch, elke 6 uur.
 | Sessies, verificatiecodes | bij verlopen (12 uur na laatste gebruik) | nee | altijd |
 | Tellers voor afremmen en mislukte inlogpogingen | 24 uur | nee | altijd |
 | Logboek tijdens toetsen | 90 dagen na de poging | 7–730 dagen | altijd |
-| Pogingen en antwoorden | 24 maanden na sluiten afname | 6–120 maanden | na vaststelling door de school |
-| Leerlingaccounts zonder actieve klas | 12 maanden zonder inloggen | 3–60 maanden | na vaststelling door de school |
+| Pogingen en antwoorden (ook nooit ingeleverde) | 24 maanden na sluiten afname (of na de laatste activiteit als de afname niet sluit) | 6–120 maanden | na vaststelling door de school, als automatisch verwijderen aanstaat |
+| Leerlingaccounts zonder actieve klas | 12 maanden zonder inloggen | 3–60 maanden | na vaststelling door de school, als automatisch verwijderen aanstaat |
 | Logboek docenthandelingen | 24 maanden | 6–84 maanden | altijd |
+| Verlopen bewaarblokkades (met reden) | 30 dagen na de einddatum | nee | altijd |
 | Back-ups | [[30]] dagen | bij de beheerder | buiten de applicatie |
 
 Werk van schoolexamens (PTA) wordt minstens 6 maanden na het vaststellen van de uitslag bewaard
 (Eindexamenbesluit VO, art. 55). Het officiële cijfer staat in de leerlingadministratie (bijvoorbeeld
 Magister of SOMtoday). Met een **bewaarblokkade** sluit de school gegevens uit van verwijdering, bijvoorbeeld
-tijdens een bezwaarprocedure.
+tijdens een bezwaarprocedure. Stelt de school de termijnen vast met automatisch verwijderen uit, dan
+verwijdert zij pogingen en oude accounts zelf (bijvoorbeeld bij het afsluiten van het schooljaar); de
+privacyverklaring en Mijn gegevens zeggen dat dan ook.
 
 ## 7. Subverwerkers en locatie
 
@@ -125,10 +129,19 @@ Deze maatregelen zijn in de software gebouwd:
 - **Blokkade na mislukte inlogpogingen** (8 pogingen → 15 minuten) en afremmen van te veel verzoeken.
 - **Rollen:** leerlingen zien alleen hun eigen gegevens; alleen docenten hebben beheerrechten.
 - **Logboek van docenthandelingen** dat niet via de applicatie kan worden aangepast, met ingekort
-  IP-adres (geen volledig IP).
+  IP-adres (geen volledig IP). Het legt vast wie een leerling, een poging of pincodes bekijkt (bij een
+  hele klas per leerling), code vergelijkt en leerlinggegevens wijzigt, exporteert of verwijdert. Alleen
+  bij het verwijderen van een leerling wist Pensuma zelf de scores en faciliteiten uit eerdere regels.
 - **Automatische verwijdering** volgens de bewaartermijnen, met respect voor bewaarblokkades.
-- **Dataminimalisatie:** het logboek tijdens toetsen staat standaard uit, slaat nooit geplakte tekst
-  op en kan per leerling worden uitgezet (faciliteit).
+- **Dataminimalisatie:** het logboek van vensterwissels, volledig scherm en plakpogingen staat standaard
+  uit en slaat nooit geplakte of gekopieerde tekst op; kopiëren wordt niet bijgehouden. Code uitvoeren en
+  testen wordt altijd vastgelegd, zonder de code zelf. Met de faciliteit "vensterwissels niet registreren"
+  wordt per leerling het verlaten van het venster of tabblad niet bijgehouden en telt een verlaten
+  volledig scherm niet als focusverlies; als de toets erom vraagt worden het verlaten van het volledige
+  scherm en geblokkeerde plakpogingen wel vastgelegd (de faciliteit "plakken toegestaan" heft het
+  blokkeren van plakken op).
+- **Faciliteiten in het logboek van docenthandelingen:** alleen welke soort faciliteit is gewijzigd,
+  nooit het percentage of de schakelaars zelf.
 
 Organisatorische maatregelen van de beheerder: [[updatebeleid, toegang tot de server, back-upbeleid,
 geheimhouding]].
@@ -136,12 +149,19 @@ geheimhouding]].
 ## 9. Rechten van betrokkenen
 
 - **Inzage en overdraagbaarheid:** leerlingen downloaden hun gegevens zelf (Mijn gegevens). Docenten
-  downloaden alle gegevens van een leerling als JSON (Privacy & gegevens → Inzage & verwijderen).
+  downloaden alle gegevens van een leerling als JSON (Privacy & gegevens → Inzage & verwijderen). Het
+  bestand bevat ook de gebruikte hints (en de aftrek daarvoor), bewaarblokkades met hun reden, inhaal- en
+  herkansingsafnames en wie de gegevens heeft ingezien (zonder namen van docenten).
 - **Verbetering:** docenten passen naam, klas en scores aan.
-- **Verwijdering:** docenten verwijderen een leerling met alle gegevens; het logboek bewaart alleen dat
-  dit is gebeurd (met leerlingnummer, zonder naam).
+- **Verwijdering:** docenten verwijderen een leerling met alle gegevens. Eerdere regels in het logboek
+  van docenthandelingen (wie wat wanneer bekeek of wijzigde, met leerlingnummer, zonder naam) blijven
+  staan tot de bewaartermijn van het logboek voorbij is; scores en faciliteiten worden daaruit meteen
+  gewist. Een nieuwe regel legt vast dat de leerling is verwijderd.
 - **Beperking (art. 18):** docenten blokkeren inloggen en automatische verwijdering tot de beperking is
-  opgeheven.
+  opgeheven. Zolang de beperking geldt, weigert Pensuma het wijzigen van naam, leerlingnummer en
+  faciliteiten (een bewuste uitzondering, bijvoorbeeld om gegevens te verbeteren, wordt in het logboek
+  vastgelegd). Docenten zien de beperking onder Privacy & gegevens (bewaarblokkades); de school spreekt af
+  dat scores en exports tot het einde van de procedure blijven zoals ze zijn.
 - **Bezwaar:** via de school.
 
 Verzoeken komen binnen bij de school ([[e-mail privacy]]). De school beantwoordt ze binnen een maand.

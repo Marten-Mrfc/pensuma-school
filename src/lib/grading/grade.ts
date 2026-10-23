@@ -4,7 +4,14 @@
  * pass/fail decision is made here, in TypeScript, so expected outputs and
  * expected values never enter the sandbox.
  *
- * fraction = passedWeight / totalWeight over all tests AND checks.
+ * Score: tests and checks both have a weight. A missed check costs its
+ * weight, but a passed check only pays out in proportion to the passed
+ * tests, so code that passes no test scores 0 however many checks it meets
+ * ("forbids" checks are met by doing nothing, "requires" checks often by the
+ * starter code):
+ *   fraction = testsPassed/testsTotal × (testsTotal + checksPassed) / (testsTotal + checksTotal)
+ * (all in weights; with all tests passed this equals the plain weighted
+ * sum). A question without tests scores checksPassed / checksTotal.
  * status:  syntax_error  code doesn't compile (no test ran)
  *          internal_error the runner itself failed (not the student's fault)
  *          timeout        at least one test hit the time limit
@@ -28,13 +35,14 @@ import type {
   PythonError,
   TestResult,
 } from "@/lib/questions/schema";
-import { compareOutput, compareValues, quote } from "./compare";
+import { compareOutput, compareValues, normalizeLines, quote } from "./compare";
 import {
   type PyValue,
   pyRepr,
   pyTypeName,
   tryParsePythonLiteral,
 } from "./pyvalue";
+import type { RegexTester } from "./regex-guard";
 
 /* -------------------------------------------------------------------------- */
 /*                                    Types                                   */
@@ -157,10 +165,45 @@ function outcomeFailure(
   };
 }
 
+/** What the comparison of one io test may know about the rest of the question. */
+export type IoTestContext = {
+  /** Expected outputs of the question's other io tests with a different stdin. */
+  siblings?: readonly string[];
+  /** regex mode: time-limited regex evaluation (default: guardedRegexTest). */
+  regexTest?: RegexTester;
+};
+
+function stdinKey(stdin: string): string {
+  return normalizeLines(stdin).join("\n");
+}
+
+/**
+ * The expected outputs of the OTHER io tests of a question, as alternative
+ * answers for `test` (flexible mode rejects output that also carries one of
+ * them). Tests with the same stdin are left out (their output is valid for
+ * this input too), and so are regex tests (a pattern, not an output).
+ */
+export function siblingOutputs(
+  test: IoTest,
+  tests: readonly CodeTest[],
+): string[] {
+  const key = stdinKey(test.stdin);
+  return tests
+    .filter(
+      (t): t is IoTest =>
+        t.kind === "io" &&
+        t.id !== test.id &&
+        t.match !== "regex" &&
+        stdinKey(t.stdin) !== key,
+    )
+    .map((t) => t.expectedOutput);
+}
+
 export function evaluateIoTest(
   test: IoTest,
   outcome: TestOutcome,
   timeLimitMs: number,
+  context: IoTestContext = {},
 ): TestResult {
   const base: TestResult = {
     ...baseResult(test, outcome.durationMs),
@@ -175,6 +218,9 @@ export function evaluateIoTest(
     match: test.match,
     ignoreCase: test.ignoreCase,
     tolerance: test.tolerance,
+    stdin: test.stdin,
+    siblings: context.siblings,
+    regexTest: context.regexTest,
   });
   if (r.error) {
     const feedback = cmp.passed
@@ -298,9 +344,10 @@ export function evaluateTest(
   test: CodeTest,
   outcome: TestOutcome,
   timeLimitMs: number,
+  context: IoTestContext = {},
 ): TestResult {
   return test.kind === "io"
-    ? evaluateIoTest(test, outcome, timeLimitMs)
+    ? evaluateIoTest(test, outcome, timeLimitMs, context)
     : evaluateFunctionTest(test, outcome, timeLimitMs);
 }
 
@@ -393,6 +440,7 @@ export function buildGradingResult(input: {
   /** Set when the runner failed before or during grading. */
   internal?: PythonError | null;
   now?: Date;
+  regexTest?: RegexTester;
 }): CodeGradingResult {
   const { tests, checks, analysis, outcomes, timeLimitMs } = input;
   const gradedAt = (input.now ?? new Date()).toISOString();
@@ -401,7 +449,10 @@ export function buildGradingResult(input: {
   const testResults: TestResult[] = tests.map((test) => {
     const outcome = outcomes.get(test.id);
     if (outcome && !syntaxError)
-      return evaluateTest(test, outcome, timeLimitMs);
+      return evaluateTest(test, outcome, timeLimitMs, {
+        siblings: test.kind === "io" ? siblingOutputs(test, tests) : [],
+        regexTest: input.regexTest,
+      });
     const base: TestResult = {
       ...baseResult(test, 0),
       ...(test.kind === "io"
@@ -425,12 +476,22 @@ export function buildGradingResult(input: {
   };
   const checkResults = checks.map((c) => evaluateCheck(c, fallbackAnalysis));
 
-  const totalWeight =
-    tests.reduce((s, t) => s + t.weight, 0) +
-    checks.reduce((s, c) => s + c.weight, 0);
+  const testTotal = tests.reduce((s, t) => s + t.weight, 0);
+  const testPassed = testResults.reduce(
+    (s, t) => s + (t.passed ? t.weight : 0),
+    0,
+  );
+  const checkTotal = checks.reduce((s, c) => s + c.weight, 0);
+  const checkPassed = checkResults.reduce(
+    (s, c) => s + (c.passed ? c.weight : 0),
+    0,
+  );
+  const totalWeight = testTotal + checkTotal;
+  // Passed checks count in proportion to the passed tests (see the header).
   const passedWeight =
-    testResults.reduce((s, t) => s + (t.passed ? t.weight : 0), 0) +
-    checkResults.reduce((s, c) => s + (c.passed ? c.weight : 0), 0);
+    testTotal > 0
+      ? testPassed + checkPassed * (testPassed / testTotal)
+      : checkPassed;
 
   let status: CodeGradingResult["status"] = "ok";
   if (syntaxError) status = "syntax_error";
@@ -451,7 +512,7 @@ export function buildGradingResult(input: {
     error: syntaxError ?? (input.internal || null),
     tests: testResults,
     checks: checkResults,
-    passedWeight,
+    passedWeight: Math.round(passedWeight * 10_000) / 10_000,
     totalWeight,
     fraction: Math.round(fraction * 10_000) / 10_000,
     gradedAt,
@@ -465,6 +526,8 @@ export type RunGradingOptions = {
   totalTimeLimitMs?: number;
   maxOutput?: number;
   recursionLimit?: number;
+  /** regex mode: time-limited regex evaluation (default: guardedRegexTest). */
+  regexTest?: RegexTester;
 };
 
 /** Build the harness request for one test. */
@@ -513,6 +576,7 @@ export async function runGrading(
       outcomes: new Map(),
       timeLimitMs,
       internal: internalError(e instanceof Error ? e.message : String(e)),
+      regexTest: options.regexTest,
     });
   }
   const outcomes = new Map<string, TestOutcome>();
@@ -546,5 +610,12 @@ export async function runGrading(
       }
     }
   }
-  return buildGradingResult({ tests, checks, analysis, outcomes, timeLimitMs });
+  return buildGradingResult({
+    tests,
+    checks,
+    analysis,
+    outcomes,
+    timeLimitMs,
+    regexTest: options.regexTest,
+  });
 }

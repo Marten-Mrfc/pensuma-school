@@ -13,24 +13,38 @@ import { db } from "@/server/db";
 import * as schema from "@/server/db/schema";
 import { DISABLED_AUTH_PATHS } from "@/server/security/auth-routes";
 import { clientIp, trustedProxiesFromEnv } from "@/server/security/client-ip";
+import { loggableErrorMessage } from "@/server/security/errors";
 import {
   ACCOUNT_LOCKED_MESSAGE,
   type AccountKey,
   accountKeyFor,
   clearAccountKey,
   IP_WINDOW_MINUTES,
-  ipThrottleKey,
-  lockedKeys,
-  NETWORK_LOCKED_MESSAGE,
-  recordAccountFailure,
-  recordIpFailure,
+  releaseIpAttempt,
+  releaseSignInAttempt,
+  reserveSignInAttempt,
   SIGN_IN_PATHS,
+  type SignInReservation,
   SprayDetector,
 } from "@/server/security/login-throttle";
 import { auditSystem, writeAudit } from "@/server/services/audit";
 
 /** Failures across all accounts in 10 minutes before an alert is logged. */
 const SPRAY_THRESHOLD = 300;
+
+/**
+ * Longest a session lives: one school day. Remembered sessions (teachers)
+ * end 12 hours after their last use; student sessions (rememberMe off,
+ * never refreshed by better-auth) end 12 hours after signing in instead of
+ * better-auth's fixed 24 hours.
+ */
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+
+/**
+ * Attempts counted by the before hook, per sign-in call. Keyed by the
+ * per-call context object better-auth hands to both hooks.
+ */
+const reservations = new WeakMap<object, SignInReservation>();
 
 const SPRAY_KEY = Symbol.for("pensuma.loginSprayDetector");
 /** One detector per process (survives HMR in development). */
@@ -63,7 +77,9 @@ function logHookError(event: string, path: string, error: unknown) {
       ts: new Date().toISOString(),
       event,
       path,
-      error: error instanceof Error ? error.message.slice(0, 300) : "unknown",
+      // A failed throttle query would otherwise log its parameters (the
+      // leerlingnummer or e-mail address).
+      error: loggableErrorMessage(error, 300),
     }),
   );
 }
@@ -82,10 +98,10 @@ async function lockedAccountUserId(account: AccountKey) {
   return row ?? null;
 }
 
-async function onSignInFailure(ctx: HookContext) {
-  const account = accountKeyFor(ctx.path, ctx.body);
-  const ip = hookIp(ctx);
-
+async function onSignInFailure(
+  ctx: HookContext,
+  reservation: SignInReservation | undefined,
+) {
   if (getSprayDetector().record()) {
     await auditSystem(db, {
       action: "security.login_spray_suspected",
@@ -97,42 +113,44 @@ async function onSignInFailure(ctx: HookContext) {
     });
   }
 
-  if (account) {
-    const result = await recordAccountFailure(db, account.key);
-    if (result.lockedNow) {
-      const target = await lockedAccountUserId(account);
-      await auditSystem(db, {
-        action: "auth.account_locked",
-        subjectType:
-          account.kind === "student" || target?.role === ROLES.student
-            ? "student"
-            : "staff",
-        subjectId: target?.id ?? null,
-        subjectUserId: target?.role === ROLES.student ? target.id : null,
-        subjectLabel: account.identifier,
-        details: { failuresCount: result.failures },
-      });
-    }
+  // The failure itself was counted by the before hook; only the audit
+  // rows are left.
+  const account = accountKeyFor(ctx.path, ctx.body);
+  if (account && reservation?.account?.lockedNow) {
+    const target = await lockedAccountUserId(account);
+    await auditSystem(db, {
+      action: "auth.account_locked",
+      subjectType:
+        account.kind === "student" || target?.role === ROLES.student
+          ? "student"
+          : "staff",
+      subjectId: target?.id ?? null,
+      subjectUserId: target?.role === ROLES.student ? target.id : null,
+      subjectLabel: account.identifier,
+      details: {
+        failuresCount: reservation.account.failures,
+        // 8, or fewer while the network had many failures.
+        threshold: reservation.account.maxFailures,
+      },
+    });
   }
 
-  if (ip) {
-    const result = await recordIpFailure(db, ip, env.LOGIN_IP_MAX_FAILURES);
-    if (result.lockedNow) {
-      await writeAudit(db, {
-        actorId: null,
-        actorRole: "system",
-        ipPrefix: truncateIp(ip),
-        action: "auth.network_locked",
-        subjectType: "system",
-        details: { failuresCount: result.failures },
-      });
-    }
+  if (reservation?.ip?.reachedLimit) {
+    await writeAudit(db, {
+      actorId: null,
+      actorRole: "system",
+      ipPrefix: truncateIp(hookIp(ctx)),
+      action: "auth.network_locked",
+      subjectType: "system",
+      details: { failuresCount: reservation.ip.failures },
+    });
   }
 }
 
 async function onSignInSuccess(
   ctx: HookContext,
   newSession: { user: { id: string; name: string; role?: string | null } },
+  reservation: SignInReservation | undefined,
 ) {
   const { user } = newSession;
   await db
@@ -144,6 +162,7 @@ async function onSignInSuccess(
     });
   const account = accountKeyFor(ctx.path, ctx.body);
   if (account) await clearAccountKey(db, account.key);
+  if (reservation?.ip) await releaseIpAttempt(db, reservation.ip);
   if (ctx.path === "/sign-in/email" && user.role === ROLES.admin) {
     await writeAudit(db, {
       actorId: user.id,
@@ -198,12 +217,31 @@ export const auth = betterAuth({
     },
   },
   session: {
-    expiresIn: 60 * 60 * 12, // 12 hours: one school day
+    expiresIn: SESSION_MAX_AGE_SECONDS,
     updateAge: 60 * 60,
-    // Only for better-auth's own endpoints: the tRPC context and the
-    // server guards read the session with disableCookieCache, so
-    // deactivation, PIN resets and removals take effect at once.
-    cookieCache: { enabled: true, maxAge: 60 },
+    // No better-auth.session_data cookie: every server read passes
+    // disableCookieCache anyway, and for students (rememberMe off) the
+    // cookie would sit on a shared computer until the browser closes with
+    // their name, leerlingnummer and IP address in it. better-auth clears
+    // a leftover copy on the next get-session.
+    cookieCache: { enabled: false },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        // better-auth gives a session without rememberMe a fixed 24 hours;
+        // cap every new session at one school day (see the privacy
+        // statement). Shorter ones (impersonation) are kept as they are.
+        before: async (session) => {
+          const start = session.createdAt
+            ? new Date(session.createdAt).getTime()
+            : Date.now();
+          const cap = new Date(start + SESSION_MAX_AGE_SECONDS * 1000);
+          const expiresAt = new Date(session.expiresAt);
+          return { data: { expiresAt: expiresAt > cap ? cap : expiresAt } };
+        },
+      },
+    },
   },
   rateLimit: {
     enabled: true,
@@ -213,7 +251,8 @@ export const auth = betterAuth({
     customRules: {
       // Per IP. A whole school signs in from one NAT address, so successful
       // sign-ins must not exhaust a shared bucket; failures are limited by
-      // the account and IP failure counters below.
+      // the account lock (stricter while the network has many failures,
+      // see login-throttle.ts), never by refusing the whole address.
       "/sign-in/username": { window: 60, max: 600 },
       "/sign-in/email": { window: 60, max: 60 },
       // Several classes sign out at the bell from that same address; a
@@ -246,36 +285,37 @@ export const auth = betterAuth({
           });
         }
       }
-      const account = accountKeyFor(ctx.path, ctx.body);
-      const ip = hookIp(ctx);
-      const ipKey = ip ? ipThrottleKey(ip) : null;
-      const locked = await lockedKeys(
-        db,
-        [account?.key, ipKey].filter((k): k is string => !!k),
-      );
-      if (ipKey && locked.has(ipKey)) {
-        throw new APIError("TOO_MANY_REQUESTS", {
-          message: NETWORK_LOCKED_MESSAGE,
-          code: "NETWORK_LOCKED",
-        });
-      }
-      if (account && locked.has(account.key)) {
+      // Count the attempt before the password is checked (atomic per
+      // key), so parallel requests cannot all slip past the lock check.
+      const result = await reserveSignInAttempt(db, {
+        account: accountKeyFor(ctx.path, ctx.body),
+        ip: hookIp(ctx),
+        ipMaxFailures: env.LOGIN_IP_MAX_FAILURES,
+      });
+      if (!result.ok) {
         throw new APIError("TOO_MANY_REQUESTS", {
           message: ACCOUNT_LOCKED_MESSAGE,
           code: "ACCOUNT_LOCKED",
         });
       }
+      reservations.set(ctx.context, result.reservation);
     }),
     after: createAuthMiddleware(async (ctx) => {
       if (!SIGN_IN_PATHS.has(ctx.path)) return;
+      const reservation = reservations.get(ctx.context);
+      reservations.delete(ctx.context);
       // Bookkeeping only: a sign-in never fails because of it.
       try {
         const returned = ctx.context.returned;
         const newSession = ctx.context.newSession;
         if (newSession && !isAPIError(returned)) {
-          await onSignInSuccess(ctx, newSession);
+          await onSignInSuccess(ctx, newSession, reservation);
         } else if (isAPIError(returned) && returned.statusCode === 401) {
-          await onSignInFailure(ctx);
+          await onSignInFailure(ctx, reservation);
+        } else if (reservation) {
+          // Not a wrong password (malformed request, banned account,
+          // server error): the attempt does not count.
+          await releaseSignInAttempt(db, reservation);
         }
       } catch (error) {
         logHookError("auth_hook_failed", ctx.path, error);

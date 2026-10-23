@@ -137,3 +137,20 @@ describe("sanitizeAuditDetails", () => {
     expect(sanitizeAuditDetails([1])).toBeNull();
   });
 });
+
+describe("details written by the privacy fixes survive sanitizing", () => {
+  test("facility change flags, override flag and similarity details", () => {
+    const details = {
+      extraTimeChanged: true,
+      allowPasteChanged: true,
+      focusLogChanged: true,
+      facilityActive: false,
+      restrictionOverridden: true,
+      via: "similarity",
+      answerId: uuid,
+      scope: "assignment",
+      attemptsCount: 4,
+    };
+    expect(sanitizeAuditDetails(details)).toEqual(details);
+  });
+});

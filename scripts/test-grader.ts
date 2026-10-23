@@ -14,12 +14,15 @@ import http from "node:http";
 import type net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import type { GradeInput } from "@/lib/python/types";
 import {
   type CodeQuestionData,
+  type CodeTest,
   codeQuestionDataSchema,
+  redactCodeResultForStudent,
 } from "@/lib/questions/schema";
 import { DEMO_QUESTIONS } from "@/server/demo/questions";
-import { graderConfig } from "@/server/grader/config";
+import { graderConfig, resetGraderConfig } from "@/server/grader/config";
 import {
   gradeCode,
   gradeCodeBatch,
@@ -1038,6 +1041,182 @@ async function seedAndBatch(): Promise<void> {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*          Hidden-test isolation, fair job budget, busy grader queue          */
+/* -------------------------------------------------------------------------- */
+
+function ioTest(
+  id: string,
+  stdin: string,
+  expectedOutput: string,
+  hidden = false,
+): CodeTest {
+  return q({
+    tests: [{ id, kind: "io", name: id, stdin, expectedOutput, hidden }],
+  }).tests[0];
+}
+
+const gradeItem = (
+  code: string,
+  tests: CodeTest[],
+  timeLimitMs = 2000,
+): GradeInput => ({ code, tests, checks: [], timeLimitMs });
+
+async function reliability(): Promise<void> {
+  section("Hidden test inputs never reach student-visible output");
+  // Question A stores what input() returns (module attribute + file);
+  // question B prints it in a VISIBLE test.
+  const store = gradeItem(
+    [
+      "import sys",
+      "naam = input('Naam? ')",
+      "sys.__dict__.setdefault('pensuma_seen', []).append(naam)",
+      "open('/tmp/seen.txt', 'a').write(naam + '\\n')",
+      "print('Hallo ' + naam)",
+    ].join("\n"),
+    [
+      ioTest("zichtbaar", "Mark", "Hallo Mark"),
+      ioTest("verborgen", "Fatima", "Hallo Fatima", true),
+    ],
+  );
+  const report = gradeItem(
+    [
+      "import os, sys",
+      "print('Hallo wereld!', getattr(sys, 'pensuma_seen', None))",
+      "if os.path.exists('/tmp/seen.txt'):",
+      "    print('bestand:', open('/tmp/seen.txt').read().split())",
+    ].join("\n"),
+    [ioTest("hallo", "", "Hallo wereld!")],
+  );
+  const [ra, rb] = await gradeCodeBatch([store, report]);
+  const shown = redactCodeResultForStudent(rb).tests[0].actual ?? "";
+  check(
+    "a later question can't print an earlier question's hidden input",
+    ra.fraction === 1 && !shown.includes("Fatima"),
+    JSON.stringify(shown),
+  );
+  const [single] = await gradeCodeBatch([
+    gradeItem(
+      [
+        "import sys",
+        "seen = list(getattr(sys, 'pensuma_seen2', []))",
+        "sys.__dict__.setdefault('pensuma_seen2', []).append(input())",
+        "print(seen)",
+      ].join("\n"),
+      [
+        ioTest("verborgen", "Geheim", "[]", true),
+        ioTest("zichtbaar", "Open", "[]"),
+      ],
+    ),
+  ]);
+  const visible = redactCodeResultForStudent(single).tests[1];
+  check(
+    "a hidden test stored before a visible one runs after it",
+    single.tests[0].testId === "verborgen" &&
+      !(visible.actual ?? "").includes("Geheim"),
+    JSON.stringify(visible.actual),
+  );
+  const [files] = await gradeCodeBatch([
+    gradeItem(
+      [
+        "import os",
+        "print(os.path.exists('/tmp/notitie.txt'), os.path.exists('/home/pyodide/notitie.txt'))",
+        "open('/tmp/notitie.txt', 'w').write('x')",
+        "open('/home/pyodide/notitie.txt', 'w').write('x')",
+      ].join("\n"),
+      [ioTest("a", "", "False False"), ioTest("b", "", "False False")],
+    ),
+  ]);
+  check(
+    "files written by one run are gone in the next run of the same job",
+    files.fraction === 1,
+    files.tests.map((t) => t.actual?.trim()).join(" | "),
+  );
+
+  section("One job's time is shared fairly between its questions");
+  const savedJobTimeout = process.env.GRADER_JOB_TIMEOUT_MS;
+  process.env.GRADER_JOB_TIMEOUT_MS = "6000";
+  resetGraderConfig();
+  try {
+    const honest = (n: number) =>
+      gradeItem("print(input())", [
+        ioTest(`v${n}`, String(n), String(n)),
+        ioTest(`h${n}`, String(n + 1), String(n + 1), true),
+      ]);
+    const looping = gradeItem(
+      "while True:\n    pass",
+      Array.from({ length: 6 }, (_, i) => ioTest(`l${i}`, "", "x")),
+      1000,
+    );
+    // Time the job itself, not sandbox cold starts.
+    const pool = getGraderPool();
+    for (let i = 0; i < 200 && pool.stats().ready < 2; i++)
+      await new Promise((r) => setTimeout(r, 100));
+    const t0 = performance.now();
+    const [rl, r1, r2] = await gradeCodeBatch([looping, honest(1), honest(3)]);
+    const took = performance.now() - t0;
+    check(
+      "an endless loop doesn't cost the other questions their tests",
+      r1.fraction === 1 && r2.fraction === 1 && rl.status === "timeout",
+      `${rl.status} ${r1.fraction} ${r2.fraction}`,
+    );
+    // Before: every question had the full budget (6 x (1 s + respawn)).
+    check("…and the job ends early", took < 4_500, ms(took));
+  } finally {
+    if (savedJobTimeout === undefined) delete process.env.GRADER_JOB_TIMEOUT_MS;
+    else process.env.GRADER_JOB_TIMEOUT_MS = savedJobTimeout;
+    resetGraderConfig();
+  }
+
+  section("Background grading waits for a busy grader instead of failing");
+  type G = typeof globalThis & { __pensumaGraderPool?: SandboxPool };
+  const g = globalThis as G;
+  const saved = g.__pensumaGraderPool;
+  const busy = new SandboxPool({
+    ...graderConfig(),
+    poolSize: 1,
+    maxConcurrency: 1,
+    queueTimeoutMs: 1500,
+  });
+  g.__pensumaGraderPool = busy;
+  try {
+    const hog = gradeCodeBatch([
+      gradeItem(
+        "while True:\n    pass",
+        Array.from({ length: 3 }, (_, i) => ioTest(`l${i}`, "", "x")),
+        1000,
+      ),
+    ]);
+    await new Promise((r) => setTimeout(r, 200));
+    const interactive = gradeCodeBatch([honestItem()]);
+    const background = gradeCodeBatch([honestItem()], {
+      queueTimeoutMs: null,
+      priority: "background",
+      throwWhenUnavailable: true,
+    });
+    const [ri] = await interactive;
+    const [rb2] = await background;
+    await hog;
+    check(
+      "an interactive run still gives up after its queue timeout",
+      ri.status === "internal_error",
+      ri.status,
+    );
+    check(
+      "a submitted attempt is graded once a slot is free",
+      rb2.fraction === 1,
+      `${rb2.status} ${rb2.fraction}`,
+    );
+  } finally {
+    busy.close();
+    g.__pensumaGraderPool = saved;
+  }
+}
+
+function honestItem(): GradeInput {
+  return gradeItem("print('Hallo')", [ioTest("t", "", "Hallo")]);
+}
+
 async function main(): Promise<void> {
   const config = graderConfig();
   console.log(
@@ -1051,6 +1230,7 @@ async function main(): Promise<void> {
     await adversarialRssWatchdog();
   }
   if (!only || only === "seed") await seedAndBatch();
+  if (!only || only === "reliability") await reliability();
   if (!only || only === "perf") await performanceNumbers();
   getGraderPool().close();
   console.log(`\n${passes} passed, ${failures} failed`);

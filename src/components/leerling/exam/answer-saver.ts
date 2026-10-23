@@ -8,6 +8,8 @@ import { readStorage, removeStorage, storageKey, writeStorage } from "./types";
  *  - a localStorage backup of every change (restored when newer than the
  *    server copy),
  *  - retries with exponential backoff while offline,
+ *  - drops a question the teacher deleted during the attempt (the server
+ *    answers "removed"); the other questions keep saving,
  *  - stops for good when the server says the attempt is closed, and then
  *    removes the local backup (shared school PCs keep nothing behind).
  *
@@ -34,7 +36,16 @@ const DEBOUNCE_MS = 1500;
 const MAX_WAIT_MS = 10_000;
 const MAX_RETRY_MS = 30_000;
 
-function isLockedError(err: unknown): boolean {
+/** Save status the server sends for a question that no longer exists. */
+export const REMOVED_STATUS = "removed";
+
+/**
+ * Errors after which nothing of this attempt can be saved any more: it was
+ * handed in (PRECONDITION_FAILED), or it is gone or not the student's
+ * (NOT_FOUND / FORBIDDEN). A deleted question is not an error (see
+ * REMOVED_STATUS).
+ */
+export function isLockedError(err: unknown): boolean {
   const e = err as { data?: { code?: string } } | null;
   const code = e?.data?.code;
   return (
@@ -50,6 +61,8 @@ export class AnswerSaver {
     { response: AnswerResponse; version: number }
   >();
   private version = 0;
+  /** Questions the teacher deleted during the attempt: never saved again. */
+  private removed = new Set<string>();
   private running = false;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -124,6 +137,13 @@ export class AnswerSaver {
     removeStorage(this.backupKey);
   }
 
+  private removeFromBackup(questionId: string) {
+    const backup = this.readBackup();
+    if (!(questionId in backup)) return;
+    delete backup[questionId];
+    writeStorage(this.backupKey, backup);
+  }
+
   private writeBackup(questionId: string, response: AnswerResponse) {
     const backup = this.readBackup();
     backup[questionId] = {
@@ -149,7 +169,7 @@ export class AnswerSaver {
     response: AnswerResponse,
     opts: { backup?: boolean } = {},
   ) {
-    if (this.locked) return;
+    if (this.locked || this.removed.has(questionId)) return;
     if (opts.backup !== false) this.writeBackup(questionId, response);
     this.pending.set(questionId, { response, version: ++this.version });
     this.firstDirtyAt ??= Date.now();
@@ -218,7 +238,12 @@ export class AnswerSaver {
       ];
       try {
         const res = await this.save(questionId, entry.response);
-        if (this.pending.get(questionId)?.version === entry.version) {
+        if (res.status === REMOVED_STATUS) {
+          // Only this question is gone; keep saving the others.
+          this.removed.add(questionId);
+          this.pending.delete(questionId);
+          this.removeFromBackup(questionId);
+        } else if (this.pending.get(questionId)?.version === entry.version) {
           this.pending.delete(questionId);
         }
         this.offline = false;

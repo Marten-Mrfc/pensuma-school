@@ -174,7 +174,7 @@ export function MultipleChoiceEditor({
                 [
                   "partial",
                   "Per optie",
-                  "Gedeeltelijke punten: elke goed beoordeelde optie levert punten op.",
+                  "Gedeeltelijke punten: elke goed aangevinkte optie levert een deel op, elke fout aangevinkte optie kost evenveel (nooit minder dan 0). Bij 3 goede opties geeft 2 goed en 1 fout aangevinkt dus 1/3 van de punten.",
                 ],
               ] as const
             ).map(([value, label, description]) => {

@@ -3,6 +3,11 @@
  * paste, don't log window switches. Set once, applied to every test.
  * Facilities only: never a reason or diagnosis (AVG art. 5 and 9).
  * Teachers only.
+ *
+ * The audit log records that facilities changed and which kind, never the
+ * values: extra time usually points to dyslexia or a similar condition, and
+ * audit rows outlive the account (see redactErasedStudentsAudit). Changes
+ * are refused while the processing is restricted (AVG art. 18).
  */
 import { TRPCError } from "@trpc/server";
 import { and, eq, inArray } from "drizzle-orm";
@@ -11,6 +16,11 @@ import { ROLES } from "@/lib/auth-shared";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
 import { classMembers, studentAccommodations, user } from "@/server/db/schema";
+import {
+  assertNotRestricted,
+  RESTRICTED_MESSAGE,
+  restrictedUserIds,
+} from "@/server/privacy/restriction";
 import { auditFromCtx } from "@/server/services/audit";
 
 export type Accommodation = {
@@ -26,8 +36,36 @@ const percentSchema = z
   .min(0, "Het percentage kan niet negatief zijn.")
   .max(100, "Verlengde tijd kan hoogstens +100% zijn.");
 
+const NO_ACCOMMODATION: Accommodation = {
+  extraTimePercent: 0,
+  allowPaste: false,
+  ignoreFocusEvents: false,
+};
+
 const isDefault = (a: Accommodation) =>
   a.extraTimePercent === 0 && !a.allowPaste && !a.ignoreFocusEvents;
+
+/**
+ * Audit details for a change of facilities: which kinds changed (only the
+ * ones that did) and whether any facility is still active. Never the
+ * percentage or the switches themselves.
+ */
+export function accommodationAuditDetails(
+  before: Accommodation | null | undefined,
+  after: Accommodation,
+): Record<string, boolean> {
+  const prev = before ?? NO_ACCOMMODATION;
+  const details: Record<string, boolean> = {};
+  if (prev.extraTimePercent !== after.extraTimePercent) {
+    details.extraTimeChanged = true;
+  }
+  if (prev.allowPaste !== after.allowPaste) details.allowPasteChanged = true;
+  if (prev.ignoreFocusEvents !== after.ignoreFocusEvents) {
+    details.focusLogChanged = true;
+  }
+  details.facilityActive = !isDefault(after);
+  return details;
+}
 
 async function requireStudent(db: DB, id: string) {
   const [row] = await db
@@ -78,15 +116,26 @@ export const accommodationRouter = createTRPCRouter({
         extraTimePercent: percentSchema,
         allowPaste: z.boolean(),
         ignoreFocusEvents: z.boolean(),
+        /**
+         * Change anyway while the processing is restricted (AVG art. 18),
+         * e.g. to rectify what the procedure is about. Recorded in the log.
+         */
+        overrideRestriction: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const student = await requireStudent(ctx.db, input.userId);
+      const overridden = await assertNotRestricted(ctx.db, student.id, {
+        override: input.overrideRestriction,
+      });
       const value: Accommodation = {
         extraTimePercent: input.extraTimePercent,
         allowPaste: input.allowPaste,
         ignoreFocusEvents: input.ignoreFocusEvents,
       };
+      const previous = (await accommodationsFor(ctx.db, [student.id])).get(
+        student.id,
+      );
       await ctx.db.transaction(async (tx) => {
         if (isDefault(value)) {
           await tx
@@ -109,7 +158,10 @@ export const accommodationRouter = createTRPCRouter({
             subjectId: student.id,
             subjectUserId: student.id,
             subjectLabel: student.username ?? null,
-            details: { ...value },
+            details: {
+              ...accommodationAuditDetails(previous, value),
+              ...(overridden ? { restrictionOverridden: true } : {}),
+            },
           },
           tx,
         );
@@ -117,7 +169,10 @@ export const accommodationRouter = createTRPCRouter({
       return isDefault(value) ? null : value;
     }),
 
-  /** Set only the verlengde tijd for several students at once. */
+  /**
+   * Set only the verlengde tijd for several students at once. Students
+   * whose processing is restricted (AVG art. 18) are skipped and counted.
+   */
   setMany: adminProcedure
     .input(
       z.object({
@@ -140,9 +195,22 @@ export const accommodationRouter = createTRPCRouter({
           message: "Een of meer leerlingen bestaan niet (meer).",
         });
       }
-      const current = await accommodationsFor(ctx.db, ids);
+      const [current, restricted] = await Promise.all([
+        accommodationsFor(ctx.db, ids),
+        restrictedUserIds(ctx.db, ids),
+      ]);
+      const allowed = students.filter((s) => !restricted.has(s.id));
+      if (allowed.length === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            students.length === 1
+              ? RESTRICTED_MESSAGE
+              : "Voor deze leerlingen is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
+        });
+      }
       await ctx.db.transaction(async (tx) => {
-        for (const student of students) {
+        for (const student of allowed) {
           const value: Accommodation = {
             allowPaste: false,
             ignoreFocusEvents: false,
@@ -177,13 +245,19 @@ export const accommodationRouter = createTRPCRouter({
               subjectId: student.id,
               subjectUserId: student.id,
               subjectLabel: student.username ?? null,
-              details: { ...value },
+              details: accommodationAuditDetails(
+                current.get(student.id),
+                value,
+              ),
             },
             tx,
           );
         }
       });
-      return { updated: students.length };
+      return {
+        updated: allowed.length,
+        skippedRestricted: students.length - allowed.length,
+      };
     }),
 
   /** Facilities of the students in a class, keyed by user id. */

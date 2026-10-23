@@ -70,10 +70,12 @@ describe("accommodation", () => {
     const audits = await auditRows("student.accommodation_updated", student.id);
     expect(audits).toHaveLength(1);
     expect(audits[0].subjectLabel).toBe(student.username);
+    // Which kind of facility changed, never the values (AVG: extra time
+    // usually points to a condition; audit rows outlive the account).
     expect(audits[0].details).toEqual({
-      extraTimePercent: 25,
-      allowPaste: true,
-      ignoreFocusEvents: false,
+      extraTimeChanged: true,
+      allowPasteChanged: true,
+      facilityActive: true,
     });
 
     await t.accommodation.set({

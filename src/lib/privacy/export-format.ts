@@ -7,9 +7,15 @@
  * Every field is copied explicitly (never spread), so new columns never
  * leak into an export by accident. Never included: password hash, PIN,
  * session tokens, model solutions, hidden-test input or expected output,
- * teacher names.
+ * hint texts, teacher names.
+ *
+ * schemaVersion 2 added: per answer the hints the student revealed and the
+ * resulting penalty (hints lower the automatic score), retention holds on
+ * the student (with their reason) or on an afname they took part in, and
+ * the afnames that were set for this student only (inhaal, herkansing).
  */
 import { computeGrade, LINEAR_SCALE } from "@/lib/grading/grade-scale";
+import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
 import {
   assignmentSettingsSchema,
   gradingResultSchema,
@@ -18,6 +24,7 @@ import {
 import { resultsVisible } from "@/server/services/assignment-status";
 import { AUDIT_ACTIONS } from "./audit-actions";
 import { MONITORING_EVENT_TYPES, sanitizeEventDetails } from "./event-details";
+import type { RetentionHoldKind } from "./retention";
 import type { PrivacySettings } from "./settings";
 
 export type ExportAudience = "admin" | "student";
@@ -35,6 +42,10 @@ export interface ExportAnswerRow {
   result: unknown;
   /** Multiple choice: option id → option text (to show what was chosen). */
   optionTexts?: Record<string, string>;
+  /** Hints the student revealed (answer.hints_used). */
+  hintsUsed?: readonly { id: string; at?: string | null }[] | null;
+  /** Code questions: the question's hints in order, id + penalty (no text). */
+  hints?: readonly { id: string; penalty: number }[];
 }
 
 export interface ExportEventRow {
@@ -87,6 +98,32 @@ export interface StudentExportRows {
   preferences: Record<string, unknown> | null;
   attempts: ExportAttemptRow[];
   accessLog: { createdAt: Date; action: string; actorRole: string }[];
+  /** Retention holds on the student (with the reason teachers gave). */
+  holds?: {
+    kind: RetentionHoldKind;
+    reason: string;
+    until: Date | null;
+    createdAt: Date;
+  }[];
+  /**
+   * Holds on an afname the student has an attempt in. Their reason is about
+   * the whole afname (it may concern other students) and is left out.
+   */
+  assignmentHolds?: {
+    kind: RetentionHoldKind;
+    until: Date | null;
+    createdAt: Date;
+    assignmentTitle: string | null;
+    testTitle: string;
+  }[];
+  /** Afnames set for this student only (assignment_student). */
+  targetedAssignments?: {
+    assignmentTitle: string | null;
+    testTitle: string;
+    mode: "exam" | "practice";
+    opensAt: Date | null;
+    closesAt: Date | null;
+  }[];
 }
 
 /* --------------------------------- Output -------------------------------- */
@@ -104,6 +141,17 @@ export interface StudentExportAnswer {
   maxScore: number;
   feedback: string | null;
   result: unknown;
+  /**
+   * Hints revealed for this question: their number in the question, when,
+   * and the fraction of the points each one costs.
+   */
+  hintsUsed: {
+    hintNumber: number | null;
+    at: string | null;
+    penalty: number;
+  }[];
+  /** Total fraction of the points lost to hints (0..1). */
+  hintPenalty: number;
 }
 
 export interface StudentExportAttempt {
@@ -126,7 +174,7 @@ export interface StudentExportAttempt {
 }
 
 export interface StudentExport {
-  schemaVersion: 1;
+  schemaVersion: 2;
   generatedAt: string;
   audience: ExportAudience;
   controller: {
@@ -156,6 +204,25 @@ export interface StudentExport {
   preferences: Record<string, unknown> | null;
   attempts: StudentExportAttempt[];
   accessLog: { at: string; action: string; actorRole: string }[];
+  /** Data kept from automatic deletion, and why (bewaarblokkades). */
+  holds: {
+    appliesTo: "student" | "afname";
+    kind: RetentionHoldKind;
+    /** Null for a hold on a whole afname. */
+    reason: string | null;
+    /** The afname, for a hold on an afname. */
+    afname: string | null;
+    until: string | null;
+    createdAt: string;
+  }[];
+  /** Afnames (inhaaltoets, herkansing) that were set for you only. */
+  targetedAssignments: {
+    title: string;
+    testTitle: string;
+    mode: "exam" | "practice";
+    opensAt: string | null;
+    closesAt: string | null;
+  }[];
   retention: {
     attemptEventsDays: number;
     attemptsMonths: number;
@@ -209,6 +276,40 @@ function exportResponse(row: ExportAnswerRow): StudentExportAnswer["response"] {
     return { text: obj.text };
   }
   return null;
+}
+
+/** Revealed hints with their number and penalty (never the hint text). */
+function exportHints(
+  row: ExportAnswerRow,
+): Pick<StudentExportAnswer, "hintsUsed" | "hintPenalty"> {
+  const hints = row.hints ?? [];
+  const used = (row.hintsUsed ?? []).filter(
+    (h): h is { id: string; at?: string | null } =>
+      !!h && typeof h.id === "string",
+  );
+  const seen = new Set<string>();
+  const hintsUsed: StudentExportAnswer["hintsUsed"] = [];
+  for (const h of used) {
+    if (seen.has(h.id)) continue;
+    seen.add(h.id);
+    const index = hints.findIndex((x) => x.id === h.id);
+    const at =
+      typeof h.at === "string" && !Number.isNaN(Date.parse(h.at))
+        ? new Date(h.at).toISOString()
+        : null;
+    hintsUsed.push({
+      hintNumber: index >= 0 ? index + 1 : null,
+      at,
+      penalty: index >= 0 ? Math.min(1, Math.max(0, hints[index].penalty)) : 0,
+    });
+  }
+  return {
+    hintsUsed,
+    hintPenalty: hintPenaltyFraction(
+      hints,
+      used.map((h) => ({ id: h.id })),
+    ),
+  };
 }
 
 /** Grading result safe for anyone outside the teacher's grading screen. */
@@ -314,6 +415,7 @@ export function buildStudentExport(
           maxScore: ans.maxScore,
           feedback: ans.feedback,
           result: exportResult(ans.result),
+          ...exportHints(ans),
         })),
         events: [...a.events]
           .sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())
@@ -325,8 +427,11 @@ export function buildStudentExport(
       };
     });
 
+  const titleOf = (title: string | null, testTitle: string) =>
+    title?.trim() || testTitle;
+
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: iso(now),
     audience: options.audience,
     controller: {
@@ -364,6 +469,31 @@ export function buildStudentExport(
         action: actionLabel(e.action),
         actorRole: ACTOR_ROLES.has(e.actorRole) ? e.actorRole : "system",
       })),
+    holds: [
+      ...(rows.holds ?? []).map((h) => ({
+        appliesTo: "student" as const,
+        kind: h.kind,
+        reason: h.reason,
+        afname: null,
+        until: isoOrNull(h.until),
+        createdAt: iso(h.createdAt),
+      })),
+      ...(rows.assignmentHolds ?? []).map((h) => ({
+        appliesTo: "afname" as const,
+        kind: h.kind,
+        reason: null,
+        afname: titleOf(h.assignmentTitle, h.testTitle),
+        until: isoOrNull(h.until),
+        createdAt: iso(h.createdAt),
+      })),
+    ].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    targetedAssignments: (rows.targetedAssignments ?? []).map((t) => ({
+      title: titleOf(t.assignmentTitle, t.testTitle),
+      testTitle: t.testTitle,
+      mode: t.mode,
+      opensAt: isoOrNull(t.opensAt),
+      closesAt: isoOrNull(t.closesAt),
+    })),
     retention: {
       attemptEventsDays: settings.retention.attemptEventsDays,
       attemptsMonths: settings.retention.attemptsMonths,

@@ -23,10 +23,12 @@ import {
   type FormEvent,
   type ReactNode,
   use,
+  useEffect,
   useId,
   useRef,
   useState,
 } from "react";
+import { useCurrentUser } from "@/components/app/current-user";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Markdown } from "@/components/app/markdown";
 import { PageHeader } from "@/components/app/page-header";
@@ -34,6 +36,7 @@ import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { useDocumentTitle } from "@/lib/a11y/use-document-title";
+import { claimLocalData, removeAttemptBackups } from "@/lib/local-data";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
@@ -410,6 +413,16 @@ function StartScreenContent({ id }: { id: string }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.portal.getAssignment.queryOptions({ id }));
   useDocumentTitle([query.data?.title, "Toets starten"]);
+  const user = useCurrentUser();
+  const lastSubmittedId = query.data?.lastSubmittedAttemptId ?? null;
+  // Shared school computers: drop another student's local data, and the
+  // answer backup of an attempt that has been handed in.
+  useEffect(() => {
+    claimLocalData(user.id);
+  }, [user.id]);
+  useEffect(() => {
+    if (lastSubmittedId) removeAttemptBackups([lastSubmittedId]);
+  }, [lastSubmittedId]);
 
   if (query.isPending) return <LoadingState />;
   if (query.isError) {

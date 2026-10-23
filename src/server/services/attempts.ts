@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { accommodationMinutes } from "@/lib/accommodations";
 import { db } from "@/server/db";
@@ -20,12 +20,23 @@ import {
   isPastDeadline,
   parseAssignmentSettings,
 } from "@/server/services/assignment-status";
-import { gradeAttempt } from "@/server/services/grading";
+import {
+  gradeAttempt,
+  gradeAttemptsInBackground,
+  isGradingInFlight,
+  logGradingFailure,
+  markGradingScheduled,
+} from "@/server/services/grading";
 
 /**
  * Attempt lifecycle helpers (start, submit, auto-submit at the deadline).
  * Used by the student portal router; the teacher side may use `submitAttempt`
  * (force-submit) and `autoSubmitExpiredAttempts` (sweep) as well.
+ *
+ * Background sweeps (`startAttemptSweeper`, started from instrumentation):
+ * every minute, expired attempts are auto-submitted and submitted attempts
+ * whose grading was lost (restart, crash) are graded again, so neither
+ * depends on a student or teacher opening a page.
  */
 
 type Assignment = typeof assignments.$inferSelect;
@@ -108,10 +119,10 @@ export async function testQuestionIds(testId: string): Promise<string[]> {
  * Next's `after()`, elsewhere (scripts) the promise simply runs unawaited.
  */
 export function scheduleGrading(attemptId: string): void {
+  // Counts as in flight from now on, so sweeps don't grade it twice.
+  markGradingScheduled(attemptId);
   const task = () =>
-    gradeAttempt(attemptId).catch((err) => {
-      console.error(`[grading] attempt ${attemptId} failed`, err);
-    });
+    gradeAttempt(attemptId).catch((err) => logGradingFailure(attemptId, err));
   try {
     after(task);
   } catch {
@@ -124,6 +135,10 @@ export function scheduleGrading(attemptId: string): void {
 /**
  * Submit an in-progress attempt (idempotent: only the first call wins) and
  * schedule grading. Returns true when this call submitted the attempt.
+ *
+ * `atDeadline`: the attempt is submitted because its deadline passed (a
+ * sweep, possibly long after); "ingeleverd op" becomes the deadline when
+ * that is earlier than now, since no work was accepted after it.
  */
 export async function submitAttempt(
   attemptId: string,
@@ -131,6 +146,7 @@ export async function submitAttempt(
     auto?: boolean;
     by?: "student" | "timer" | "server" | "teacher";
     grade?: boolean;
+    atDeadline?: boolean;
   } = {},
 ): Promise<boolean> {
   const now = new Date();
@@ -138,7 +154,9 @@ export async function submitAttempt(
     .update(attempts)
     .set({
       status: "submitted",
-      submittedAt: now,
+      submittedAt: opts.atDeadline
+        ? sql`least(${now.toISOString()}::timestamptz, ${attempts.deadlineAt})`
+        : now,
       autoSubmitted: opts.auto ?? false,
       gradingStatus: "pending",
     })
@@ -184,7 +202,11 @@ export async function autoSubmitIfExpired(
   now = new Date(),
 ): Promise<boolean> {
   if (!isAttemptExpired(attempt, assignment, now)) return false;
-  return submitAttempt(attempt.id, { auto: true, by: "server" });
+  return submitAttempt(attempt.id, {
+    auto: true,
+    by: "server",
+    atDeadline: attempt.deadlineAt !== null,
+  });
 }
 
 /**
@@ -210,9 +232,151 @@ export async function autoSubmitExpiredAttempts(
     );
   const done: string[] = [];
   for (const { id } of rows) {
-    if (await submitAttempt(id, { auto: true, by: "server" })) done.push(id);
+    if (await submitAttempt(id, { auto: true, by: "server", atDeadline: true }))
+      done.push(id);
   }
   return done;
+}
+
+/* --------------------------------- Sweeps --------------------------------- */
+
+/** Grading still "pending" this long after submitting counts as lost. */
+export const STALE_PENDING_MS = 2 * 60_000;
+/**
+ * How often one server re-grades the same lost attempt (with growing gaps:
+ * 2, 4, 8, 16 min). An attempt that keeps failing is left for the teacher's
+ * "Opnieuw nakijken" instead of running every minute forever.
+ */
+const MAX_SWEEP_REGRADES = 5;
+const SWEEP_FIRST_DELAY_MS = 30_000;
+const SWEEP_JITTER_MS = 15_000;
+const SWEEP_INTERVAL_MS = 60_000;
+
+/**
+ * Grade submitted attempts whose grading was lost: still "pending" long
+ * after submitting and not being graded (or about to be) by this process.
+ * Grading runs in the background (2 at a time); returns the attempt ids.
+ */
+export async function regradeStalePendingAttempts(
+  opts: { olderThanMs?: number; limit?: number } = {},
+): Promise<string[]> {
+  const cutoff = new Date(Date.now() - (opts.olderThanMs ?? STALE_PENDING_MS));
+  const rows = await db
+    .select({ id: attempts.id })
+    .from(attempts)
+    .where(
+      and(
+        eq(attempts.status, "submitted"),
+        eq(attempts.gradingStatus, "pending"),
+        isNotNull(attempts.submittedAt),
+        lt(attempts.submittedAt, cutoff),
+      ),
+    )
+    .orderBy(asc(attempts.submittedAt))
+    .limit(opts.limit ?? 100);
+  const now = Date.now();
+  const ids = rows
+    .map((r) => r.id)
+    .filter((id) => !isGradingInFlight(id) && sweepMayRegrade(id, now));
+  for (const id of ids) {
+    const count = (sweepRegrades.get(id)?.count ?? 0) + 1;
+    sweepRegrades.set(id, {
+      count,
+      nextAt: now + STALE_PENDING_MS * 2 ** (count - 1),
+    });
+    if (count === MAX_SWEEP_REGRADES)
+      console.warn(
+        `[grading] attempt ${id} is still pending after ${count} sweeps; leaving it for the teacher`,
+      );
+  }
+  if (ids.length > 0) void gradeAttemptsInBackground(ids, 2);
+  return ids;
+}
+
+type SweepRecord = { count: number; nextAt: number };
+const globalForSweeps = globalThis as unknown as {
+  pensumaSweepRegrades?: Map<string, SweepRecord>;
+};
+globalForSweeps.pensumaSweepRegrades ??= new Map();
+/** Lost attempts this process already re-graded (attemptId → record). */
+const sweepRegrades = globalForSweeps.pensumaSweepRegrades;
+
+function sweepMayRegrade(attemptId: string, now: number): boolean {
+  const record = sweepRegrades.get(attemptId);
+  if (!record) return true;
+  return record.count < MAX_SWEEP_REGRADES && now >= record.nextAt;
+}
+
+/**
+ * One sweep: auto-submit expired attempts, then re-grade lost ones. A
+ * Postgres advisory lock makes sure only one server (replica) sweeps at a
+ * time; returns null when another one holds it.
+ */
+export async function runAttemptSweep(): Promise<{
+  autoSubmitted: string[];
+  regrading: string[];
+} | null> {
+  return db.transaction(async (tx) => {
+    const lock = await tx.execute<{ locked: boolean }>(
+      sql`select pg_try_advisory_xact_lock(hashtext('pensuma:attempt-sweep')) as locked`,
+    );
+    if (lock.rows[0]?.locked !== true) return null;
+    const autoSubmitted = await autoSubmitExpiredAttempts();
+    const regrading = await regradeStalePendingAttempts();
+    return { autoSubmitted, regrading };
+  });
+}
+
+function sweepLog(entry: Record<string, unknown>): void {
+  const line = JSON.stringify({ ts: new Date().toISOString(), ...entry });
+  if (entry.level === "error") console.error(line);
+  else console.log(line);
+}
+
+type SweeperState = { timer: ReturnType<typeof setTimeout> | null };
+const globalForSweeper = globalThis as unknown as {
+  pensumaAttemptSweeper?: SweeperState;
+};
+
+/**
+ * Run `runAttemptSweep` every minute (first run 30–45 s after start), once
+ * per process. Timers are unref()'d; errors are logged, never thrown.
+ */
+export function startAttemptSweeper(): void {
+  if (globalForSweeper.pensumaAttemptSweeper) return;
+  const state: SweeperState = { timer: null };
+  globalForSweeper.pensumaAttemptSweeper = state;
+  const tick = async () => {
+    try {
+      const result = await runAttemptSweep();
+      if (result && (result.autoSubmitted.length || result.regrading.length)) {
+        sweepLog({
+          level: "info",
+          msg: "attempt_sweep",
+          autoSubmitted: result.autoSubmitted.length,
+          regrading: result.regrading.length,
+        });
+      }
+    } catch (error) {
+      sweepLog({
+        level: "error",
+        msg: "attempt_sweep_failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  const schedule = (delayMs: number) => {
+    state.timer = setTimeout(() => {
+      void tick().finally(() => schedule(SWEEP_INTERVAL_MS));
+    }, delayMs);
+    state.timer.unref?.();
+  };
+  schedule(SWEEP_FIRST_DELAY_MS + Math.floor(Math.random() * SWEEP_JITTER_MS));
+  sweepLog({
+    level: "info",
+    msg: "attempt_sweeper_started",
+    intervalMs: SWEEP_INTERVAL_MS,
+  });
 }
 
 /* ---------------------------------- Start --------------------------------- */

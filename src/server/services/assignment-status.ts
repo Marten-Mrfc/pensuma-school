@@ -77,12 +77,39 @@ export function isPastDeadline(
   return deadlineAt != null && now.getTime() > deadlineAt.getTime() + graceMs;
 }
 
-/** Whether a student may see their results for a submitted attempt. */
+/**
+ * Whether anybody can still work on an afname, from its in-progress
+ * attempts: a personal deadline (plus grace) that has not passed yet
+ * (verlengde tijd keeps going after the close), or an attempt without a
+ * deadline while the afname is still open. An attempt whose deadline has
+ * passed but that was not auto-submitted yet never holds anything back.
+ */
+export function anyoneStillWorking(
+  running: readonly { deadlineAt: Date | null }[],
+  a: Pick<AssignmentLike, "status" | "opensAt" | "closesAt">,
+  now = new Date(),
+  graceMs = DEADLINE_GRACE_MS,
+): boolean {
+  const open = effectiveAssignmentStatus(a, now) !== "closed";
+  return running.some((r) =>
+    r.deadlineAt ? !isPastDeadline(r.deadlineAt, now, graceMs) : open,
+  );
+}
+
+/**
+ * Whether a student may see their results for a submitted attempt.
+ *
+ * `othersWorking` (see `anyoneStillWorking`): for "after_close" the results
+ * (score, questions, right answers) stay hidden while classmates with
+ * verlengde tijd are still taking the closed afname, unless the teacher
+ * released them explicitly.
+ */
 export function resultsVisible(
   a: Pick<AssignmentLike, "status" | "opensAt" | "closesAt" | "settings"> & {
     resultsReleased: boolean;
   },
   now = new Date(),
+  othersWorking = false,
 ): boolean {
   const { showResults } = parseAssignmentSettings(a.settings);
   switch (showResults) {
@@ -90,7 +117,8 @@ export function resultsVisible(
       return true;
     case "after_close":
       return (
-        effectiveAssignmentStatus(a, now) === "closed" || a.resultsReleased
+        a.resultsReleased ||
+        (effectiveAssignmentStatus(a, now) === "closed" && !othersWorking)
       );
     case "manual":
       return a.resultsReleased;

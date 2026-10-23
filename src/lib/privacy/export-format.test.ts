@@ -204,7 +204,7 @@ describe("buildStudentExport", () => {
 
   test("admin export: full shape", () => {
     const out = buildStudentExport(rows(), { audience: "admin", now: NOW });
-    expect(out.schemaVersion).toBe(1);
+    expect(out.schemaVersion).toBe(2);
     expect(out.generatedAt).toBe(NOW.toISOString());
     expect(out.controller).toEqual({
       school: "Het Lyceum",
@@ -339,6 +339,126 @@ describe("buildStudentExport", () => {
     expect(out.student.active).toBe(false);
     expect(out.attempts[0]?.answers[0]?.response).toBeNull();
     expect(out.attempts[0]?.answers[0]?.result).toBeNull();
+  });
+});
+
+describe("export completeness (schemaVersion 2)", () => {
+  const HINT_TEXT = "Gebruik ** voor machtsverheffen";
+
+  test("revealed hints explain a lowered score (number, time, penalty; no text)", () => {
+    const base = attempt();
+    const [code, mc] = base.answers;
+    const out = buildStudentExport(
+      rows([
+        attempt({
+          answers: [
+            {
+              ...code,
+              hints: [
+                { id: "h1", penalty: 0.25 },
+                { id: "h2", penalty: 0.5 },
+              ],
+              hintsUsed: [
+                { id: "h2", at: "2026-10-01T09:15:00.000Z" },
+                { id: "h2", at: "2026-10-01T09:16:00.000Z" },
+                { id: "weg", at: "2026-10-01T09:17:00.000Z" },
+              ],
+              // A careless loader passing the hint text along.
+              ...({ hintTexts: [HINT_TEXT] } as object),
+            },
+            mc,
+          ],
+        }),
+      ]),
+      { audience: "student", now: NOW },
+    );
+    const [first, second] = out.attempts[0]?.answers ?? [];
+    expect(first?.hintsUsed).toEqual([
+      { hintNumber: 2, at: "2026-10-01T09:15:00.000Z", penalty: 0.5 },
+      { hintNumber: null, at: "2026-10-01T09:17:00.000Z", penalty: 0 },
+    ]);
+    expect(first?.hintPenalty).toBe(0.5);
+    expect(second?.hintsUsed).toEqual([]);
+    expect(second?.hintPenalty).toBe(0);
+    expect(JSON.stringify(out)).not.toContain(HINT_TEXT);
+  });
+
+  test("retention holds: the student's own with reason, afname holds without", () => {
+    const r = rows();
+    r.holds = [
+      {
+        kind: "dispute",
+        reason: "Bezwaar ouders tegen cijfer H3",
+        until: new Date("2026-12-31T22:59:59Z"),
+        createdAt: new Date("2026-10-10T10:00:00Z"),
+        ...({
+          createdById: "teacher-1",
+          createdByName: "Docent Jansen",
+        } as object),
+      },
+    ];
+    r.assignmentHolds = [
+      {
+        kind: "exam_dossier",
+        until: null,
+        createdAt: new Date("2026-10-02T10:00:00Z"),
+        assignmentTitle: null,
+        testTitle: "PTA H3",
+        ...({ reason: "Bezwaar van een andere leerling" } as object),
+      },
+    ];
+    for (const audience of ["admin", "student"] as const) {
+      const out = buildStudentExport(r, { audience, now: NOW });
+      expect(out.holds).toEqual([
+        {
+          appliesTo: "afname",
+          kind: "exam_dossier",
+          reason: null,
+          afname: "PTA H3",
+          until: null,
+          createdAt: "2026-10-02T10:00:00.000Z",
+        },
+        {
+          appliesTo: "student",
+          kind: "dispute",
+          reason: "Bezwaar ouders tegen cijfer H3",
+          afname: null,
+          until: "2026-12-31T22:59:59.000Z",
+          createdAt: "2026-10-10T10:00:00.000Z",
+        },
+      ]);
+      const json = JSON.stringify(out);
+      expect(json).not.toContain("Docent Jansen");
+      expect(json).not.toContain("teacher-1");
+      expect(json).not.toContain("andere leerling");
+    }
+  });
+
+  test("afnames set for this student only (inhaal, herkansing)", () => {
+    const r = rows();
+    r.targetedAssignments = [
+      {
+        assignmentTitle: "Inhaaltoets H3",
+        testTitle: "Python H3",
+        mode: "exam",
+        opensAt: new Date("2026-10-15T08:00:00Z"),
+        closesAt: null,
+      },
+    ];
+    const out = buildStudentExport(r, { audience: "student", now: NOW });
+    expect(out.targetedAssignments).toEqual([
+      {
+        title: "Inhaaltoets H3",
+        testTitle: "Python H3",
+        mode: "exam",
+        opensAt: "2026-10-15T08:00:00.000Z",
+        closesAt: null,
+      },
+    ]);
+    // Missing inputs give empty lists, never undefined.
+    const bare = buildStudentExport(rows(), { audience: "admin", now: NOW });
+    expect(bare.holds).toEqual([]);
+    expect(bare.targetedAssignments).toEqual([]);
   });
 });
 

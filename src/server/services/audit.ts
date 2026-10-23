@@ -8,6 +8,7 @@ import {
   type AuditDb,
   type AuditEntry,
   writeAudit,
+  writeAuditMany,
 } from "@/server/privacy/audit-writer";
 import { clientIp } from "@/server/security/client-ip";
 
@@ -18,15 +19,18 @@ export {
   type AuditEntry,
   auditSystem,
   writeAudit,
+  writeAuditMany,
 } from "@/server/privacy/audit-writer";
 
 /**
  * Audit log writer (AVG art. 5(2) accountability, security logging).
  *
- *  - writeAudit    insert one row (inside the caller's transaction if given)
- *  - auditFromCtx  actor from the tRPC context (or anything shaped like it)
- *  - auditRead     read access: non-blocking, de-duplicated for 10 minutes
- *  - auditSystem   actions by the system itself (retention runs, scripts)
+ *  - writeAudit        insert one row (inside the caller's transaction if given)
+ *  - auditFromCtx      actor from the tRPC context (or anything shaped like it)
+ *  - auditManyFromCtx  the same for several rows (one per student), one insert
+ *  - auditRead         read access: non-blocking, de-duplicated for 10 minutes
+ *  - auditReadMany     the same for several rows, written in one insert
+ *  - auditSystem       actions by the system itself (retention runs, scripts)
  *
  * Details pass through `sanitizeAuditDetails`: ids, counts, booleans,
  * dates and enum-like strings only. Never put names, PINs, passwords, code
@@ -77,6 +81,25 @@ export async function auditFromCtx(
   if (ctx.auditState) ctx.auditState.written = true;
 }
 
+/**
+ * Several semantic audit entries for the current request (e.g. one row per
+ * student for a class-wide PIN reset), in one multi-row insert. Marks
+ * `ctx.auditState.written` like auditFromCtx.
+ */
+export async function auditManyFromCtx(
+  ctx: AuditContext,
+  entries: readonly AuditEntry[],
+  dbOrTx: AuditDb = ctx.db,
+): Promise<void> {
+  if (entries.length === 0) return;
+  const actor = actorFromCtx(ctx);
+  await writeAuditMany(
+    dbOrTx,
+    entries.map((entry) => ({ ...actor, ...entry })),
+  );
+  if (ctx.auditState) ctx.auditState.written = true;
+}
+
 /* ------------------------------- Read access ------------------------------ */
 
 const READ_DEDUPE_MS = 10 * 60_000;
@@ -108,28 +131,54 @@ function logAuditError(action: AuditAction, error: unknown) {
   );
 }
 
+/** Run after the response (or detached outside a request scope). */
+function runAfter(task: () => Promise<unknown>) {
+  try {
+    after(task);
+  } catch {
+    // No request scope (scripts, tests): run detached.
+    void task();
+  }
+}
+
 /**
  * Log read access (student.viewed, attempt.viewed, student.pins_viewed …)
  * without blocking the response. A repeat of the same actor, action and
  * subject within 10 minutes is skipped. Never throws.
  */
 export function auditRead(ctx: AuditContext, entry: AuditEntry): void {
+  auditReadMany(ctx, [entry]);
+}
+
+/**
+ * auditRead for several entries at once (e.g. one row per student whose
+ * PIN was shown on a class's login cards): each entry is de-duplicated on
+ * its own, the rest is written in one multi-row insert after the response.
+ * Never throws.
+ */
+export function auditReadMany(
+  ctx: AuditContext,
+  entries: readonly AuditEntry[],
+): void {
   try {
     const actor = actorFromCtx(ctx);
-    const key = `${actor.actorId ?? ""}|${entry.action}|${entry.subjectId ?? ""}`;
-    if (seenRecently(key, Date.now())) return;
-    const task = () =>
-      writeAudit(ctx.db, { ...actor, ...entry }).catch((error: unknown) => {
-        recentReads.delete(key);
-        logAuditError(entry.action, error);
-      });
-    try {
-      after(task);
-    } catch {
-      // No request scope (scripts, tests): run detached.
-      void task();
+    const now = Date.now();
+    const fresh: { key: string; entry: AuditEntry }[] = [];
+    for (const entry of entries) {
+      const key = `${actor.actorId ?? ""}|${entry.action}|${entry.subjectId ?? ""}`;
+      if (!seenRecently(key, now)) fresh.push({ key, entry });
     }
+    if (fresh.length === 0) return;
+    runAfter(() =>
+      writeAuditMany(
+        ctx.db,
+        fresh.map(({ entry }) => ({ ...actor, ...entry })),
+      ).catch((error: unknown) => {
+        for (const { key } of fresh) recentReads.delete(key);
+        logAuditError(fresh[0].entry.action, error);
+      }),
+    );
   } catch (error) {
-    logAuditError(entry.action, error);
+    logAuditError(entries[0]?.action ?? "trpc.mutation", error);
   }
 }

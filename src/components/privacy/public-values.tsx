@@ -8,7 +8,11 @@
  */
 import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDays, formatMonths } from "@/lib/privacy/retention";
+import {
+  autoDeleteNotice,
+  formatDays,
+  formatMonths,
+} from "@/lib/privacy/retention";
 import type { PublicPrivacyInfo } from "@/lib/privacy/settings";
 import { cn } from "@/lib/utils";
 import {
@@ -119,16 +123,36 @@ export function RetentionValue({ field }: { field: RetentionField }) {
   );
 }
 
-/** Note shown while the school has not confirmed the retention periods. */
+/**
+ * Note shown whenever attempts and old accounts are not deleted
+ * automatically: the school has not confirmed the periods yet, or confirmed
+ * them with automatic deletion switched off (the engine's own condition).
+ */
 export function RetentionConfirmationNote() {
   return (
     <WithInfo skeleton={null}>
-      {(info) =>
-        info && !info.retention.confirmed ? (
-          <p className="text-sm text-muted-foreground">
-            Je school stelt deze bewaartermijnen nog definitief vast. Tot die
-            tijd worden pogingen en antwoorden niet automatisch verwijderd.
+      {(info) => {
+        const notice = info ? autoDeleteNotice(info.retention) : null;
+        return notice ? (
+          <p className="rounded-xl border bg-card px-4 py-3 text-sm text-foreground">
+            {notice}
           </p>
+        ) : null;
+      }}
+    </WithInfo>
+  );
+}
+
+/**
+ * " (zie de toelichting hieronder)" after a retention period that is not
+ * applied automatically (see RetentionConfirmationNote); nothing otherwise.
+ */
+export function RetentionNoticeRef() {
+  return (
+    <WithInfo skeleton={null}>
+      {(info) =>
+        info && autoDeleteNotice(info.retention) ? (
+          <> (zie de toelichting hieronder)</>
         ) : null
       }
     </WithInfo>

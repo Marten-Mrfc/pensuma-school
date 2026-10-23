@@ -375,6 +375,67 @@ stdin.on("data", (chunk) => {
 stdin.on("end", () => reallyExit(0));
 stdin.on("error", () => reallyExit(0));
 
+/* ------------------------- Filesystem reset per run ------------------------ */
+
+// Files persist in Pyodide's in-memory filesystem for the lifetime of the
+// process (one job = several runs of one student's code). Defense in depth
+// against carrying data from one run into the next (e.g. a hidden test's
+// input): after every run, everything that did not exist at start-up is
+// removed. The parent also runs hidden tests last (see grader.ts).
+const FS_SKIP = new Set(["/proc"]);
+
+function listFs(FS) {
+  const found = [];
+  const stack = ["/"];
+  while (stack.length) {
+    const dir = stack.pop();
+    let names;
+    try {
+      names = FS.readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (name === "." || name === "..") continue;
+      const full = dir === "/" ? `/${name}` : `${dir}/${name}`;
+      if (FS_SKIP.has(full)) continue;
+      found.push(full);
+      try {
+        if (FS.isDir(FS.lstat(full).mode)) stack.push(full);
+      } catch {
+        // vanished or unreadable
+      }
+    }
+  }
+  return found;
+}
+
+function removeFsTree(FS, target) {
+  const stat = FS.lstat(target);
+  if (FS.isDir(stat.mode)) {
+    for (const name of FS.readdir(target)) {
+      if (name !== "." && name !== "..") removeFsTree(FS, `${target}/${name}`);
+    }
+    FS.rmdir(target);
+  } else {
+    FS.unlink(target);
+  }
+}
+
+function resetFs(FS, baseline) {
+  // Parents sort before their children, so a new folder goes in one step.
+  const added = listFs(FS)
+    .filter((p) => !baseline.has(p))
+    .sort((a, b) => a.length - b.length);
+  for (const target of added) {
+    try {
+      removeFsTree(FS, target);
+    } catch {
+      // already removed with its parent, or not removable
+    }
+  }
+}
+
 async function nextMessage() {
   while (queue.length === 0) await new Promise((r) => (wake = r));
   return queue.shift();
@@ -440,6 +501,8 @@ async function main() {
   const runJson = pyodide.globals.get("_pensuma_run_json");
   const analyzeJson = pyodide.globals.get("_pensuma_analyze_json");
 
+  const fsBaseline = new Set(listFs(pyodide.FS));
+
   lockdown();
   send({
     t: "ready",
@@ -456,7 +519,12 @@ async function main() {
         const json = analyzeJson(String(msg.code ?? ""));
         sendRaw(`{"t":"analysis","id":${JSON.stringify(id)},"result":`, json);
       } else if (msg.t === "run") {
-        const json = runJson(JSON.stringify(msg.request ?? {}));
+        let json;
+        try {
+          json = runJson(JSON.stringify(msg.request ?? {}));
+        } finally {
+          resetFs(pyodide.FS, fsBaseline);
+        }
         sendRaw(`{"t":"result","id":${JSON.stringify(id)},"result":`, json);
       } else if (msg.t === "ping") {
         send({ t: "pong", id, rss: memoryUsage().rss });

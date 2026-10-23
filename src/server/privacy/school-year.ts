@@ -6,7 +6,12 @@
 import { type SQL, sql } from "drizzle-orm";
 import type { RetentionHoldKind } from "@/lib/privacy/retention";
 import { studentThrottleKeys } from "@/server/security/login-throttle";
-import { type AuditActor, type AuditDb, writeAudit } from "./audit-writer";
+import {
+  type AuditActor,
+  type AuditDb,
+  redactErasedStudentsAudit,
+  writeAudit,
+} from "./audit-writer";
 
 export type SchoolYearSummary = {
   schoolYear: string;
@@ -335,6 +340,12 @@ export async function closeSchoolYear(
             )})`,
           );
         }
+        // Earlier audit rows keep that something happened, not the scores
+        // or facilities of the deleted students.
+        await redactErasedStudentsAudit(
+          tx,
+          chunk.map((r) => r.id),
+        );
         for (const r of chunk) {
           await writeAudit(tx, {
             ...options.actor,

@@ -3,6 +3,7 @@
  * No database or server imports.
  */
 import type { MultipleChoiceData, QuestionType } from "@/lib/questions/schema";
+import { normalizeCode } from "./code-normalize";
 
 /** Round to two decimals (scores are stored with at most two decimals). */
 export const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -15,7 +16,11 @@ export function effectiveScore(answer: {
   return answer.manualScore ?? answer.autoScore ?? 0;
 }
 
-/** Is this response blank for its question type? */
+/**
+ * Is this response blank for its question type? Code is blank when it is
+ * empty or the starter code, ignoring comments, blank lines and spacing:
+ * "starter code + `# geen idee`" is not an answer and scores 0.
+ */
 export function isBlankResponse(
   type: QuestionType,
   response: unknown,
@@ -25,7 +30,8 @@ export function isBlankResponse(
   switch (type) {
     case "code": {
       const code = typeof r.code === "string" ? r.code : "";
-      return code.trim() === "" || code.trim() === starterCode.trim();
+      if (code.trim() === "" || code.trim() === starterCode.trim()) return true;
+      return normalizeCode(code) === normalizeCode(starterCode);
     }
     case "multiple_choice":
       return !Array.isArray(r.selected) || r.selected.length === 0;

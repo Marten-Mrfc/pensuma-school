@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  countFocusLosses,
   isEventAllowed,
   MONITORING_EVENT_TYPES,
   type MonitoringSettings,
+  RECORDED_EVENT_TYPES,
   sanitizeEventDetails,
 } from "./event-details";
 
@@ -26,7 +28,6 @@ describe("isEventAllowed", () => {
         case "focus_gained":
         case "visibility_hidden":
         case "visibility_visible":
-        case "copy":
           return s.logFocusEvents;
         case "fullscreen_enter":
         case "fullscreen_exit":
@@ -65,11 +66,21 @@ describe("isEventAllowed", () => {
       true,
     );
     expect(isEventAllowed("copy", { ...off, blockPaste: true })).toBe(false);
+    expect(isEventAllowed("copy", { ...off, logFocusEvents: true })).toBe(
+      false,
+    );
     expect(
       isEventAllowed("fullscreen_exit", { ...off, requireFullscreen: true }),
     ).toBe(true);
     expect(isEventAllowed("code_run", off)).toBe(true);
     expect(isEventAllowed("self_test", off)).toBe(true);
+  });
+
+  test("copying is accepted on the wire but never stored or recorded", () => {
+    // Old clients may still send it: the batch must not fail validation.
+    expect(MONITORING_EVENT_TYPES).toContain("copy");
+    expect(RECORDED_EVENT_TYPES as readonly string[]).not.toContain("copy");
+    for (const s of combos) expect(isEventAllowed("copy", s)).toBe(false);
   });
 
   test("other types are never allowed from the browser", () => {
@@ -166,5 +177,29 @@ describe("sanitizeEventDetails", () => {
     expect(sanitizeEventDetails("focus_lost", null)).toBeNull();
     expect(sanitizeEventDetails("focus_lost", [1])).toBeNull();
     expect(sanitizeEventDetails("focus_lost", {})).toBeNull();
+  });
+});
+
+describe("countFocusLosses", () => {
+  const stored = [
+    "focus_lost",
+    "focus_gained",
+    "visibility_hidden",
+    "fullscreen_exit",
+    "fullscreen_enter",
+    "paste",
+    "code_run",
+  ];
+
+  test("focus losses count while window switches are logged", () => {
+    expect(countFocusLosses(stored, { logFocusEvents: true })).toBe(3);
+    expect(countFocusLosses([], { logFocusEvents: true })).toBe(0);
+  });
+
+  test("facility 'vensterwissels niet registreren': a fullscreen exit is logged but not counted", () => {
+    expect(countFocusLosses(stored, { logFocusEvents: false })).toBe(0);
+    expect(
+      countFocusLosses(["fullscreen_exit"], { logFocusEvents: false }),
+    ).toBe(0);
   });
 });

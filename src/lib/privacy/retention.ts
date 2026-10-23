@@ -27,6 +27,12 @@ export interface RetentionReport {
   inactiveStudents: number;
   auditLog: number;
   retentionRuns: number;
+  /**
+   * Retention holds (with their reason) whose end date passed more than
+   * EXPIRED_HOLD_GRACE_DAYS ago. Reports stored before this step existed
+   * lack it (read them as Partial, like retentionDeletedTotal does).
+   */
+  expiredHolds: number;
   skippedByHold: number;
   dryRun: boolean;
   startedAt: string;
@@ -46,6 +52,7 @@ export const RETENTION_COUNT_KEYS = [
   "inactiveStudents",
   "auditLog",
   "retentionRuns",
+  "expiredHolds",
   "skippedByHold",
 ] as const satisfies readonly (keyof RetentionReport)[];
 
@@ -64,6 +71,7 @@ export const RETENTION_COUNT_LABELS: Record<RetentionCountKey, string> = {
   inactiveStudents: "Leerlingaccounts zonder actieve klas",
   auditLog: "Regels uit het logboek van docenthandelingen",
   retentionRuns: "Oude opschoonrapporten",
+  expiredHolds: "Verlopen bewaarblokkades",
   skippedByHold: "Overgeslagen vanwege een bewaarblokkade",
 };
 
@@ -83,6 +91,7 @@ const DELETED_KEYS: readonly RetentionCountKey[] = [
   "inactiveStudents",
   "auditLog",
   "retentionRuns",
+  "expiredHolds",
 ];
 
 /** Total number of rows deleted by a run (0 for a missing report). */
@@ -116,6 +125,7 @@ export function emptyRetentionReport(
     inactiveStudents: 0,
     auditLog: 0,
     retentionRuns: 0,
+    expiredHolds: 0,
     skippedByHold: 0,
     dryRun,
     startedAt: iso,
@@ -184,6 +194,51 @@ export function subtractMonthsUtc(date: Date, months: number): Date {
 /** Whether attempts and inactive accounts may be deleted automatically. */
 export function autoDeleteActive(retention: RetentionSettings): boolean {
   return retention.autoDeleteAttempts && retention.confirmedAt != null;
+}
+
+/**
+ * A retention hold with an end date stays visible (as "Verlopen") for this
+ * many days after that date; then the retention engine deletes it, reason
+ * and all.
+ */
+export const EXPIRED_HOLD_GRACE_DAYS = 30;
+
+/**
+ * Automatic deletion of attempts and inactive accounts, as the public
+ * privacy info describes it (the engine's own condition, see
+ * autoDeleteActive):
+ *  - "on": the school confirmed the periods and auto-delete is on;
+ *  - "unconfirmed": the periods are not confirmed yet (nothing is deleted
+ *    automatically, whatever the switch says);
+ *  - "off": the periods are confirmed with auto-delete switched off.
+ */
+export type AutoDeleteState = "on" | "unconfirmed" | "off";
+
+export function autoDeleteState(retention: {
+  confirmed: boolean;
+  autoDeleteAttempts: boolean;
+}): AutoDeleteState {
+  if (!retention.confirmed) return "unconfirmed";
+  return retention.autoDeleteAttempts ? "on" : "off";
+}
+
+/**
+ * The caveat shown under the retention periods (on /privacy and on Mijn
+ * gegevens) whenever attempts and old accounts are not deleted
+ * automatically; null when they are.
+ */
+export function autoDeleteNotice(retention: {
+  confirmed: boolean;
+  autoDeleteAttempts: boolean;
+}): string | null {
+  switch (autoDeleteState(retention)) {
+    case "on":
+      return null;
+    case "unconfirmed":
+      return "Je school stelt deze bewaartermijnen nog definitief vast. Tot die tijd worden pogingen, antwoorden en oude accounts niet automatisch verwijderd.";
+    case "off":
+      return "Pogingen, antwoorden en oude accounts worden niet automatisch verwijderd. Je school verwijdert ze zelf, bijvoorbeeld bij het afsluiten van het schooljaar.";
+  }
 }
 
 /** The moments before which each kind of data is deleted. */

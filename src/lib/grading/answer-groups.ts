@@ -2,48 +2,33 @@
  * "Groeperen op gelijke antwoorden": a key per answer so identical answers
  * can be graded together. Pure module (no server or browser imports).
  *
- *  - open: lower-case, whitespace collapsed, punctuation ignored;
+ * The teacher sees one answer and may apply its score to every answer in
+ * the group, so the key may only ignore what never changes the meaning:
+ *  - open: whitespace and sentence punctuation after a word ("code." /
+ *    "lus," / "klaar!") are ignored; case, operators, minus signs, brackets
+ *    and other symbols are kept ("4" ≠ "-4", "a < b" ≠ "a > b", "True" ≠
+ *    "true");
  *  - code: Python tokens (comments, blank lines and spacing ignored;
  *    variable names, strings and indentation structure kept);
  *  - multiple_choice: the chosen option ids, in any order.
  */
-import { tokenizePython } from "@/lib/python/tokenize";
 import type { QuestionType } from "@/lib/questions/schema";
+import { normalizeCode } from "./code-normalize";
 
 function normalizeText(text: string): string {
-  return text
-    .normalize("NFKC")
-    .toLocaleLowerCase("nl-NL")
-    .replace(/[\p{P}\p{S}]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeCode(code: string): string {
-  const { tokens } = tokenizePython(code.replace(/\r\n?/g, "\n"));
-  const parts: string[] = [];
-  for (const token of tokens) {
-    switch (token.kind) {
-      case "comment":
-        break;
-      case "newline":
-        parts.push("⏎");
-        break;
-      case "indent":
-        parts.push("→");
-        break;
-      case "dedent":
-        parts.push("←");
-        break;
-      default:
-        parts.push(token.value);
-    }
-  }
-  // Trailing newline/dedent markers depend on how the file ends: ignore.
-  while (parts.length > 0 && ["⏎", "←"].includes(parts[parts.length - 1])) {
-    parts.pop();
-  }
-  return parts.join(" ");
+  return (
+    text
+      .normalize("NFKC")
+      .replace(/\s+/gu, " ")
+      .trim()
+      // Sentence punctuation directly after a word, at a word end ("lus,"
+      // "code." "klaar!"); "1, 2", "x[1:]" and "3.5" keep theirs.
+      .replace(/(?<=\p{L})[.,;:!?]+(?=\s|$)/gu, "")
+      // A full stop / ! / ? at the very end of the answer ("print(x).").
+      .replace(/[.!?]+$/u, "")
+      .replace(/\s+/gu, " ")
+      .trim()
+  );
 }
 
 /**

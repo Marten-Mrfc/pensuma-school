@@ -4,7 +4,8 @@
  * needed; they are disclosed on /privacy. Pure module.
  *
  * Without HTTPS (development) the better-auth cookie names have no
- * "__Secure-" prefix.
+ * "__Secure-" prefix. better-auth's session_data cookie (a cached copy of
+ * the session) is switched off in src/server/auth.ts, so it is not listed.
  */
 
 export type StorageKind = "cookie" | "lokale opslag";
@@ -26,21 +27,16 @@ export const STORAGE_ITEMS: readonly StorageItem[] = [
     kind: "cookie",
     category: "noodzakelijk",
     purpose: "Ingelogd blijven",
-    retention: "12 uur; voor leerlingen tot je de browser sluit",
-  },
-  {
-    name: "__Secure-better-auth.session_data",
-    kind: "cookie",
-    category: "noodzakelijk",
-    purpose: "Snelle controle van je sessie",
-    retention: "1 minuut",
+    retention:
+      "12 uur; voor leerlingen tot je uitlogt of de browser sluit (maximaal 12 uur geldig)",
   },
   {
     name: "better-auth.dont_remember",
     kind: "cookie",
     category: "noodzakelijk",
+    audience: "alleen leerlingen",
     purpose: "Onthouden dat je sessie eindigt als je de browser sluit",
-    retention: "tot sluiten browser",
+    retention: "tot je uitlogt of de browser sluit",
   },
   {
     name: "sidebar_state",

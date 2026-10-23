@@ -8,14 +8,25 @@
  * - exact:    lines must match exactly (`ignoreCase` applies).
  * - flexible: compares words and numbers only, so case (when `ignoreCase`,
  *             the default), spacing and punctuation don't matter. Numbers
- *             compare by value ("108.50" = "108.5"). Each expected line must
- *             appear, in order, inside an output line, with token boundaries
- *             ("5" never matches inside "15"); extra text around it (labels
- *             such as "Antwoord:") is fine. Extra output lines are allowed
- *             only when they look like a prompt or heading (they end with
- *             ":" or "?", e.g. `print("Geef een getal:")`) or contain no
- *             words/numbers at all; any other extra line fails the test, so
- *             printing *all* numbers doesn't pass "print the even numbers".
+ *             compare by value ("108.50" = "108.5"); "1x3=3" reads as
+ *             "1 x 3 = 3". Each expected line must appear, in order, inside
+ *             its own output line, with token boundaries ("5" never matches
+ *             inside "15"). Text around it is fine when it is a label or a
+ *             sentence ("Antwoord: 15", "Het getal 4 is even", "3 + 4 = 7"),
+ *             but NOT when it changes or doubles the answer:
+ *               - a negation right before/after a word answer ("Niet
+ *                 geslaagd" is not "Geslaagd", "even: nee" is not "even");
+ *               - another number glued to a numeric answer ("7 8 9" is not
+ *                 "8"; a number before it needs a label such as ":" or "=");
+ *               - the expected line of ANOTHER test of the same question
+ *                 (`siblings`) next to the answer ("even oneven", "Je mag
+ *                 stemmen / Je mag nog niet stemmen").
+ *             Extra output lines are allowed when they contain no
+ *             words/numbers, or when they look like a prompt or heading:
+ *             they end with ":" or "?", contain a word, don't carry another
+ *             test's answer, and there are at most (stdin lines + 2) of
+ *             them. So printing *all* numbers or every candidate answer
+ *             doesn't pass "print the even numbers" or "even/oneven".
  * - contains: every expected line must appear (as whole words/numbers)
  *             somewhere in the output, in any order.
  * - numbers:  only the numbers count: the expected numbers must appear in
@@ -25,15 +36,31 @@
  *             Understands "108.50", "1e3", "-5" and Dutch decimal
  *             commas ("108,50").
  * - regex:    `expected` is a JavaScript regular expression, searched in
- *             the output (flags "m", plus "i" when `ignoreCase`).
+ *             the output (flags "m", plus "i" when `ignoreCase`). It runs
+ *             with a time limit (see regex-guard.ts): a pattern that
+ *             backtracks too long fails the test instead of hanging.
  */
 import type { OutputMatchMode } from "@/lib/questions/schema";
 import { type PyValue, pyRepr, pyTypeName } from "./pyvalue";
+import { guardedRegexTest, type RegexTester } from "./regex-guard";
 
 export type OutputCompareOptions = {
   match: OutputMatchMode;
   ignoreCase: boolean;
   tolerance: number;
+  /**
+   * flexible: the stdin of this test. Echoed input never counts as "another
+   * answer", and it sets how many prompt/heading lines are tolerated.
+   */
+  stdin?: string;
+  /**
+   * flexible: the expected outputs of the question's OTHER io tests that use
+   * a different stdin (the alternative answers). An output line that carries
+   * one of them next to the answer fails.
+   */
+  siblings?: readonly string[];
+  /** regex: evaluates the pattern with a time limit (default: guardedRegexTest). */
+  regexTest?: RegexTester;
 };
 
 export type OutputCompareResult = {
@@ -72,21 +99,47 @@ function fold(s: string, ignoreCase: boolean): string {
 
 /* ------------------------------ Tokens (flexible) ------------------------- */
 
-type Token = { num: number | null; text: string };
+type Token = {
+  num: number | null;
+  text: string;
+  /** Position in the (raw) line: [start, end). */
+  start: number;
+  end: number;
+  /** Contains a letter (a word, not a number or a symbol such as "²"). */
+  word: boolean;
+  /** Lookup key, filled in on first use (see tokenKey). */
+  key?: string;
+};
 
+/**
+ * Numbers and words. Numbers and letters split where they touch ("1x3=3" →
+ * 1, x, 3, 3; "180cm" → 180, cm), but a number never starts inside a longer
+ * run of digits ("15" never yields "5"). A "-" is a minus sign only when no
+ * letter or digit comes before it ("10-3" → 10, 3; "Antwoord: -5" → -5). An
+ * exponent counts only when no letter follows ("1e3" = 1000, "1e3x" → 1, e,
+ * 3, x).
+ */
 const TOKEN_RE =
-  /(?<![\p{L}\p{N}_.])-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\p{L}\p{N}_])|[\p{L}\p{N}_]+/gu;
+  /(?:(?<![\p{L}\p{N}_.])-)?(?<![\p{N}_.])\d+(?:\.\d+)?(?:[eE][+-]?\d+(?![\p{L}_]))?(?![\p{N}_])|[\p{L}_]+|\p{N}+/gu;
 
 /** Words and numbers of a line (punctuation and spacing dropped). */
 export function tokenize(line: string, ignoreCase: boolean): Token[] {
   const out: Token[] = [];
   for (const m of line.matchAll(TOKEN_RE)) {
     const text = m[0];
+    const start = m.index ?? 0;
+    const end = start + text.length;
     const n = /^-?\d/.test(text) ? Number(text) : Number.NaN;
     out.push(
       Number.isFinite(n)
-        ? { num: n, text }
-        : { num: null, text: fold(text, ignoreCase) },
+        ? { num: n, text, start, end, word: false }
+        : {
+            num: null,
+            text: fold(text, ignoreCase),
+            start,
+            end,
+            word: /\p{L}/u.test(text),
+          },
     );
   }
   return out;
@@ -103,22 +156,299 @@ function tokenEqual(a: Token, b: Token): boolean {
   return a.text === b.text;
 }
 
-/** Does `hay` contain `needle` as a contiguous token run? */
-function containsTokens(hay: Token[], needle: Token[]): boolean {
-  if (needle.length === 0) return true;
+/** Start positions where `needle` occurs in `hay` as a contiguous token run. */
+function occurrences(hay: Token[], needle: Token[]): number[] {
+  const out: number[] = [];
+  if (needle.length === 0) return out;
   outer: for (let i = 0; i + needle.length <= hay.length; i++) {
     for (let j = 0; j < needle.length; j++) {
       if (!tokenEqual(hay[i + j], needle[j])) continue outer;
     }
-    return true;
+    out.push(i);
   }
-  return false;
+  return out;
 }
 
-/** Extra lines that are fine in flexible mode: prompts/headings and decoration. */
-function isTolerableExtraLine(raw: string, tokens: Token[]): boolean {
-  if (tokens.length === 0) return true;
-  return /[:?]\s*$/u.test(raw);
+/** Does `hay` contain `needle` as a contiguous token run? */
+function containsTokens(hay: Token[], needle: Token[]): boolean {
+  return needle.length === 0 || occurrences(hay, needle).length > 0;
+}
+
+function sameTokens(a: Token[], b: Token[]): boolean {
+  return a.length === b.length && a.every((t, i) => tokenEqual(t, b[i]));
+}
+
+const isWordToken = (t: Token) => t.word;
+
+/** Lookup key of a token (numbers rounded like `numbersEqual` compares them). */
+function tokenKey(t: Token): string {
+  if (t.key === undefined) {
+    t.key =
+      t.num === null
+        ? `w${t.text}`
+        : Number.isInteger(t.num) && Math.abs(t.num) < 1e9
+          ? `n${t.num}`
+          : `n${Number(t.num.toPrecision(9))}`;
+  }
+  return t.key;
+}
+const isNumberToken = (t: Token) => t.num !== null;
+
+/** Words that turn an answer around ("niet geslaagd", "even: nee"). */
+const NEGATIONS: ReadonlySet<string> = new Set([
+  "niet",
+  "geen",
+  "nee",
+  "nooit",
+  "not",
+  "no",
+  "never",
+]);
+const isNegation = (t: Token) =>
+  t.word && NEGATIONS.has(t.text.toLowerCase());
+
+/** Text between two tokens that makes the part before it a label: "3 + 4 = 7", "Stap 2: 8". */
+const LABEL_SEPARATOR = /[:=?>→⇒]/u;
+
+/* -------------------------- Flexible: line matching ------------------------ */
+
+/**
+ * Tokenized non-empty lines of an expected output. Cached: the same
+ * expected outputs come back for every test of a question and every
+ * student (small and bounded; teacher data only).
+ */
+const expectedCache = new Map<string, Token[][]>();
+
+function expectedLineTokens(text: string, ignoreCase: boolean): Token[][] {
+  const key = `${ignoreCase ? 1 : 0}${text}`;
+  const cached = expectedCache.get(key);
+  if (cached) return cached;
+  const lines = normalizeLines(text)
+    .map((l) => tokenize(l, ignoreCase))
+    .filter((t) => t.length > 0);
+  if (text.length <= 20_000) {
+    if (expectedCache.size >= 500) expectedCache.clear();
+    expectedCache.set(key, lines);
+  }
+  return lines;
+}
+
+type Line = { raw: string; tokens: Token[] };
+
+/** An occurrence of another test's expected line inside an output line. */
+type ForeignHit = {
+  start: number;
+  end: number;
+  /** Index of the sibling test it belongs to. */
+  sibling: number;
+  /** The sibling line contains a word (not only numbers). */
+  wordy: boolean;
+};
+
+/**
+ * Everything the flexible comparison of ONE test needs to know besides the
+ * output: its expected lines, the other tests' expected lines and the input.
+ */
+class FlexibleContext {
+  readonly expected: Token[][];
+  /** Per expected line: it contains a negation itself ("Niet geslaagd"). */
+  private readonly negated: boolean[];
+  /**
+   * The sibling tests' expected lines that this test does not also expect,
+   * by the key of their first token.
+   */
+  private readonly foreign = new Map<
+    string,
+    { tokens: Token[]; sibling: number; wordy: boolean }[]
+  >();
+  /** Per sibling test: all its expected lines. */
+  private readonly siblingLines: Token[][][];
+  private readonly echo: Token[];
+  private readonly stdinLines: number;
+  /** At most this many prompt/heading lines (with words) may be skipped. */
+  readonly maxPromptLines: number;
+  /** Per raw output line (outputs often repeat lines). */
+  private readonly hitCache = new Map<string, ForeignHit[]>();
+  private readonly skipCache = new Map<string, number>();
+
+  constructor(
+    expected: Token[][],
+    options: {
+      ignoreCase: boolean;
+      stdin?: string;
+      siblings?: readonly string[];
+    },
+  ) {
+    this.expected = expected;
+    this.negated = expected.map((e) => e.some(isNegation));
+    this.siblingLines = (options.siblings ?? []).map((text) =>
+      expectedLineTokens(text, options.ignoreCase),
+    );
+    this.siblingLines.forEach((lines, sibling) => {
+      for (const tokens of lines) {
+        if (expected.some((e) => sameTokens(e, tokens))) continue;
+        // Keyed by the first two tokens (one for a one-token line).
+        const key = tokens
+          .slice(0, 2)
+          .map((t) => tokenKey(t))
+          .join(" ");
+        const list = this.foreign.get(key) ?? [];
+        list.push({ tokens, sibling, wordy: tokens.some(isWordToken) });
+        this.foreign.set(key, list);
+      }
+    });
+    const stdin = options.stdin ?? "";
+    this.stdinLines = normalizeLines(stdin).length;
+    this.echo = tokenize(stdin, options.ignoreCase);
+    this.maxPromptLines = this.stdinLines + 2;
+  }
+
+  /**
+   * Echoed input never counts as another test's answer: tokens from this
+   * test's stdin, and small integers that number the inputs ("Getal 3:").
+   */
+  private isEcho(t: Token): boolean {
+    if (this.echo.some((e) => tokenEqual(e, t))) return true;
+    return (
+      t.num !== null &&
+      Number.isInteger(t.num) &&
+      t.num >= 1 &&
+      t.num <= this.stdinLines
+    );
+  }
+
+  /** Numbers after a numeric answer (from token `from` on) are allowed? */
+  private cleanNumericTail(line: Line, from: number): boolean {
+    let sawWord = false;
+    for (const t of line.tokens.slice(from)) {
+      if (isWordToken(t)) sawWord = true;
+      if (!isNumberToken(t)) continue;
+      if (t.start > 0 && /[\p{L}_]/u.test(line.raw[t.start - 1])) continue;
+      if (sawWord && this.echo.some((e) => tokenEqual(e, t))) continue;
+      return false;
+    }
+    return true;
+  }
+
+  /** Where other tests' expected lines occur in this output line. */
+  foreignHits(line: Line): ForeignHit[] {
+    const cached = this.hitCache.get(line.raw);
+    if (cached) return cached;
+    const hits: ForeignHit[] = [];
+    const L = line.tokens;
+    if (this.foreign.size > 0) {
+      const keys = L.map((t) => tokenKey(t));
+      const none: never[] = [];
+      for (let start = 0; start < L.length; start++) {
+        const one = this.foreign.get(keys[start]) ?? none;
+        const two =
+          start + 1 < L.length
+            ? (this.foreign.get(`${keys[start]} ${keys[start + 1]}`) ?? none)
+            : none;
+        for (const list of [one, two]) {
+          for (const s of list) {
+            const end = start + s.tokens.length;
+            if (end > L.length) continue;
+            if (!s.tokens.every((t, k) => tokenEqual(L[start + k], t)))
+              continue;
+            if (L.slice(start, end).every((t) => this.isEcho(t))) continue;
+            hits.push({ start, end, sibling: s.sibling, wordy: s.wordy });
+          }
+        }
+      }
+    }
+    this.hitCache.set(line.raw, hits);
+    return hits;
+  }
+
+  /**
+   * Can expected line `e` be matched by this output line? Some occurrence
+   * of it must leave only label text around it (see the file header).
+   */
+  matches(i: number, line: Line): boolean {
+    const e = this.expected[i];
+    const L = line.tokens;
+    if (e.length > L.length) return false;
+    const first = e[0];
+    const last = e[e.length - 1];
+    const negatedAnswer = this.negated[i];
+    return occurrences(L, e).some((s) => {
+      const end = s + e.length;
+      const before = s > 0 ? L[s - 1] : null;
+      // Numeric start: no other number directly in front ("7 8"), unless a
+      // label separates them ("3 + 4 = 7", "Stap 2: 8").
+      if (
+        isNumberToken(first) &&
+        before &&
+        isNumberToken(before) &&
+        !LABEL_SEPARATOR.test(line.raw.slice(before.end, L[s].start))
+      )
+        return false;
+      // Numeric end: no number after it ("8 9", "8,5" for 8), except digits
+      // glued to a letter (a unit or name: "12 m2") and the echoed input
+      // after some words ("25 is het kwadraat van 5").
+      if (isNumberToken(last) && !this.cleanNumericTail(line, end))
+        return false;
+      // Word answers: no negation right before or after it.
+      if (!negatedAnswer) {
+        if (
+          !isNumberToken(first) &&
+          L.slice(Math.max(0, s - 2), s).some(isNegation)
+        )
+          return false;
+        if (!isNumberToken(last) && L.slice(end, end + 2).some(isNegation))
+          return false;
+      }
+      // No other test's (worded) answer next to it ("even oneven").
+      return !this.foreignHits(line).some(
+        (h) => h.wordy && (h.start < s || h.end > end),
+      );
+    });
+  }
+
+  /**
+   * Cost of leaving this output line unmatched: 0 for decoration (no words
+   * or numbers), 1 for a prompt/heading line, Infinity when not allowed.
+   */
+  skipCost(line: Line): number {
+    const L = line.tokens;
+    if (L.length === 0) return 0;
+    if (!/[:?]\s*$/u.test(line.raw) || !L.some(isWordToken))
+      return Number.POSITIVE_INFINITY;
+    let cost = this.skipCache.get(line.raw);
+    if (cost === undefined) {
+      cost = this.carriesForeignAnswer(line) ? Number.POSITIVE_INFINITY : 1;
+      this.skipCache.set(line.raw, cost);
+    }
+    return cost;
+  }
+
+  /**
+   * A prompt-like line that carries another test's answer, but not this
+   * test's own (distinct) answer next to it: "oneven:" in the test that
+   * expects "even". A heading that lists every option ("Is het getal even
+   * of oneven?") stays allowed.
+   */
+  private carriesForeignAnswer(line: Line): boolean {
+    const hits = this.foreignHits(line);
+    if (hits.length === 0) return false;
+    const L = line.tokens;
+    const ownHits = this.expected.map((e) =>
+      occurrences(L, e).map((start) => ({ start, end: start + e.length })),
+    );
+    return hits.some((h) => {
+      const covered = ownHits.some((hits) =>
+        hits.some((o) => o.start <= h.start && o.end >= h.end),
+      );
+      if (covered) return false;
+      const rescued = this.expected.some(
+        (e, idx) =>
+          !this.siblingLines[h.sibling].some((s) => sameTokens(s, e)) &&
+          ownHits[idx].some((o) => o.end <= h.start || o.start >= h.end),
+      );
+      return !rescued;
+    });
+  }
 }
 
 /* ----------------------------- Numbers (numbers) -------------------------- */
@@ -264,10 +594,13 @@ function compareExact(
 function compareFlexible(
   actual: string,
   expected: string,
-  ignoreCase: boolean,
+  options: OutputCompareOptions,
 ): OutputCompareResult {
-  const aRaw = normalizeLines(actual);
-  const aTok = aRaw.map((l) => tokenize(l, ignoreCase));
+  const { ignoreCase } = options;
+  const out: Line[] = normalizeLines(actual).map((raw) => ({
+    raw,
+    tokens: tokenize(raw, ignoreCase),
+  }));
   const eRaw: string[] = [];
   const eTok: Token[][] = [];
   for (const line of normalizeLines(expected)) {
@@ -277,31 +610,31 @@ function compareFlexible(
       eTok.push(t);
     }
   }
-  const tolerable = aRaw.map((l, j) => isTolerableExtraLine(l, aTok[j]));
-  const A = aRaw.length;
+  const ctx = new FlexibleContext(eTok, options);
+  const A = out.length;
   const E = eTok.length;
+  const skip = out.map((l) => ctx.skipCost(l));
+  const limit = ctx.maxPromptLines;
 
-  // can[i][j]: expected lines i.. can be matched in actual lines j.., with
-  // every skipped actual line tolerable. Filled backwards.
-  let passed: boolean;
+  // cost[i][j]: the fewest prompt/heading lines that must be skipped to
+  // match expected lines i.. in output lines j.. (Infinity: impossible).
+  // Filled backwards, one row at a time.
+  let passed = false;
   if ((E + 1) * (A + 1) <= 4_000_000) {
-    const W = A + 1;
-    const can = new Uint8Array((E + 1) * W);
-    can[E * W + A] = 1;
-    for (let j = A - 1; j >= 0; j--)
-      can[E * W + j] = tolerable[j] && can[E * W + j + 1] ? 1 : 0;
+    let next = new Float64Array(A + 1);
+    for (let j = A - 1; j >= 0; j--) next[j] = skip[j] + next[j + 1];
     for (let i = E - 1; i >= 0; i--) {
+      const cur = new Float64Array(A + 1);
+      cur[A] = Number.POSITIVE_INFINITY;
       for (let j = A - 1; j >= 0; j--) {
-        can[i * W + j] =
-          (tolerable[j] && can[i * W + j + 1]) ||
-          (can[(i + 1) * W + j + 1] && containsTokens(aTok[j], eTok[i]))
-            ? 1
-            : 0;
+        let best = skip[j] + cur[j + 1];
+        if (next[j + 1] < best && ctx.matches(i, out[j]))
+          best = next[j + 1];
+        cur[j] = best;
       }
+      next = cur;
     }
-    passed = can[0] === 1;
-  } else {
-    passed = false; // fall through to the greedy check below
+    passed = next[0] <= limit;
   }
 
   // Greedy assignment (earliest match): used for very large outputs and to
@@ -311,7 +644,7 @@ function compareFlexible(
   let missing = -1;
   for (let i = 0; i < E; i++) {
     let k = j;
-    while (k < A && !containsTokens(aTok[k], eTok[i])) k++;
+    while (k < A && !ctx.matches(i, out[k])) k++;
     if (k >= A) {
       missing = i;
       break;
@@ -319,41 +652,44 @@ function compareFlexible(
     matched[k] = true;
     j = k + 1;
   }
-  if (
-    !passed &&
-    missing < 0 &&
-    aRaw.every((_, idx) => matched[idx] || tolerable[idx])
-  ) {
-    passed = true;
-  }
+  const skipped = out.map((_, idx) => idx).filter((idx) => !matched[idx]);
+  const skippedCost = skipped.reduce((sum, idx) => sum + skip[idx], 0);
+  if (!passed && missing < 0 && skippedCost <= limit) passed = true;
   if (passed) return { passed: true, feedback: null };
 
-  if (aRaw.every((l) => l.trim() === "")) {
+  if (out.every((l) => l.raw.trim() === "")) {
     return {
       passed: false,
       feedback: `Je programma printte niets. Verwacht: ${quote(eRaw[0] ?? "")}${E > 1 ? " …" : ""}.`,
     };
   }
   if (missing >= 0) {
-    // Show the output line that was probably meant: the unmatched, non-prompt
-    // line after the last match that shares the most words with the expected
-    // line (the first one when none overlap).
+    // Show the output line that was probably meant: the unmatched line after
+    // the last match that contains the expected text, or else shares the
+    // most words with it (prompts and headings only when nothing else fits).
+    const wanted = eTok[missing];
     let candidate = -1;
     let best = -1;
     for (let k = j; k < A; k++) {
-      if (matched[k] || tolerable[k]) continue;
-      const overlap = eTok[missing].filter((t) =>
-        aTok[k].some((a) => tokenEqual(a, t)),
-      ).length;
+      if (matched[k]) continue;
+      const contains = containsTokens(out[k].tokens, wanted);
+      if (skip[k] !== Number.POSITIVE_INFINITY && !contains) continue;
+      const overlap =
+        (contains ? wanted.length + 1 : 0) +
+        wanted.filter((t) => out[k].tokens.some((a) => tokenEqual(a, t)))
+          .length;
       if (overlap > best) {
         best = overlap;
         candidate = k;
       }
     }
     if (candidate >= 0) {
+      const extra = containsTokens(out[candidate].tokens, wanted)
+        ? " Het antwoord staat er wel in, maar met iets erbij dat niet mag (zoals ‘niet’, een tweede antwoord of een extra getal)."
+        : "";
       return {
         passed: false,
-        feedback: `Regel ${candidate + 1}: verwacht ${quote(eRaw[missing])}, maar je programma printte ${quote(aRaw[candidate].trim())}.`,
+        feedback: `Regel ${candidate + 1}: verwacht ${quote(eRaw[missing])}, maar je programma printte ${quote(out[candidate].raw.trim())}.${extra}`,
       };
     }
     return {
@@ -364,10 +700,18 @@ function compareFlexible(
           : `Je programma printte geen regel met ${quote(eRaw[missing])}.`,
     };
   }
-  const extra = aRaw.findIndex((_, idx) => !matched[idx] && !tolerable[idx]);
+  const extra = skipped.find((idx) => skip[idx] === Number.POSITIVE_INFINITY);
+  if (extra !== undefined) {
+    return {
+      passed: false,
+      feedback: `Je programma printte een regel die niet verwacht werd (regel ${extra + 1}): ${quote(out[extra].raw.trim())}.`,
+    };
+  }
+  const prompts = skipped.filter((idx) => skip[idx] > 0);
+  const example = prompts[prompts.length - 1] ?? skipped[0];
   return {
     passed: false,
-    feedback: `Je programma printte een regel die niet verwacht werd (regel ${extra + 1}): ${quote(aRaw[extra].trim())}.`,
+    feedback: `Je programma printte meer extra regels dan verwacht, zoals regel ${example + 1}: ${quote(out[example].raw.trim())}. Print alleen wat er gevraagd wordt.`,
   };
 }
 
@@ -441,10 +785,11 @@ function compareRegex(
   actual: string,
   pattern: string,
   ignoreCase: boolean,
+  regexTest: RegexTester,
 ): OutputCompareResult {
-  let re: RegExp;
+  const flags = ignoreCase ? "imu" : "mu";
   try {
-    re = new RegExp(pattern, ignoreCase ? "imu" : "mu");
+    new RegExp(pattern, flags);
   } catch (e) {
     return {
       passed: false,
@@ -452,7 +797,15 @@ function compareRegex(
     };
   }
   const text = normalizeLines(actual).join("\n");
-  if (re.test(text)) return { passed: true, feedback: null };
+  const result = regexTest(pattern, flags, text);
+  if (result === "timeout") {
+    return {
+      passed: false,
+      feedback:
+        "De reguliere expressie van deze test is te traag; vraag je docent om dit te controleren.",
+    };
+  }
+  if (result) return { passed: true, feedback: null };
   return {
     passed: false,
     feedback:
@@ -472,13 +825,18 @@ export function compareOutput(
     case "exact":
       return compareExact(actual, expected, options.ignoreCase);
     case "flexible":
-      return compareFlexible(actual, expected, options.ignoreCase);
+      return compareFlexible(actual, expected, options);
     case "contains":
       return compareContains(actual, expected, options.ignoreCase);
     case "numbers":
       return compareNumbers(actual, expected, options.tolerance);
     case "regex":
-      return compareRegex(actual, expected, options.ignoreCase);
+      return compareRegex(
+        actual,
+        expected,
+        options.ignoreCase,
+        options.regexTest ?? guardedRegexTest,
+      );
   }
 }
 

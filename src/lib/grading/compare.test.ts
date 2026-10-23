@@ -18,6 +18,23 @@ function cmp(
   return compareOutput(actual, expected, { match, ignoreCase, tolerance });
 }
 
+/** Flexible comparison of one test of a question (stdin + the other tests' expected outputs). */
+function flex(
+  actual: string,
+  expected: string,
+  { stdin, siblings }: { stdin?: string; siblings?: string[] } = {},
+) {
+  return compareOutput(actual, expected, {
+    match: "flexible",
+    ignoreCase: true,
+    tolerance: 0.01,
+    stdin,
+    siblings,
+  });
+}
+
+const upTo = (n: number) => Array.from({ length: n }, (_, i) => i);
+
 describe("normalizeLines", () => {
   test("CRLF, trailing whitespace and trailing empty lines", () => {
     expect(normalizeLines("a  \r\nb\t\n\n\n")).toEqual(["a", "b"]);
@@ -173,6 +190,251 @@ describe("flexible", () => {
   });
 });
 
+describe("flexible: printing every candidate answer does not pass (F03, F27)", () => {
+  test("all numbers on one line", () => {
+    const all = upTo(1000).join(" ");
+    expect(flex(all, "8").passed).toBe(false);
+    expect(
+      flex(all, "8", { stdin: "3\n5", siblings: ["7", "350"] }).passed,
+    ).toBe(false);
+    expect(flex("7 8 9", "8").passed).toBe(false);
+    expect(flex("3 9 5", "9", { stdin: "3\n9\n5" }).passed).toBe(false);
+  });
+
+  test("numbers next to a numeric answer need a label", () => {
+    expect(flex("8,5", "8").passed).toBe(false);
+    expect(flex("[1, 2, 4, 6]", "[2, 4, 6]").passed).toBe(false);
+    expect(flex("[2, 4, 6, 8]", "[2, 4, 6]").passed).toBe(false);
+    expect(flex("3 + 4 = 7", "7", { stdin: "3\n4" }).passed).toBe(true);
+    expect(flex("Stap 2: 8", "8").passed).toBe(true);
+    expect(flex("Oppervlakte: 12 m2", "12").passed).toBe(true);
+    // Echoed input after some words is fine; bare candidates are not.
+    expect(flex("25 is het kwadraat van 5", "25", { stdin: "5" }).passed).toBe(
+      true,
+    );
+    expect(
+      flex("9 is groter dan 3 en 5", "9", { stdin: "9\n3\n5" }).passed,
+    ).toBe(true);
+    expect(flex("9 3 5", "9", { stdin: "9\n3\n5" }).passed).toBe(false);
+    expect(flex("8 en 9 en 10", "8", { stdin: "4" }).passed).toBe(false);
+  });
+
+  test("both answers on one line", () => {
+    const evenOdd = { even: ["oneven"], odd: ["even"] };
+    expect(
+      flex("even oneven", "even", { stdin: "4", siblings: evenOdd.even })
+        .passed,
+    ).toBe(false);
+    expect(
+      flex("even oneven", "oneven", { stdin: "7", siblings: evenOdd.odd })
+        .passed,
+    ).toBe(false);
+    expect(
+      flex("Ja Nee", "Ja", { stdin: "18", siblings: ["Nee"] }).passed,
+    ).toBe(false);
+    expect(
+      flex("Ja Nee", "Nee", { stdin: "12", siblings: ["Ja"] }).passed,
+    ).toBe(false);
+    expect(
+      flex("True False", "True", { stdin: "4", siblings: ["False"] }).passed,
+    ).toBe(false);
+    const both = "Je mag stemmen / Je mag nog niet stemmen";
+    expect(
+      flex(both, "Je mag stemmen", {
+        stdin: "18",
+        siblings: ["Je mag nog niet stemmen", "Je mag stemmen"],
+      }).passed,
+    ).toBe(false);
+    expect(
+      flex(both, "Je mag nog niet stemmen", {
+        stdin: "15",
+        siblings: ["Je mag stemmen", "Je mag stemmen"],
+      }).passed,
+    ).toBe(false);
+  });
+
+  test("a negation turns a word answer around", () => {
+    expect(flex("Niet geslaagd", "Geslaagd").passed).toBe(false);
+    expect(flex("Het getal is niet even", "even").passed).toBe(false);
+    expect(flex("Geen toegang", "Toegang").passed).toBe(false);
+    expect(flex("Geslaagd? Nee", "Geslaagd").passed).toBe(false);
+    expect(
+      flex("Niet geslaagd", "Geslaagd", {
+        stdin: "6.5",
+        siblings: ["Niet geslaagd"],
+      }).passed,
+    ).toBe(false);
+    expect(
+      flex("Helaas, je bent niet geslaagd", "Niet geslaagd", {
+        stdin: "4",
+        siblings: ["Geslaagd"],
+      }).passed,
+    ).toBe(true);
+  });
+
+  test("candidates printed as prompt-like lines", () => {
+    // Bare "N:" lines are never prompts.
+    expect(flex("1:\n2:\n3:\n4:\n5:\n6:", "2\n4\n6").passed).toBe(false);
+    const repeated = [0, 1, 2, 3]
+      .flatMap(() => upTo(30).map((n) => `${n}:`))
+      .join("\n");
+    expect(flex(repeated, "8\n22\n10\n6").passed).toBe(false);
+    // A prompt-like line may not carry another test's answer.
+    expect(
+      flex("even:\noneven:", "even", { stdin: "4", siblings: ["oneven"] })
+        .passed,
+    ).toBe(false);
+    expect(
+      flex("even:\noneven:", "oneven", { stdin: "7", siblings: ["even"] })
+        .passed,
+    ).toBe(false);
+    expect(
+      flex("Antwoord: even:\nAntwoord: oneven:", "even", {
+        stdin: "4",
+        siblings: ["oneven"],
+      }).passed,
+    ).toBe(false);
+    expect(
+      flex(
+        "Uitslag:\nGeslaagd:\nUitslag: Niet geslaagd:",
+        "Uitslag:\nGeslaagd",
+        {
+          stdin: "7",
+          siblings: ["Uitslag:\nNiet geslaagd"],
+        },
+      ).passed,
+    ).toBe(false);
+    expect(
+      flex(
+        "Uitslag:\nGeslaagd:\nUitslag: Niet geslaagd:",
+        "Uitslag:\nNiet geslaagd",
+        {
+          stdin: "4",
+          siblings: ["Uitslag:\nGeslaagd"],
+        },
+      ).passed,
+    ).toBe(false);
+  });
+
+  test("at most (stdin lines + 2) prompt/heading lines", () => {
+    const lines = upTo(31)
+      .map((n) => `Getal ${n}:`)
+      .join("\n");
+    const r = flex(lines, "2\n4\n6\n8\n10", { stdin: "10" });
+    expect(r.passed).toBe(false);
+    expect(r.feedback).toContain("meer extra regels dan verwacht");
+    expect(
+      flex("Getal 1:\nGetal 2:\nGetal 3:\nSom: 6", "6", {
+        stdin: "1\n2\n3",
+        siblings: ["3", "2"],
+      }).passed,
+    ).toBe(true);
+  });
+
+  test("feedback says the answer is there, but with something extra", () => {
+    expect(flex("Niet geslaagd", "Geslaagd").feedback).toBe(
+      "Regel 1: verwacht `Geslaagd`, maar je programma printte `Niet geslaagd`. Het antwoord staat er wel in, maar met iets erbij dat niet mag (zoals ‘niet’, een tweede antwoord of een extra getal).",
+    );
+    expect(
+      flex("even:\noneven:", "even", { stdin: "4", siblings: ["oneven"] })
+        .feedback,
+    ).toBe(
+      "Je programma printte een regel die niet verwacht werd (regel 2): `oneven:`.",
+    );
+  });
+});
+
+describe("flexible: honest answers keep passing", () => {
+  test.each([
+    ["Geef 5 getallen:\n5", "5", ""],
+    ["Het antwoord is: 15", "15", ""],
+    ["Wat is je naam? Hallo Mark", "Hallo Mark", "Mark"],
+    ["Hallo Mark, welkom!", "Hallo Mark", "Mark"],
+    ["Het getal 4 is even", "even", "4"],
+    ["4 is een even getal", "even", "4"],
+    ["Is het getal even of oneven?\neven", "even", "4"],
+    ["Gefeliciteerd, je bent geslaagd!", "Geslaagd", "6.5"],
+    ["informatica heeft 5 klinkers", "5", "informatica"],
+    ["Het woord Python heeft 1 klinker(s)", "1", "Python"],
+    ["3+4=7", "7", "3\n4"],
+    ["10-2=8", "8", "10\n-2"],
+    ["Geef een getal: Geef nog een getal: 7", "7", "3\n4"],
+    ["100.0 euro is 108.0 dollar", "108", "100"],
+    ["Grootste van 3, 9, 5: 9", "9", "3\n9\n5"],
+    ["Tafel van 7:\n1 x 7 = 7\n2 x 7 = 14\n3 x 7 = 21", "7\n14\n21", "7"],
+    ["kat omgekeerd is tak", "tak", "kat"],
+    ["Ja, 2024 is een schrikkeljaar", "2024 is een schrikkeljaar", "2024"],
+  ])("%p passes %p", (actual, expected, stdin) => {
+    const siblings: Record<string, string[]> = {
+      even: ["oneven"],
+      Geslaagd: ["Niet geslaagd"],
+      "Hallo Mark": ["Hallo Fatima"],
+      "5": ["1", "8"],
+      "1": ["5", "8"],
+      "7": ["8", "350"],
+      "9": ["5", "1"],
+      "7\n14\n21": ["3\n6\n9"],
+      tak: ["kat"],
+      "2024 is een schrikkeljaar": ["2023 is geen schrikkeljaar"],
+    };
+    expect(
+      flex(actual, expected, { stdin, siblings: siblings[expected] }).passed,
+    ).toBe(true);
+  });
+
+  test("a heading that lists every option is fine", () => {
+    expect(
+      flex("Is het getal even of oneven?\noneven", "oneven", {
+        stdin: "7",
+        siblings: ["even"],
+      }).passed,
+    ).toBe(true);
+    expect(
+      flex(
+        "Uitslag (geslaagd of niet geslaagd):\nniet geslaagd",
+        "Niet geslaagd",
+        {
+          stdin: "4",
+          siblings: ["Geslaagd"],
+        },
+      ).passed,
+    ).toBe(true);
+  });
+
+  test("the expected output itself always passes, whatever the other tests expect", () => {
+    expect(
+      flex("Uitslag:\nNiet geslaagd", "Uitslag:\nNiet geslaagd", {
+        stdin: "4",
+        siblings: ["Uitslag:\nGeslaagd", "Geslaagd"],
+      }).passed,
+    ).toBe(true);
+    expect(
+      flex("Je mag nog niet stemmen", "Je mag nog niet stemmen", {
+        stdin: "15",
+        siblings: ["Je mag stemmen"],
+      }).passed,
+    ).toBe(true);
+  });
+});
+
+describe("flexible: digits and letters split (F35)", () => {
+  test("'3x7=21' matches '3 x 7 = 21'", () => {
+    expect(cmp("1x3=3", "1 x 3 = 3", "flexible").passed).toBe(true);
+    expect(cmp("1 X 3=3", "1 x 3 = 3", "flexible").passed).toBe(true);
+    expect(cmp("Lengte: 180cm", "180 cm", "flexible").passed).toBe(true);
+    expect(cmp("5euro", "5 euro", "flexible").passed).toBe(true);
+  });
+
+  test("number boundaries, signs and exponents still hold", () => {
+    expect(cmp("15", "5", "flexible").passed).toBe(false);
+    expect(cmp("x15", "x 5", "flexible").passed).toBe(false);
+    expect(cmp("1e3", "1000", "flexible").passed).toBe(true);
+    expect(cmp("Antwoord: -5", "-5", "flexible").passed).toBe(true);
+    expect(cmp("Antwoord: 5", "-5", "flexible").passed).toBe(false);
+    expect(cmp("10-3", "-3", "flexible").passed).toBe(false);
+  });
+});
+
 describe("contains", () => {
   test("every expected line somewhere, any order", () => {
     expect(cmp("x\nResultaat: 42\nklaar", "klaar\n42", "contains").passed).toBe(
@@ -244,6 +506,34 @@ describe("regex", () => {
     expect(cmp("abc", "(", "regex").feedback).toContain(
       "ongeldige reguliere expressie",
     );
+  });
+
+  // Regression (F08): a teacher pattern with nested quantifiers on crafted
+  // student output used to block the server's event loop for hours.
+  test("a pattern that backtracks too long fails the test instead of hanging", () => {
+    const started = Date.now();
+    const r = cmp(`${"a".repeat(40)}!`, "^(\\w+\\s?)+$", "regex");
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(r.passed).toBe(false);
+    expect(r.feedback).toBe(
+      "De reguliere expressie van deze test is te traag; vraag je docent om dit te controleren.",
+    );
+  });
+
+  test("uses the injected regex tester", () => {
+    const calls: string[][] = [];
+    const r = compareOutput("Hallo", "^Hallo$", {
+      match: "regex",
+      ignoreCase: false,
+      tolerance: 0,
+      regexTest: (pattern, flags, text) => {
+        calls.push([pattern, flags, text]);
+        return "timeout";
+      },
+    });
+    expect(calls).toEqual([["^Hallo$", "mu", "Hallo"]]);
+    expect(r.passed).toBe(false);
+    expect(r.feedback).toContain("te traag");
   });
 });
 

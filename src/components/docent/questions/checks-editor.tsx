@@ -130,19 +130,30 @@ export function ChecksEditor({
           uit te voeren.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2.5">
-          {checks.map((check, index) => (
-            <CheckRow
-              key={check.id}
-              index={index}
-              count={checks.length}
-              check={check}
-              onMove={move}
-              onChange={(patch) => set(check.id, patch)}
-              onRemove={() => onChange(checks.filter((c) => c.id !== check.id))}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="flex flex-col gap-2.5">
+            {checks.map((check, index) => (
+              <CheckRow
+                key={check.id}
+                index={index}
+                count={checks.length}
+                check={check}
+                onMove={move}
+                onChange={(patch) => set(check.id, patch)}
+                onRemove={() =>
+                  onChange(checks.filter((c) => c.id !== check.id))
+                }
+              />
+            ))}
+          </ul>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Zo tellen eisen mee: een eis die niet gehaald wordt, kost punten
+            naar zijn gewicht. Een gehaalde eis levert alleen punten op naar
+            verhouding van de geslaagde tests, dus code die geen enkele test
+            haalt, krijgt 0 punten. Heeft de vraag geen tests, dan tellen alleen
+            de eisen.
+          </p>
+        </>
       )}
 
       <div className="flex flex-col gap-2">

@@ -19,7 +19,7 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 | Betrokkenen | Leerlingen; docenten (als nakijker) |
 | Gegevens | Naam, leerlingnummer, klas, antwoorden en code, testresultaten, scores, cijfers, feedback, tijden |
 | Ontvangers | Docenten informatica van de school; de leerling zelf; de beheerder alleen voor technisch onderhoud |
-| Bewaartermijn | Standaard 24 maanden na het sluiten van de afname (instelbaar 6–120); PTA-werk minstens 6 maanden na vaststelling van de uitslag |
+| Bewaartermijn | Standaard 24 maanden na het sluiten van de afname (instelbaar 6–120), ook voor pogingen die nooit zijn ingeleverd; bij een afname die niet sluit telt de laatste activiteit. Automatisch alleen na vaststelling met automatisch verwijderen aan, anders verwijdert de school zelf. PTA-werk minstens 6 maanden na vaststelling van de uitslag |
 | Beveiliging | Zie privacybijsluiter, §8 |
 
 ## Verwerking 2: Accounts en inloggen
@@ -40,10 +40,10 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 | Doel | Een eerlijke toetsafname: de docent kan het gesprek aangaan als er iets opvalt |
 | Grondslag | Taak van algemeen belang (art. 6 lid 1 sub e) |
 | Betrokkenen | Leerlingen |
-| Gegevens | Alleen als de docent het per afname aanzet: venster of tabblad verlaten (met duur), volledig scherm verlaten, plakpogingen (lengte, geen inhoud), code uitvoeren en testen |
+| Gegevens | Altijd: code uitvoeren en testen (vraag, duur, soort fout, aantal geslaagde tests; nooit de code zelf). Alleen als de docent het per afname aanzet: venster of tabblad verlaten (met duur), volledig scherm verlaten, plakpogingen (lengte, geen inhoud). Kopiëren wordt niet bijgehouden |
 | Ontvangers | Docenten informatica |
 | Bewaartermijn | Standaard 90 dagen na het einde van de poging (instelbaar 7–730), automatisch |
-| Waarborgen | Standaard uit, vooraf zichtbaar voor de leerling, nooit inhoud of toetsaanslagen, geen automatische gevolgen, uit te zetten per leerling |
+| Waarborgen | Vooraf zichtbaar voor de leerling, nooit inhoud of toetsaanslagen, geen automatische gevolgen. Vensterwissels, volledig scherm en plakpogingen: standaard uit; het registreren van vensterwissels is per leerling uit te zetten (faciliteit), het verlaten van het volledige scherm en geblokkeerde plakpogingen worden dan nog vastgelegd als de toets erom vraagt, maar tellen niet als focusverlies |
 
 ## Verwerking 4: Faciliteiten
 
@@ -51,7 +51,7 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 | --- | --- |
 | Doel | Leerlingen met een faciliteitenpas extra tijd of andere faciliteiten geven |
 | Grondslag | Taak van algemeen belang (art. 6 lid 1 sub e) |
-| Gegevens | Percentage verlengde tijd, plakken toegestaan, geen logboek. **Nooit** een reden of diagnose |
+| Gegevens | Percentage verlengde tijd, plakken toegestaan, vensterwissels niet registreren. **Nooit** een reden of diagnose. Het logboek van docenthandelingen legt alleen vast welke soort faciliteit is gewijzigd, niet de waarde |
 | Ontvangers | Docenten informatica |
 | Bewaartermijn | Tot de faciliteit wordt uitgezet of het account wordt verwijderd |
 
@@ -59,10 +59,10 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 
 | Onderdeel | Invulling |
 | --- | --- |
-| Doel | Verantwoording en beveiliging: wie heeft welke leerlinggegevens bekeken of gewijzigd |
+| Doel | Verantwoording en beveiliging: wie heeft een leerling, een poging of pincodes bekeken (bij een hele klas per leerling), code van leerlingen vergeleken, of leerlinggegevens gewijzigd, geëxporteerd of verwijderd |
 | Grondslag | Wettelijke verplichting (art. 6 lid 1 sub c, met art. 5 lid 2 en art. 32) |
 | Betrokkenen | Docenten (handelende persoon), leerlingen (betrokkene) |
-| Gegevens | Tijdstip, docent (naam), handeling, leerlingnummer, aantallen, ingekort IP-adres; nooit inhoud |
+| Gegevens | Tijdstip, docent (naam), handeling, leerlingnummer, ids en aantallen, ingekort IP-adres; bij een scorewijziging de oude en nieuwe score; nooit de inhoud van antwoorden. Bij het verwijderen van een leerling worden scores en faciliteiten uit eerdere regels gewist |
 | Ontvangers | Docenten met toegang tot Pensuma (alleen lezen) |
 | Bewaartermijn | Standaard 24 maanden (instelbaar 6–84), automatisch |
 | Opmerking | De MR heeft instemmingsrecht op regelingen over personeelsvolgsystemen (WMS); bespreek dit logboek met de MR |

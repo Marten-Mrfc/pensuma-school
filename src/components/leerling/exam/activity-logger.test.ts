@@ -3,6 +3,7 @@ import type { MonitoringSettings } from "@/lib/privacy/event-details";
 import {
   ActivityLogger,
   attachMonitoring,
+  type ClientEventType,
   MAX_BATCH,
   type MonitoringTargets,
   type QueuedEvent,
@@ -75,7 +76,6 @@ describe("ActivityLogger", () => {
     const logger = new ActivityLogger(async () => {}, OFF);
     logger.log("focus_lost");
     logger.log("visibility_hidden");
-    logger.log("copy");
     logger.log("fullscreen_exit", { afterEscapeKey: false });
     logger.log("paste", { questionId: "q", blocked: false });
     logger.log("code_run", { questionId: "q" });
@@ -94,6 +94,13 @@ describe("ActivityLogger", () => {
       "paste",
       "fullscreen_exit",
     ]);
+  });
+
+  test("copying is never queued, whatever the settings (not disclosed)", () => {
+    const logger = new ActivityLogger(async () => {}, ALL);
+    // An older client could still call this; the type no longer allows it.
+    logger.log("copy" as ClientEventType);
+    expect(logger.pending).toHaveLength(0);
   });
 
   test("a paste is logged when paste is blocked, even without focus logging", () => {
@@ -169,7 +176,8 @@ describe("attachMonitoring", () => {
       now: () => now,
     });
     expect(win.types()).toEqual(["blur", "focus"]);
-    expect(doc.types()).toEqual(["copy", "visibilitychange"]);
+    // No "copy" listener: copying is not monitored.
+    expect(doc.types()).toEqual(["visibilitychange"]);
 
     win.dispatch("blur");
     doc.visibilityState = "hidden";

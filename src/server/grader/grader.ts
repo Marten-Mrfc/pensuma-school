@@ -11,18 +11,27 @@
 import {
   buildGradingResult,
   type GradingExecutor,
+  harnessRequestForTest,
   internalError,
   MEMORY_ERROR,
+  type RunGradingOptions,
   runGrading,
   type TestOutcome,
+  TOTAL_TIMEOUT_ERROR,
   timeoutError,
 } from "@/lib/grading/grade";
 import type { HarnessAnalysis, HarnessRunRequest } from "@/lib/python/harness";
 import { sanitizeAnalysis, sanitizeRunResult } from "@/lib/python/protocol";
 import type { GradeInput, RunInput, RunResult } from "@/lib/python/types";
-import type { CodeGradingResult, PythonError } from "@/lib/questions/schema";
-import { graderConfig } from "./config";
-import { getGraderPool, type JobLease } from "./pool";
+import type {
+  CodeGradingResult,
+  CodeTest,
+  PythonError,
+} from "@/lib/questions/schema";
+import { JobBudget, runPhase } from "./budget";
+import { type GraderConfig, graderConfig } from "./config";
+import { isGraderUnavailable } from "./errors";
+import { getGraderPool, type JobLease, type JobOptions } from "./pool";
 import type { SandboxResponse } from "./sandbox-process";
 
 const ANALYZE_TIMEOUT_MS = 15_000;
@@ -144,13 +153,25 @@ const TOO_LARGE: PythonError = {
   traceback: "",
 };
 
+export type GradeBatchOptions = JobOptions & {
+  /**
+   * Throw the GraderUnavailableError (queue timeout, sandboxes failing to
+   * start) instead of returning "internal_error" results, so the caller can
+   * keep the answers ungraded and retry later (background grading).
+   */
+  throwWhenUnavailable?: boolean;
+};
+
 /**
  * Grade code against ALL given tests (including hidden ones) and checks.
  * Never throws for student errors; infrastructure problems give
- * status "internal_error".
+ * status "internal_error" (or throw, see `throwWhenUnavailable`).
  */
-export async function gradeCode(input: GradeInput): Promise<CodeGradingResult> {
-  const [result] = await gradeCodeBatch([input]);
+export async function gradeCode(
+  input: GradeInput,
+  options: GradeBatchOptions = {},
+): Promise<CodeGradingResult> {
+  const [result] = await gradeCodeBatch([input], options);
   return result;
 }
 
@@ -162,14 +183,22 @@ export async function gradeCode(input: GradeInput): Promise<CodeGradingResult> {
  * 1. Static analysis (syntax + AST checks) of every question runs first, in
  *    the pristine sandbox, before any student code runs, so code of one
  *    question can't tamper with the checks of another.
- * 2. Then every test of every question runs, each in a fresh namespace with
- *    builtins/modules restored; after a timeout or crash the job continues
- *    in a fresh sandbox process.
- * Each question gets the full GRADER_JOB_TIMEOUT_MS budget. Results are
- * returned in the same order as `items`.
+ * 2. Then the VISIBLE tests of every question run, and only after that the
+ *    HIDDEN tests. Each test runs in a fresh namespace with builtins/modules
+ *    restored, but other interpreter state (module attributes, files) can
+ *    survive between runs of one job. Because no visible test runs after a
+ *    hidden input has entered the interpreter, student code can't smuggle
+ *    hidden inputs into output the student gets to see. After a timeout or
+ *    crash the job continues in a fresh sandbox process.
+ * 3. `runGrading` (src/lib/grading/grade.ts) then decides pass/fail per
+ *    question in stored test order, replaying the recorded outcomes.
+ *
+ * The whole job shares GRADER_JOB_TIMEOUT_MS fairly between the questions
+ * (see ./budget.ts). Results are returned in the same order as `items`.
  */
 export async function gradeCodeBatch(
   items: GradeInput[],
+  options: GradeBatchOptions = {},
 ): Promise<CodeGradingResult[]> {
   if (items.length === 0) return [];
   const config = graderConfig();
@@ -182,45 +211,15 @@ export async function gradeCodeBatch(
     (item) => item.code.length <= MAX_CODE_LENGTH,
   );
   try {
-    const graded = await getGraderPool().withJob(async (lease) => {
-      const executor = new SandboxExecutor(lease);
-      const analyses = new Map<string, HarnessAnalysis | Error>();
-      for (const item of gradable) {
-        if (analyses.has(item.code)) continue;
-        try {
-          analyses.set(item.code, await executor.analyze(item.code));
-        } catch (e) {
-          analyses.set(
-            item.code,
-            e instanceof Error ? e : new Error(String(e)),
-          );
-        }
-      }
-      const results = new Map<GradeInput, CodeGradingResult>();
-      for (const item of gradable) {
-        const analysis = analyses.get(item.code);
-        const cached: GradingExecutor = {
-          analyze: async () => {
-            if (!analysis || analysis instanceof Error)
-              throw analysis ?? new Error("geen analyse");
-            return analysis;
-          },
-          run: (request, timeLimitMs) => executor.run(request, timeLimitMs),
-        };
-        results.set(
-          item,
-          await runGrading(item, cached, {
-            totalTimeLimitMs: config.jobTimeoutMs,
-            maxOutput: config.maxOutput,
-          }),
-        );
-      }
-      return results;
-    });
+    const graded = await getGraderPool().withJob(
+      (lease) => gradeInJob(lease, gradable, config),
+      { queueTimeoutMs: options.queueTimeoutMs, priority: options.priority },
+    );
     return normalized.map(
       (item) => graded.get(item) ?? emptyResult(item, TOO_LARGE),
     );
   } catch (e) {
+    if (options.throwWhenUnavailable && isGraderUnavailable(e)) throw e;
     const error = internalError(e instanceof Error ? e.message : String(e));
     return normalized.map((item) =>
       item.code.length > MAX_CODE_LENGTH
@@ -228,6 +227,138 @@ export async function gradeCodeBatch(
         : emptyResult(item, error),
     );
   }
+}
+
+/** Outcomes of one question's tests, by request (the code is the same for all). */
+class OutcomeLog {
+  private readonly byRequest = new Map<string, TestOutcome[]>();
+
+  private static key(request: HarnessRunRequest): string {
+    return JSON.stringify({ ...request, code: undefined });
+  }
+
+  add(request: HarnessRunRequest, outcome: TestOutcome): void {
+    const key = OutcomeLog.key(request);
+    const list = this.byRequest.get(key);
+    if (list) list.push(outcome);
+    else this.byRequest.set(key, [outcome]);
+  }
+
+  take(request: HarnessRunRequest): TestOutcome | undefined {
+    return this.byRequest.get(OutcomeLog.key(request))?.shift();
+  }
+}
+
+function toError(e: unknown): Error {
+  return e instanceof Error ? e : new Error(String(e));
+}
+
+/** Everything `gradeCodeBatch` does while it holds a grader slot. */
+async function gradeInJob(
+  lease: JobLease,
+  items: GradeInput[],
+  config: GraderConfig,
+): Promise<Map<GradeInput, CodeGradingResult>> {
+  const executor = new SandboxExecutor(lease);
+  const runOptions: RunGradingOptions = { maxOutput: config.maxOutput };
+
+  // 1. Static analysis in the pristine sandbox.
+  const analyses = new Map<string, HarnessAnalysis | Error>();
+  for (const item of items) {
+    if (analyses.has(item.code)) continue;
+    try {
+      analyses.set(item.code, await executor.analyze(item.code));
+    } catch (e) {
+      if (isGraderUnavailable(e)) throw e;
+      analyses.set(item.code, toError(e));
+    }
+  }
+
+  // 2. Run every test once: the visible tests of all questions, then the
+  //    hidden ones, round-robin within each phase (see ./budget.ts).
+  const runnable = items.filter((item) => {
+    const analysis = analyses.get(item.code);
+    return (
+      !!analysis &&
+      !(analysis instanceof Error) &&
+      analysis.ok &&
+      item.tests.length > 0
+    );
+  });
+  const logs = new Map<GradeInput, OutcomeLog>(
+    items.map((item) => [item, new OutcomeLog()]),
+  );
+  const budget = new JobBudget(
+    config.jobTimeoutMs,
+    runnable.map((item) => item.timeLimitMs),
+  );
+  const execute = async (i: number, test: CodeTest): Promise<boolean> => {
+    const item = runnable[i];
+    const request = harnessRequestForTest(item.code, test, runOptions);
+    let outcome: TestOutcome;
+    try {
+      outcome = await executor.run(request, item.timeLimitMs);
+    } catch (e) {
+      if (isGraderUnavailable(e)) throw e;
+      outcome = {
+        kind: "crashed",
+        error: internalError(toError(e).message),
+        durationMs: 0,
+      };
+    }
+    logs.get(item)?.add(request, outcome);
+    return outcome.kind !== "result";
+  };
+  const skip = (i: number, test: CodeTest): void => {
+    const item = runnable[i];
+    logs.get(item)?.add(harnessRequestForTest(item.code, test, runOptions), {
+      kind: "crashed",
+      error: TOTAL_TIMEOUT_ERROR,
+      durationMs: 0,
+    });
+  };
+  const visible = runnable.map((item) =>
+    item.tests.filter((t) => t.hidden !== true),
+  );
+  const hidden = runnable.map((item) =>
+    item.tests.filter((t) => t.hidden === true),
+  );
+  await runPhase(
+    budget,
+    visible,
+    hidden.map((list) => list.length === 0),
+    execute,
+    skip,
+  );
+  await runPhase(
+    budget,
+    hidden,
+    hidden.map(() => true),
+    execute,
+    skip,
+  );
+
+  // 3. Evaluate in stored test order (no code runs any more).
+  const results = new Map<GradeInput, CodeGradingResult>();
+  for (const item of items) {
+    const analysis = analyses.get(item.code);
+    const log = logs.get(item) as OutcomeLog;
+    const replay: GradingExecutor = {
+      analyze: async () => {
+        if (!analysis || analysis instanceof Error)
+          throw analysis ?? new Error("geen analyse");
+        return analysis;
+      },
+      run: async (request) =>
+        log.take(request) ?? {
+          kind: "crashed",
+          error: internalError("test niet uitgevoerd"),
+          durationMs: 0,
+        },
+    };
+    results.set(item, await runGrading(item, replay, runOptions));
+  }
+  return results;
 }
 
 function toRunResult(outcome: TestOutcome, timeLimitMs: number): RunResult {

@@ -2,7 +2,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { env } from "@/env";
 import { appRouter } from "@/server/api/root";
 import { createTRPCContext } from "@/server/api/trpc";
-import { errorIdFor } from "@/server/security/errors";
+import { trpcErrorLog } from "@/server/security/errors";
 import {
   enforceBodyLimit,
   isCrossSiteMutation,
@@ -46,23 +46,12 @@ const handler = async (incoming: Request) => {
     maxBatchSize: MAX_BATCH_SIZE,
     createContext: () => createTRPCContext({ headers: req.headers }),
     onError: ({ path, error, ctx }) => {
-      // One JSON line per error, in every environment. Never the input
-      // (personal data) and never a stack.
-      const internal = error.code === "INTERNAL_SERVER_ERROR";
-      const level = internal
-        ? "error"
-        : error.code === "TOO_MANY_REQUESTS"
-          ? "warn"
-          : "info";
-      const line = JSON.stringify({
-        level,
-        ts: new Date().toISOString(),
-        event: "trpc_error",
-        errorId: internal ? errorIdFor(error) : undefined,
-        path: path ?? null,
-        code: error.code,
-        message: internal ? error.message.slice(0, 500) : undefined,
-        userId: ctx?.session?.user.id ?? null,
+      // One JSON line per error, in every environment (see trpcErrorLog:
+      // no input, no stack, a user id only for internal errors).
+      const { level, line } = trpcErrorLog({
+        error,
+        path,
+        userId: ctx?.session?.user.id,
       });
       if (level === "error") console.error(line);
       else if (level === "warn") console.warn(line);

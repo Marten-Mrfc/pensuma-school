@@ -7,6 +7,10 @@ mock.module("next/server", () => ({ after: () => {} }));
 mock.module("@/server/db", () => ({ db: {} }));
 mock.module("@/server/services/grading", () => ({
   gradeAttempt: async () => {},
+  gradeAttemptsInBackground: async () => ({ graded: [], failed: [] }),
+  isGradingInFlight: () => false,
+  logGradingFailure: () => {},
+  markGradingScheduled: () => {},
 }));
 
 const { isInCooldown, NEW_ATTEMPT_COOLDOWN_MS, optionOrderFor, shuffled } =

@@ -112,8 +112,9 @@ const ESCAPE_WINDOW_MS = 500;
 /**
  * Attach the monitoring listeners the settings ask for and return a
  * cleanup function:
- *  - logFocusEvents: blur/focus, visibility and copy (one "away" episode =
- *    one loss; coming back logs how long it took);
+ *  - logFocusEvents: blur/focus and visibility (one "away" episode = one
+ *    loss; coming back logs how long it took). Copying is never logged:
+ *    students are not told about it and nobody uses it;
  *  - requireFullscreen: fullscreen enter/exit, with afterEscapeKey when the
  *    exit followed an Escape press.
  * With neither setting on, no listener is added at all.
@@ -157,7 +158,6 @@ export function attachMonitoring(
         ? goAway("visibility_hidden")
         : comeBack("visibility_visible"),
     );
-    listen(targets.document, "copy", () => logger.log("copy"));
   }
 
   if (settings.requireFullscreen) {

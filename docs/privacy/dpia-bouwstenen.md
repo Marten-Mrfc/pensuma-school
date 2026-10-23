@@ -5,10 +5,12 @@ De school voert de DPIA uit en neemt de besluiten; dit document levert de feiten
 
 ## Waarom een DPIA?
 
-Pensuma verwerkt gegevens van kinderen (een kwetsbare groep). Het optionele logboek tijdens toetsen is
-een vorm van systematische monitoring. Daarmee voldoet de verwerking aan twee criteria van de EDPB-lijst,
-en wordt een DPIA sterk aangeraden. Zonder het logboek (alleen oefenen en toetsen nakijken) is het risico
-duidelijk lager; de school kan besluiten het logboek niet te gebruiken.
+Pensuma verwerkt gegevens van kinderen (een kwetsbare groep). Het optionele logboek tijdens toetsen
+(vensterwissels, volledig scherm, plakpogingen) is een vorm van systematische monitoring. Daarmee voldoet
+de verwerking aan twee criteria van de EDPB-lijst, en wordt een DPIA sterk aangeraden. Zonder dat logboek
+(alleen oefenen en toetsen nakijken) is het risico duidelijk lager; de school kan besluiten het niet te
+gebruiken. Wat altijd wordt vastgelegd, ook zonder logboek: wanneer een leerling code uitvoert of test
+(vraag, duur, soort fout, aantal geslaagde tests; nooit de code zelf).
 
 ## 1. Systematische beschrijving
 
@@ -49,20 +51,29 @@ duidelijk lager; de school kan besluiten het logboek niet te gebruiken.
 
 ## 4. Maatregelen in Pensuma
 
-- **Logboek opt-in per afname**; bij oefenen standaard uit.
+- **Logboek opt-in per afname** (vensterwissels, volledig scherm, plakpogingen); bij oefenen standaard
+  uit. Code uitvoeren en testen wordt altijd vastgelegd, zonder de code; kopiëren nooit.
 - **Vooraf zichtbaar** op het startscherm, plus een indicator tijdens de toets.
 - **Geen inhoud vastgelegd:** geen toetsaanslagen, scherm, camera, microfoon of klembordinhoud; bij
   plakken alleen de lengte.
-- **Faciliteit "geen logboek"** per leerling, bijvoorbeeld bij een aandoening die tot veel focusverlies
-  leidt (zonder de reden vast te leggen).
+- **Faciliteit "vensterwissels niet registreren"** per leerling, bijvoorbeeld bij een aandoening die tot
+  veel focusverlies leidt (zonder de reden vast te leggen). Het verlaten van het venster of tabblad wordt
+  dan niet vastgelegd en een verlaten volledig scherm telt niet als focusverlies. Als de toets erom
+  vraagt, worden het verlaten van het volledige scherm en geblokkeerde plakpogingen wel vastgelegd
+  (de faciliteit "plakken toegestaan" heft het blokkeren van plakken op).
 - **Korte bewaartermijn** voor het logboek (standaard 90 dagen), automatisch verwijderd.
 - **Geen automatische gevolgen:** een melding verandert nooit een score; de interface vraagt docenten
   het gesprek aan te gaan.
 - **Menselijke controle bij nakijken:** de docent kan elke score aanpassen en geeft resultaten pas vrij
   als de toets is gesloten (instelbaar).
 - **Export alleen op verzoek** (opt-in) en gelogd.
-- **Logboek van docenthandelingen** (inzien, wijzigen, exporteren, verwijderen) met ingekort IP-adres.
-- **Bewaarblokkades** voor bezwaar- en beroepsprocedures en examendossiers.
+- **Logboek van docenthandelingen** met ingekort IP-adres: het openen van een leerling, een poging of
+  pincodes (bij een hele klas per leerling), code vergelijken, en wijzigen, exporteren en verwijderen.
+  Overzichtspagina's (resultaten, live monitor, analyse) worden niet per bezoek vastgelegd.
+- **Bewaarblokkades** voor bezwaar- en beroepsprocedures en examendossiers; verlopen blokkades (met hun
+  reden) worden 30 dagen na de einddatum automatisch verwijderd.
+- **Beperking van de verwerking (AVG art. 18):** blokkeert inloggen en automatische verwijdering;
+  Pensuma weigert dan het wijzigen van naam, leerlingnummer en faciliteiten.
 - **Beveiliging:** zie privacybijsluiter §8.
 
 ## 5. Openstaande besluiten voor de school

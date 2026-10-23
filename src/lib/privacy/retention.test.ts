@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   autoDeleteActive,
+  autoDeleteNotice,
+  autoDeleteState,
   computeRetentionCutoffs,
   emptyRetentionReport,
   formatDays,
@@ -133,7 +135,11 @@ describe("report helpers", () => {
         skippedByHold: 5,
       }),
     ).toBe(15);
+    expect(retentionDeletedTotal({ ...r, expiredHolds: 2 })).toBe(2);
     expect(retentionDeletedTotal(null)).toBe(0);
+    // Reports stored before expiredHolds existed still add up.
+    const { expiredHolds: _gone, ...legacy } = r;
+    expect(retentionDeletedTotal({ ...legacy, sessions: 1 })).toBe(1);
   });
 
   test("every count has a Dutch label", () => {
@@ -147,5 +153,45 @@ describe("report helpers", () => {
     expect(formatMonths(24)).toBe("24 maanden");
     expect(formatDays(1)).toBe("1 dag");
     expect(formatDays(90)).toBe("90 dagen");
+  });
+});
+
+describe("autoDeleteState / autoDeleteNotice", () => {
+  test("only confirmed + switched on counts as automatic deletion", () => {
+    expect(autoDeleteState({ confirmed: true, autoDeleteAttempts: true })).toBe(
+      "on",
+    );
+    expect(
+      autoDeleteState({ confirmed: false, autoDeleteAttempts: true }),
+    ).toBe("unconfirmed");
+    expect(
+      autoDeleteState({ confirmed: false, autoDeleteAttempts: false }),
+    ).toBe("unconfirmed");
+    expect(
+      autoDeleteState({ confirmed: true, autoDeleteAttempts: false }),
+    ).toBe("off");
+  });
+
+  test("the caveat matches the engine (confirmed with auto-delete off)", () => {
+    expect(
+      autoDeleteNotice({ confirmed: true, autoDeleteAttempts: true }),
+    ).toBeNull();
+    const unconfirmed = autoDeleteNotice({
+      confirmed: false,
+      autoDeleteAttempts: false,
+    });
+    expect(unconfirmed).toContain("nog definitief vast");
+    const off = autoDeleteNotice({
+      confirmed: true,
+      autoDeleteAttempts: false,
+    });
+    expect(off).toContain("niet automatisch verwijderd");
+    expect(off).not.toContain("nog definitief");
+    // Agrees with the engine's own condition.
+    const confirmedOff = retention({
+      autoDeleteAttempts: false,
+      confirmedAt: "2026-09-01T00:00:00.000Z",
+    });
+    expect(autoDeleteActive(confirmedOff)).toBe(false);
   });
 });

@@ -43,6 +43,34 @@ describe("formatAuditDetails", () => {
     );
   });
 
+  test("facility changes: which kind, never the values", () => {
+    expect(
+      formatAuditDetails({
+        extraTimeChanged: true,
+        focusLogChanged: true,
+        facilityActive: true,
+      }),
+    ).toBe(
+      "verlengde tijd gewijzigd: ja · vensterwissels registreren gewijzigd: ja · faciliteit actief: ja",
+    );
+    // Rows stored before the fix still render, with the corrected label.
+    expect(formatAuditDetails({ ignoreFocusEvents: true })).toBe(
+      "vensterwissels niet registreren: ja",
+    );
+    expect(formatAuditDetails({ restrictionOverridden: true })).toBe(
+      "ondanks beperking (AVG art. 18): ja",
+    );
+  });
+
+  test("similarity views and expired holds", () => {
+    expect(
+      formatAuditDetails({ via: "similarity", answerId: "x", scope: "test" }),
+    ).toBe("via: code vergelijken · bereik: alle afnames van de toets");
+    expect(formatAuditDetails({ expiredHolds: 2 })).toBe(
+      "verlopen bewaarblokkades: 2",
+    );
+  });
+
   test("empty and unknown keys", () => {
     expect(formatAuditDetails(null)).toBe("");
     expect(formatAuditDetails({})).toBe("");

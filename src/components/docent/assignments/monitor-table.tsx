@@ -73,6 +73,7 @@ export function MonitorTable({
   serverOffsetMs,
   scale,
   logFocusEvents = true,
+  resultsWaitForEveryone = false,
 }: {
   assignmentId: string;
   data: Monitor;
@@ -82,6 +83,11 @@ export function MonitorTable({
   /** The afname's grading scale (from assignment.get settings). */
   scale?: GradingScale;
   logFocusEvents?: boolean;
+  /**
+   * Results show "after close" and are not released by hand: they wait
+   * until nobody is working any more (also a reopened attempt).
+   */
+  resultsWaitForEveryone?: boolean;
 }) {
   const headingId = useId();
   const [filter, setFilter] = useState<Filter>("all");
@@ -331,6 +337,7 @@ export function MonitorTable({
             : 0)
         }
         assignmentClosed={data.assignment.effectiveStatus === "closed"}
+        resultsWaitForEveryone={resultsWaitForEveryone}
         onClose={() => setDialog(null)}
       />
       <ResetAttemptDialog
@@ -914,27 +921,35 @@ function ReopenAttemptDialog({
   row,
   defaultMinutes,
   assignmentClosed,
+  resultsWaitForEveryone,
   onClose,
 }: {
   row: StudentRow | null;
   defaultMinutes: number;
   assignmentClosed: boolean;
+  resultsWaitForEveryone: boolean;
   onClose: () => void;
 }) {
   const trpc = useTRPC();
   const invalidate = useInvalidateAssignment();
   const reopen = useMutation(
     trpc.assignment.reopenAttempt.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (res) => {
         await invalidate();
         toast.success(`De poging van ${row?.student.name} is heropend`, {
           description:
-            "De leerling kan via ‘Mijn toetsen’ verder waar hij of zij gebleven was.",
+            res.reviewedAnswers > 0
+              ? "De leerling kan via ‘Mijn toetsen’ verder. Past de leerling een antwoord aan dat je al had beoordeeld, dan kijk je dat na het inleveren opnieuw na."
+              : "De leerling kan via ‘Mijn toetsen’ verder waar hij of zij gebleven was.",
         });
         onClose();
       },
     }),
   );
+  const reviewed =
+    !!row?.attempt &&
+    (row.attempt.gradingStatus === "graded" ||
+      row.attempt.gradingStatus === "needs_review");
   return (
     <MinutesDialog
       key={row?.attempt?.id ?? "none"}
@@ -963,6 +978,16 @@ function ReopenAttemptDialog({
         <p className="rounded-md bg-info/10 px-3 py-2 text-sm text-info-ink">
           De afname is gesloten, maar deze leerling kan toch verder tot de
           gekozen tijd om is.
+          {resultsWaitForEveryone
+            ? " Zolang de leerling bezig is, zien klasgenoten hun resultaten nog niet."
+            : null}
+        </p>
+      ) : null}
+      {reviewed ? (
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+          Past de leerling een antwoord aan dat je al hebt beoordeeld, dan
+          vervallen jouw score en feedback bij dat antwoord. Je kijkt het na het
+          inleveren opnieuw na.
         </p>
       ) : null}
     </MinutesDialog>

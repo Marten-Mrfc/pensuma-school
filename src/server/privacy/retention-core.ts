@@ -5,10 +5,15 @@
  * Always: expired sessions and verification rows, rate-limit and
  * login-throttle counters older than 24 hours, attempt logs (attempt_event)
  * older than `attemptEventsDays`, audit log and retention reports older than
- * `auditLogMonths`. Only after the school confirmed the periods and enabled
- * auto-delete: submitted attempts (answers cascade) and student accounts
- * without an active class. Every deletion of personal data skips rows
- * covered by an active retention hold.
+ * `auditLogMonths`, and retention holds (with their reason) whose end date
+ * passed more than EXPIRED_HOLD_GRACE_DAYS ago; audit rows about students
+ * who no longer exist lose their scores and facilities (the same redaction
+ * as on erasure, for students deleted before that). Only after the school
+ * confirmed the periods and enabled auto-delete: attempts (answers cascade)
+ * of afnames that closed `attemptsMonths` ago — submitted or not — or that
+ * have been idle that long, and student accounts without an active class.
+ * Every deletion of personal data skips rows covered by an active retention
+ * hold.
  *
  * Deliberately free of "server-only" and Next.js imports: it runs from
  * tRPC (ctx.db), from instrumentation (the scheduler) and from the CLI.
@@ -18,15 +23,22 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   autoDeleteActive,
   computeRetentionCutoffs,
+  EXPIRED_HOLD_GRACE_DAYS,
   emptyRetentionReport,
   type RetentionReport,
   type RetentionSettings,
+  subtractDays,
 } from "@/lib/privacy/retention";
 import type { PrivacySettings } from "@/lib/privacy/settings";
 import type * as schema from "@/server/db/schema";
 import { retentionRuns } from "@/server/db/schema";
 import { studentThrottleKeys } from "@/server/security/login-throttle";
-import { auditSystem, writeAudit } from "./audit-writer";
+import {
+  auditSystem,
+  redactDeletedStudentsAudit,
+  redactErasedStudentsAudit,
+  writeAudit,
+} from "./audit-writer";
 import { getPrivacySettings } from "./settings-store";
 
 export type RetentionDb = NodePgDatabase<typeof schema>;
@@ -202,6 +214,16 @@ async function attemptEvents(
   report.attemptsReset = reset.rowCount ?? 0;
 }
 
+/**
+ * Last sign of life of an attempt (alias `a`): start, last update, last
+ * heartbeat or the last saved answer.
+ */
+const attemptActivity = sql`greatest(
+  a.started_at, a.updated_at, a.last_seen_at,
+  (select max(greatest(an.updated_at, an.saved_at)) from answer an
+    where an.attempt_id = a.id)
+)`;
+
 async function attempts(
   db: RetentionDb,
   report: RetentionReport,
@@ -210,8 +232,17 @@ async function attempts(
   dryRun: boolean,
 ) {
   const limit = RETENTION_BATCH_SIZE;
-  const expired = sql`a.status = 'submitted'
-    and coalesce(s.closes_at, a.submitted_at, a.updated_at) < ${tz(before)}`;
+  // Submitted: counted from the close of the afname (else hand-in).
+  // Never handed in (left open, the afname closed by its closing time or by
+  // the teacher, or a practice afname that never closes): counted from the
+  // close of the afname or the last activity, whichever is later. Nothing
+  // else ever moves such an attempt to "submitted", so without this it
+  // would outlive the retention period until the account is deleted.
+  const expired = sql`case
+      when a.status = 'submitted'
+        then coalesce(s.closes_at, a.submitted_at, a.updated_at)
+      else greatest(s.closes_at, ${attemptActivity})
+    end < ${tz(before)}`;
   const notHeld = attemptNotHeld(now);
   const from = sql`from attempt a join assignment s on s.id = a.assignment_id`;
 
@@ -355,6 +386,12 @@ async function inactiveStudents(
           )})`,
         );
       }
+      // Earlier audit rows keep that something happened, not the scores
+      // or facilities of the deleted student.
+      await redactErasedStudentsAudit(
+        tx,
+        rows.map((r) => r.id),
+      );
       // Proof of erasure per student: leerlingnummer only, no name.
       for (const r of rows) {
         await writeAudit(tx, {
@@ -373,6 +410,38 @@ async function inactiveStudents(
     report.inactiveStudents += n;
     if (n < limit) return;
   }
+}
+
+/**
+ * Retention holds whose end date passed more than EXPIRED_HOLD_GRACE_DAYS
+ * ago: they no longer protect anything, but their free-text reason (e.g.
+ * "Bezwaar ouders tegen cijfer H3") would stay linked to the student.
+ * Restrictions (AVG art. 18) never have an end date and are only lifted by
+ * a teacher, together with the sign-in block.
+ */
+async function expiredHolds(
+  db: RetentionDb,
+  report: RetentionReport,
+  now: Date,
+  dryRun: boolean,
+) {
+  const limit = RETENTION_BATCH_SIZE;
+  const where = sql`until is not null
+    and until < ${tz(subtractDays(now, EXPIRED_HOLD_GRACE_DAYS))}
+    and kind <> 'restriction'`;
+  if (dryRun) {
+    report.expiredHolds = await count(
+      db,
+      sql`select count(*)::int as n from retention_hold where ${where}`,
+    );
+    return;
+  }
+  report.expiredHolds = await deleteInBatches(
+    db,
+    () => sql`delete from retention_hold where id in (
+      select id from retention_hold where ${where} limit ${limit}
+    ) returning id`,
+  );
 }
 
 async function auditAndRuns(
@@ -446,6 +515,7 @@ export async function runRetention(
     const cutoffs = computeRetentionCutoffs(settings.retention, now);
 
     await technicalData(db, report, now, cutoffs, dryRun);
+    await expiredHolds(db, report, now, dryRun);
     await attemptEvents(db, report, now, cutoffs.attemptEventsBefore, dryRun);
     if (cutoffs.attemptsBefore && autoDeleteActive(settings.retention)) {
       await attempts(db, report, now, cutoffs.attemptsBefore, dryRun);
@@ -458,6 +528,11 @@ export async function runRetention(
         cutoffs.inactiveStudentsBefore,
         dryRun,
       );
+    }
+    if (!dryRun) {
+      // Scores and facilities of students who no longer exist (deleted
+      // before deletion redacted the log) leave the audit log too.
+      await redactDeletedStudentsAudit(db);
     }
     await auditAndRuns(db, report, cutoffs.auditLogBefore, dryRun);
     report.finishedAt = new Date().toISOString();

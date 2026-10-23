@@ -3,7 +3,18 @@
  * manage individual attempts (extra time, reopen, reset).
  */
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { after } from "next/server";
 import { z } from "zod";
 import {
@@ -13,6 +24,7 @@ import {
   normalizeAccessCode,
 } from "@/components/docent/assignments/defaults";
 import { ROLES } from "@/lib/auth-shared";
+import { HOLD_KIND_LABELS } from "@/lib/privacy/retention";
 import {
   type AssignmentSettings,
   assignmentSettingsSchema,
@@ -31,6 +43,7 @@ import {
   classes,
   classMembers,
   questions,
+  retentionHolds,
   studentAccommodations,
   tests,
   user,
@@ -43,7 +56,17 @@ import {
   parseAssignmentSettings,
   totalExtraMinutes,
 } from "@/server/services/assignment-status";
-import { targetedStudentIds } from "@/server/services/assignment-targets";
+import {
+  isTargetedSettings,
+  settingsWithTargetingSql,
+  targetedStudentIds,
+  withTargetingFlag,
+} from "@/server/services/assignment-targets";
+import {
+  type AuditContext,
+  type AuditDb,
+  auditFromCtx,
+} from "@/server/services/audit";
 import { gradeAttempt } from "@/server/services/grading";
 
 /* -------------------------------------------------------------------------- */
@@ -131,6 +154,181 @@ async function getAttemptWithAssignmentOrThrow(db: DB, attemptId: string) {
     });
   }
   return row;
+}
+
+/* ------------------------ Retention holds and audits ----------------------- */
+
+/** The app database or a transaction of it. */
+type Executor = AuditDb;
+
+export type ActiveHold = {
+  id: string;
+  kind: keyof typeof HOLD_KIND_LABELS;
+  reason: string;
+  until: Date | null;
+  userId: string | null;
+  assignmentId: string | null;
+  studentNumber: string | null;
+};
+
+/**
+ * Active retention holds (until null or in the future) on one of these
+ * afnames or students: bezwaar/beroep, examendossier or an AVG art. 18
+ * restriction. Same rule as the retention engine and erasure.
+ */
+export async function findActiveHolds(
+  db: Executor,
+  scope: { assignmentIds?: readonly string[]; userIds?: readonly string[] },
+): Promise<ActiveHold[]> {
+  const assignmentIds = [...new Set(scope.assignmentIds ?? [])];
+  const userIds = [...new Set(scope.userIds ?? [])];
+  if (!assignmentIds.length && !userIds.length) return [];
+  return db
+    .select({
+      id: retentionHolds.id,
+      kind: retentionHolds.kind,
+      reason: retentionHolds.reason,
+      until: retentionHolds.until,
+      userId: retentionHolds.userId,
+      assignmentId: retentionHolds.assignmentId,
+      studentNumber: user.username,
+    })
+    .from(retentionHolds)
+    .leftJoin(user, eq(user.id, retentionHolds.userId))
+    .where(
+      and(
+        or(isNull(retentionHolds.until), gt(retentionHolds.until, sql`now()`)),
+        or(
+          inArray(retentionHolds.assignmentId, assignmentIds),
+          inArray(retentionHolds.userId, userIds),
+        ),
+      ),
+    )
+    .orderBy(retentionHolds.createdAt);
+}
+
+/** "Examendossier: PTA bewaren" (the reason shortened). */
+function holdLabel(hold: ActiveHold) {
+  const kind = HOLD_KIND_LABELS[hold.kind] ?? "Bewaarblokkade";
+  const reason = hold.reason.trim().replace(/\s+/g, " ");
+  if (!reason) return kind;
+  return `${kind}: ${reason.length > 80 ? `${reason.slice(0, 79)}…` : reason}`;
+}
+
+/**
+ * Refuse (PRECONDITION_FAILED) to delete data covered by an active
+ * retention hold. Call it inside the transaction that deletes, before the
+ * delete. `afname` names the afname(s) for a hold on an afname, e.g.
+ * "deze afname"; `consequence` says what is refused.
+ */
+export async function assertNoActiveHolds(
+  db: Executor,
+  scope: { assignmentIds?: readonly string[]; userIds?: readonly string[] },
+  text: { afname: string; consequence: string; remedy?: string },
+): Promise<void> {
+  const holds = await findActiveHolds(db, scope);
+  const [first] = holds;
+  if (!first) return;
+  const subject = first.userId
+    ? `leerling ${first.studentNumber ?? "(onbekend)"}`
+    : text.afname;
+  const others = holds.length - 1;
+  const more =
+    others > 0
+      ? ` Er ${others === 1 ? "is nog 1 andere blokkade" : `zijn nog ${others} andere blokkades`}.`
+      : "";
+  throw new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message: `Voor ${subject} geldt een bewaarblokkade (${holdLabel(first)}). ${text.consequence} ${text.remedy ?? "Hef de blokkade eerst op onder Privacy › Bewaarblokkades."}${more}`,
+  });
+}
+
+/**
+ * Students with attempts in these afnames, with their leerlingnummer and
+ * how many attempts (in how many afnames) they have there.
+ */
+export async function studentsWithAttempts(
+  db: Executor,
+  assignmentIds: readonly string[],
+) {
+  if (!assignmentIds.length) return [];
+  return db
+    .select({
+      userId: attempts.userId,
+      studentNumber: user.username,
+      attemptsCount: sql<number>`count(*)::int`,
+      assignmentsCount: sql<number>`count(distinct ${attempts.assignmentId})::int`,
+    })
+    .from(attempts)
+    .innerJoin(user, eq(user.id, attempts.userId))
+    .where(inArray(attempts.assignmentId, [...assignmentIds]))
+    .groupBy(attempts.userId, user.username);
+}
+
+/**
+ * Audit a bulk deletion of students' work (afname or klas removed): one
+ * summary row for the container plus one `attempt.reset` row per student,
+ * so the deletion shows up under that student in the audit log and in
+ * their own inzage export.
+ */
+export async function auditAttemptsDeleted(
+  ctx: AuditContext,
+  tx: Executor,
+  opts: {
+    path: string;
+    subjectType: "assignment" | "class";
+    subjectId: string;
+    details: Record<string, unknown>;
+    students: Awaited<ReturnType<typeof studentsWithAttempts>>;
+  },
+) {
+  const deletedAttempts = opts.students.reduce(
+    (sum, s) => sum + s.attemptsCount,
+    0,
+  );
+  await auditFromCtx(
+    ctx,
+    {
+      action: "trpc.mutation",
+      subjectType: opts.subjectType,
+      subjectId: opts.subjectId,
+      details: {
+        path: opts.path,
+        ...opts.details,
+        deletedAttempts,
+        studentsCount: opts.students.length,
+      },
+    },
+    tx,
+  );
+  for (const s of opts.students) {
+    await auditFromCtx(
+      ctx,
+      {
+        action: "attempt.reset",
+        subjectType: opts.subjectType,
+        subjectId: opts.subjectId,
+        subjectUserId: s.userId,
+        subjectLabel: s.studentNumber,
+        details: {
+          path: opts.path,
+          ...opts.details,
+          attemptsCount: s.attemptsCount,
+          assignmentsCount: s.assignmentsCount,
+        },
+      },
+      tx,
+    );
+  }
+}
+
+/** Leerlingnummer of a student (null when unknown). */
+async function studentNumberOf(db: Executor, userId: string) {
+  const [row] = await db
+    .select({ username: user.username })
+    .from(user)
+    .where(eq(user.id, userId));
+  return row?.username ?? null;
 }
 
 /** Question count and total points per test. */
@@ -419,21 +617,52 @@ function resolveAccessCode(
   return fallbackGenerate ? generateAccessCode() : null;
 }
 
-/** Recompute deadlines of running attempts after the window/time limit changed. */
+/**
+ * The later of two deadlines. Null means "no deadline of its own": the
+ * attempt runs until the afname closes, which is later than any date
+ * while the afname is open, and over once it is closed.
+ */
+export function laterDeadline(
+  current: Date | null,
+  recomputed: Date | null,
+  afnameOpen: boolean,
+): Date | null {
+  if (recomputed == null) return afnameOpen ? null : current;
+  if (current == null) return afnameOpen ? null : recomputed;
+  return current.getTime() >= recomputed.getTime() ? current : recomputed;
+}
+
+/**
+ * Recompute deadlines of running attempts after the window/time limit
+ * changed (start + limit + extra minutes, capped by closesAt).
+ *
+ * A deadline is never moved earlier when `neverEarlier` is set (reopening
+ * the afname), nor for attempts the teacher reopened: their deadline was
+ * chosen by hand (reopenAttempt: now + N minutes, or extendTime on top of
+ * that), and a recompute from the original start would cut them off.
+ * Returns the number of attempts whose deadline changed.
+ */
 async function recomputeRunningDeadlines(
-  db: DB,
+  db: Executor,
   assignment: {
     id: string;
+    status: "planned" | "open" | "closed";
+    opensAt: Date | null;
     timeLimitMinutes: number | null;
     closesAt: Date | null;
   },
+  opts: { neverEarlier?: boolean } = {},
 ) {
   const running = await db
     .select({
       id: attempts.id,
       startedAt: attempts.startedAt,
+      deadlineAt: attempts.deadlineAt,
       extraMinutes: attempts.extraMinutes,
       accommodationMinutes: attempts.accommodationMinutes,
+      // Reopened by the teacher: a "reopened" event, or a score from an
+      // earlier hand-in (survives deleting the attempt's log).
+      reopened: sql<boolean>`(${attempts.score} is not null or exists (select 1 from ${attemptEvents} e where e.attempt_id = ${attempts}.id and e.type = 'reopened'))`,
     })
     .from(attempts)
     .where(
@@ -442,19 +671,27 @@ async function recomputeRunningDeadlines(
         eq(attempts.status, "in_progress"),
       ),
     );
+  const afnameOpen = effectiveAssignmentStatus(assignment) !== "closed";
+  let changed = 0;
   for (const a of running) {
-    await db
+    const recomputed = computeAttemptDeadline(
+      assignment,
+      a.startedAt,
+      totalExtraMinutes(a),
+    );
+    const next =
+      opts.neverEarlier || a.reopened
+        ? laterDeadline(a.deadlineAt, recomputed, afnameOpen)
+        : recomputed;
+    if (next?.getTime() === a.deadlineAt?.getTime()) continue;
+    const [updated] = await db
       .update(attempts)
-      .set({
-        deadlineAt: computeAttemptDeadline(
-          assignment,
-          a.startedAt,
-          totalExtraMinutes(a),
-        ),
-      })
-      .where(eq(attempts.id, a.id));
+      .set({ deadlineAt: next })
+      .where(and(eq(attempts.id, a.id), eq(attempts.status, "in_progress")))
+      .returning({ id: attempts.id });
+    if (updated) changed++;
   }
-  return running.length;
+  return changed;
 }
 
 /**
@@ -974,7 +1211,9 @@ export const assignmentRouter = createTRPCRouter({
               closesAt,
               timeLimitMinutes: input.timeLimitMinutes ?? null,
               accessCode: codeFor(index),
-              settings,
+              // Selected students (one class only): remember the intent, so
+              // erasing those students never opens it up to the whole class.
+              settings: withTargetingFlag(settings, !!studentIds?.length),
               retakeOfId: input.retakeOfId ?? null,
               createdById: ctx.user.id,
             })),
@@ -1110,6 +1349,11 @@ export const assignmentRouter = createTRPCRouter({
             .insert(assignmentStudents)
             .values(userIds.map((userId) => ({ assignmentId: a.id, userId })));
         }
+        // The intent lives on the afname too (see assignment-targets.ts).
+        await tx
+          .update(assignments)
+          .set({ settings: settingsWithTargetingSql(userIds !== null) })
+          .where(eq(assignments.id, a.id));
       });
       const keep = userIds ? new Set(userIds) : null;
       const removed = keep
@@ -1164,9 +1408,10 @@ export const assignmentRouter = createTRPCRouter({
         );
       }
       if (input.settings) {
-        patch.settings = mergeSettings(
-          parseAssignmentSettings(a.settings),
-          input.settings,
+        // Parsing drops unknown keys: keep the "selected students" flag.
+        patch.settings = withTargetingFlag(
+          mergeSettings(parseAssignmentSettings(a.settings), input.settings),
+          isTargetedSettings(a.settings),
         );
       }
       const opensAt = patch.opensAt !== undefined ? patch.opensAt : a.opensAt;
@@ -1193,11 +1438,17 @@ export const assignmentRouter = createTRPCRouter({
         .set(patch)
         .where(eq(assignments.id, a.id))
         .returning();
+      // Only when the window or the limit really changed: the settings
+      // sheet always sends the time limit, and a needless recompute would
+      // still rewrite every running deadline.
+      const limitChanged =
+        input.timeLimitMinutes !== undefined &&
+        input.timeLimitMinutes !== a.timeLimitMinutes;
+      const closeChanged =
+        input.closesAt !== undefined &&
+        (input.closesAt?.getTime() ?? null) !== (a.closesAt?.getTime() ?? null);
       let recomputedDeadlines = 0;
-      if (
-        input.timeLimitMinutes !== undefined ||
-        input.closesAt !== undefined
-      ) {
+      if (limitChanged || closeChanged) {
         recomputedDeadlines = await recomputeRunningDeadlines(ctx.db, updated);
       }
       return { id: updated.id, recomputedDeadlines };
@@ -1325,9 +1576,18 @@ export const assignmentRouter = createTRPCRouter({
         })
         .where(eq(assignments.id, a.id))
         .returning();
+      // close() cut running verlengde-tijd attempts off at the closing time
+      // + their extra minutes: give them their personal time back. Never
+      // earlier, so attempts reopened by hand keep their own end time.
+      const restoredDeadlines = await recomputeRunningDeadlines(
+        ctx.db,
+        updated,
+        { neverEarlier: true },
+      );
       return {
         id: updated.id,
         effectiveStatus: effectiveAssignmentStatus(updated, now),
+        restoredDeadlines,
       };
     }),
 
@@ -1335,12 +1595,34 @@ export const assignmentRouter = createTRPCRouter({
     .input(z.object({ id: idSchema }))
     .mutation(async ({ ctx, input }) => {
       const a = await getAssignmentOrThrow(ctx.db, input.id);
-      const [{ count }] = await ctx.db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(attempts)
-        .where(eq(attempts.assignmentId, a.id));
-      await ctx.db.delete(assignments).where(eq(assignments.id, a.id));
-      return { id: a.id, deletedAttempts: count };
+      const deletedAttempts = await ctx.db.transaction(async (tx) => {
+        // Lock the afname: a hold created meanwhile waits for us (and then
+        // fails), instead of being removed by the cascade.
+        await tx
+          .select({ id: assignments.id })
+          .from(assignments)
+          .where(eq(assignments.id, a.id))
+          .for("update");
+        const students = await studentsWithAttempts(tx, [a.id]);
+        await assertNoActiveHolds(
+          tx,
+          { assignmentIds: [a.id], userIds: students.map((s) => s.userId) },
+          {
+            afname: "deze afname",
+            consequence: "Je kunt de afname daarom niet verwijderen.",
+          },
+        );
+        await auditAttemptsDeleted(ctx, tx, {
+          path: "assignment.delete",
+          subjectType: "assignment",
+          subjectId: a.id,
+          details: { assignmentId: a.id, testId: a.testId, classId: a.classId },
+          students,
+        });
+        await tx.delete(assignments).where(eq(assignments.id, a.id));
+        return students.reduce((sum, s) => sum + s.attemptsCount, 0);
+      });
+      return { id: a.id, deletedAttempts };
     }),
 
   regenerateAccessCode: adminProcedure
@@ -1563,18 +1845,40 @@ export const assignmentRouter = createTRPCRouter({
             "Deze afname heeft geen tijdslimiet; verlengen is niet nodig.",
         });
       }
-      await ctx.db
-        .update(attempts)
-        .set({ extraMinutes, deadlineAt })
-        .where(eq(attempts.id, attempt.id));
-      await ctx.db.insert(attemptEvents).values({
-        attemptId: attempt.id,
-        type: "time_extended",
-        details: {
-          minutes: input.minutes,
-          totalExtraMinutes: extraMinutes,
-          by: ctx.user.name,
-        },
+      const studentNumber = await studentNumberOf(ctx.db, attempt.userId);
+      await ctx.db.transaction(async (tx) => {
+        await tx
+          .update(attempts)
+          .set({ extraMinutes, deadlineAt })
+          .where(eq(attempts.id, attempt.id));
+        await tx.insert(attemptEvents).values({
+          attemptId: attempt.id,
+          type: "time_extended",
+          details: {
+            minutes: input.minutes,
+            totalExtraMinutes: extraMinutes,
+            by: ctx.user.name,
+          },
+        });
+        await auditFromCtx(
+          ctx,
+          {
+            action: "trpc.mutation",
+            subjectType: "attempt",
+            subjectId: attempt.id,
+            subjectUserId: attempt.userId,
+            subjectLabel: studentNumber,
+            details: {
+              path: "assignment.extendTime",
+              attemptId: attempt.id,
+              assignmentId: attempt.assignmentId,
+              minutes: input.minutes,
+              totalExtraMinutes: extraMinutes,
+              deadlineAt,
+            },
+          },
+          tx,
+        );
       });
       return { attemptId: attempt.id, extraMinutes, deadlineAt };
     }),
@@ -1640,30 +1944,64 @@ export const assignmentRouter = createTRPCRouter({
           deadlineAt = new Date(now.getTime() + 15 * 60_000);
         }
       }
-      await ctx.db
-        .update(attempts)
-        .set({
-          status: "in_progress",
-          submittedAt: null,
-          autoSubmitted: false,
-          deadlineAt,
-          gradingStatus: "pending",
-        })
-        .where(eq(attempts.id, attempt.id));
-      await ctx.db.insert(attemptEvents).values({
-        attemptId: attempt.id,
-        type: "reopened",
-        details: {
-          minutes: input.minutes ?? null,
-          deadlineAt: deadlineAt?.toISOString() ?? null,
-          by: ctx.user.name,
-        },
+      const studentNumber = await studentNumberOf(ctx.db, attempt.userId);
+      // Answers the teacher already reviewed: when the student changes one,
+      // its manual score and feedback are cleared (portal.saveAnswer), so it
+      // needs a new review after the hand-in.
+      const [{ reviewedAnswers }] = await ctx.db
+        .select({ reviewedAnswers: sql<number>`count(*)::int` })
+        .from(answers)
+        .where(
+          and(
+            eq(answers.attemptId, attempt.id),
+            sql`(${answers.manualScore} is not null or ${answers.reviewedAt} is not null)`,
+          ),
+        );
+      await ctx.db.transaction(async (tx) => {
+        await tx
+          .update(attempts)
+          .set({
+            status: "in_progress",
+            submittedAt: null,
+            autoSubmitted: false,
+            deadlineAt,
+            gradingStatus: "pending",
+          })
+          .where(eq(attempts.id, attempt.id));
+        await tx.insert(attemptEvents).values({
+          attemptId: attempt.id,
+          type: "reopened",
+          details: {
+            minutes: input.minutes ?? null,
+            deadlineAt: deadlineAt?.toISOString() ?? null,
+            by: ctx.user.name,
+          },
+        });
+        await auditFromCtx(
+          ctx,
+          {
+            action: "trpc.mutation",
+            subjectType: "attempt",
+            subjectId: attempt.id,
+            subjectUserId: attempt.userId,
+            subjectLabel: studentNumber,
+            details: {
+              path: "assignment.reopenAttempt",
+              attemptId: attempt.id,
+              assignmentId: attempt.assignmentId,
+              minutes: input.minutes ?? null,
+              deadlineAt,
+            },
+          },
+          tx,
+        );
       });
       return {
         attemptId: attempt.id,
         deadlineAt,
         assignmentClosed:
           effectiveAssignmentStatus(assignment, now) === "closed",
+        reviewedAnswers,
       };
     }),
 
@@ -1674,7 +2012,37 @@ export const assignmentRouter = createTRPCRouter({
         ctx.db,
         input.attemptId,
       );
-      await ctx.db.delete(attempts).where(eq(attempts.id, attempt.id));
+      const studentNumber = await studentNumberOf(ctx.db, attempt.userId);
+      await ctx.db.transaction(async (tx) => {
+        await assertNoActiveHolds(
+          tx,
+          { assignmentIds: [attempt.assignmentId], userIds: [attempt.userId] },
+          {
+            afname: "deze afname",
+            consequence: "Je kunt deze poging daarom niet wissen.",
+          },
+        );
+        // Written before the delete: afterwards the attempt id no longer
+        // tells whose work it was.
+        await auditFromCtx(
+          ctx,
+          {
+            action: "attempt.reset",
+            subjectType: "attempt",
+            subjectId: attempt.id,
+            subjectUserId: attempt.userId,
+            subjectLabel: studentNumber,
+            details: {
+              attemptId: attempt.id,
+              assignmentId: attempt.assignmentId,
+              attemptNumber: attempt.attemptNumber,
+              status: attempt.status,
+            },
+          },
+          tx,
+        );
+        await tx.delete(attempts).where(eq(attempts.id, attempt.id));
+      });
       return { attemptId: attempt.id, userId: attempt.userId };
     }),
 });

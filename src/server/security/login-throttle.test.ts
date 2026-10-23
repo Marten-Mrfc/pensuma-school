@@ -5,7 +5,7 @@ import {
   FAILURES_AFTER_EXPIRED_LOCK,
   ipThrottleKey,
   MAX_FAILURES,
-  NETWORK_LOCKED_MESSAGE,
+  RESTRICTED_NETWORK_MAX_FAILURES,
   SprayDetector,
   studentThrottleKeys,
 } from "./login-throttle";
@@ -69,12 +69,20 @@ describe("keys and messages", () => {
     expect(MAX_FAILURES - FAILURES_AFTER_EXPIRED_LOCK).toBe(3);
   });
 
-  test("Dutch lock messages", () => {
+  test("a restricted network tightens the lock, never below the restart value", () => {
+    expect(RESTRICTED_NETWORK_MAX_FAILURES).toBeLessThan(MAX_FAILURES);
+    // After an expired lock the first wrong PIN from a restricted network
+    // re-locks: one guess per lock period.
+    expect(RESTRICTED_NETWORK_MAX_FAILURES).toBeLessThanOrEqual(
+      FAILURES_AFTER_EXPIRED_LOCK,
+    );
+    // A couple of typos never lock a pupil, even during a spray.
+    expect(RESTRICTED_NETWORK_MAX_FAILURES).toBeGreaterThanOrEqual(3);
+  });
+
+  test("Dutch lock message (the only refusal a sign-in gets)", () => {
     expect(ACCOUNT_LOCKED_MESSAGE).toBe(
       "Te veel mislukte pogingen. Probeer het over 15 minuten opnieuw of vraag je docent om hulp.",
-    );
-    expect(NETWORK_LOCKED_MESSAGE).toBe(
-      "Te veel mislukte pogingen vanaf dit netwerk. Wacht 10 minuten en probeer het opnieuw.",
     );
   });
 });

@@ -20,13 +20,14 @@ import {
   HostingLocation,
   ProcessorName,
   RetentionConfirmationNote,
+  RetentionNoticeRef,
   RetentionValue,
   UpdatedAt,
   ValueSkeleton,
 } from "./public-values";
 
 /** Date of the current text of this statement (shown as "Laatst bijgewerkt"). */
-export const PRIVACY_STATEMENT_VERSION_DATE = "2026-10-22";
+export const PRIVACY_STATEMENT_VERSION_DATE = "2026-10-23";
 
 export const PRIVACY_SECTIONS = [
   { id: "kort", title: "In het kort (voor leerlingen)" },
@@ -268,20 +269,27 @@ export function PrivacyStatement() {
 
           <Section id="logboek">
             <p>
-              Bij sommige toetsen zet je docent een logboek aan. Dat zie je
-              altijd op het startscherm, voordat je begint, en tijdens de toets.
-              Bij oefenen staat het logboek standaard uit.
+              Bij elke toets, ook een oefentoets van je docent, houdt Pensuma
+              bij wanneer je je code uitvoert of test: bij welke vraag, hoe lang
+              het duurde, welke soort fout er was en hoeveel tests slaagden. Je
+              code zelf staat daar niet in; die zit in je antwoord. Op de vrije
+              oefenplek (Oefenen) komt niets in het logboek.
+            </p>
+            <p>
+              Bij sommige toetsen zet je docent daarnaast het logboek van je
+              toetsvenster aan. Dat zie je altijd op het startscherm, voordat je
+              begint, en tijdens de toets. Bij oefentoetsen staat dat standaard
+              uit.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <CheckList
                 icon={Eye}
                 tone="success"
-                title="Wat we bijhouden"
+                title="Wat we bijhouden als het aanstaat"
                 items={[
                   "Wanneer je het toetsvenster of tabblad verlaat en weer terugkomt",
                   "Wanneer je het volledige scherm verlaat",
                   "Pogingen om te plakken, zonder wát je plakt",
-                  "Wanneer je je code uitvoert of test",
                 ]}
               />
               <CheckList
@@ -291,11 +299,18 @@ export function PrivacyStatement() {
                 items={[
                   "Je toetsaanslagen",
                   "Je scherm, camera of microfoon",
-                  "De inhoud van je klembord",
+                  "Wat je kopieert, en de inhoud van je klembord",
                   "Wat je in andere tabbladen doet",
                 ]}
               />
             </div>
+            <p>
+              Heb je de faciliteit ‘vensterwissels niet registreren’? Dan houden
+              we niet bij wanneer je het toetsvenster of tabblad verlaat. Als de
+              toets erom vraagt, zien we wel wanneer je het volledige scherm
+              verlaat of probeert te plakken, en ook dan houden we bij wanneer
+              je je code uitvoert of test.
+            </p>
             <p>
               Alleen je docenten informatica kunnen het logboek zien. Het wordt{" "}
               <Inline>
@@ -332,8 +347,13 @@ export function PrivacyStatement() {
                 <Inline>
                   <RetentionValue field="attemptsMonths" />
                 </Inline>{" "}
-                na het sluiten van de afname. Werk van schoolexamens (PTA) wordt
-                minstens 6 maanden na het vaststellen van de uitslag bewaard.
+                na het sluiten van de afname, ook als je een poging nooit hebt
+                ingeleverd
+                <Inline>
+                  <RetentionNoticeRef />
+                </Inline>
+                . Werk van schoolexamens (PTA) wordt minstens 6 maanden na het
+                vaststellen van de uitslag bewaard.
               </li>
               <li>
                 <strong>Logboek tijdens toetsen:</strong>{" "}
@@ -348,7 +368,11 @@ export function PrivacyStatement() {
                 <Inline>
                   <RetentionValue field="inactiveStudentMonths" />
                 </Inline>{" "}
-                na de laatste keer inloggen verwijderd.
+                na de laatste keer inloggen verwijderd
+                <Inline>
+                  <RetentionNoticeRef />
+                </Inline>
+                .
               </li>
               <li>
                 <strong>Inloggegevens:</strong> een sessie verloopt 12 uur nadat
@@ -450,12 +474,14 @@ export function PrivacyStatement() {
                 internet.
               </li>
               <li>
-                Wie welke leerlinggegevens bekijkt of wijzigt, wordt vastgelegd
-                in een logboek dat niet kan worden aangepast.
+                Wie leerlinggegevens wijzigt, exporteert of verwijdert, en wie
+                een leerling, een poging of pincodes bekijkt, wordt vastgelegd
+                in een logboek dat docenten niet kunnen aanpassen.
               </li>
               <li>
-                Gegevens worden automatisch verwijderd als de bewaartermijn
-                voorbij is.
+                Technische gegevens en logboeken worden automatisch verwijderd
+                als de bewaartermijn voorbij is; pogingen en oude accounts ook,
+                zodra de school dat heeft aangezet.
               </li>
             </Bullets>
           </Section>
@@ -480,8 +506,11 @@ export function PrivacyStatement() {
                 zijn, laten we verwijderen.
               </li>
               <li>
-                <strong>Beperking:</strong> terwijl er een vraag of klacht
-                loopt, kan de school de verwerking tijdelijk stopzetten.
+                <strong>Beperking:</strong> terwijl er een vraag of klacht over
+                je gegevens loopt, kan de school de verwerking beperken. Je
+                account wordt dan geblokkeerd en je gegevens worden bewaard
+                zoals ze zijn: ze worden niet automatisch verwijderd en docenten
+                passen ze pas weer aan als de vraag is afgehandeld.
               </li>
               <li>
                 <strong>Bezwaar:</strong> je kunt bezwaar maken tegen het
@@ -515,20 +544,27 @@ export function PrivacyStatement() {
             <p>
               Ook docenten zijn betrokkenen. Pensuma houdt een{" "}
               <strong>logboek van docenthandelingen</strong> bij: wie wanneer
-              leerlinggegevens heeft bekeken, scores heeft aangepast, gegevens
-              heeft geëxporteerd of verwijderd, en wanneer docenten inloggen.
-              Daarbij worden de naam van de docent, het tijdstip en een ingekort
-              IP-adres vastgelegd, nooit de inhoud van antwoorden.
+              een leerling, een poging of pincodes heeft bekeken, code van
+              leerlingen heeft vergeleken, scores heeft aangepast (met de oude
+              en nieuwe score), gegevens heeft geëxporteerd of verwijderd, en
+              wanneer docenten inloggen. Daarbij worden de naam van de docent,
+              het tijdstip en een ingekort IP-adres vastgelegd, nooit de inhoud
+              van antwoorden. Bij een gewijzigde faciliteit staat alleen wát er
+              is gewijzigd (bijvoorbeeld de verlengde tijd), niet de nieuwe
+              waarde.
             </p>
             <p>
               Het logboek is er voor verantwoording en beveiliging. Docenten met
-              toegang tot Pensuma kunnen het inzien; niemand kan het aanpassen.
-              Het wordt na{" "}
+              toegang tot Pensuma kunnen het inzien, maar niet aanpassen. Het
+              wordt na{" "}
               <Inline>
                 <RetentionValue field="auditLogMonths" />
               </Inline>{" "}
-              automatisch verwijderd. De medezeggenschapsraad (MR) heeft een
-              stem in het privacyreglement van de school.
+              automatisch verwijderd. Wordt een leerling eerder verwijderd, dan
+              wist Pensuma meteen de scores en faciliteiten uit de regels over
+              die leerling; wie wat wanneer deed, blijft tot die tijd staan (met
+              leerlingnummer, zonder naam). De medezeggenschapsraad (MR) heeft
+              een stem in het privacyreglement van de school.
             </p>
           </Section>
 

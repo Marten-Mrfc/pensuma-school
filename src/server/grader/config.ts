@@ -4,14 +4,18 @@
  * grader without the full app environment.
  *
  *   GRADER_POOL_SIZE          pre-warmed sandboxes kept ready (default 2)
- *   GRADER_MAX_CONCURRENCY    max simultaneous grading jobs, FIFO queue beyond (default 4)
+ *   GRADER_MAX_CONCURRENCY    max simultaneous grading jobs; beyond that jobs queue,
+ *                             interactive runs before background grading (default 4)
  *   GRADER_SANDBOX_DIR        folder with sandbox.mjs (default <cwd>/grader)
  *   PYODIDE_DIR               the pyodide npm package folder (default <cwd>/node_modules/pyodide)
  *   GRADER_NODE_PATH          node binary for sandboxes (default: this node, or `node` on PATH under bun)
  *   GRADER_MEMORY_LIMIT_MB    RSS limit per sandbox, killed above it (default 768)
  *   GRADER_WASM_MEMORY_MB     Python (wasm) memory cap; MemoryError above it (default 384)
- *   GRADER_JOB_TIMEOUT_MS     total wall-clock budget per job (default 120000)
- *   GRADER_QUEUE_TIMEOUT_MS   max time a job may wait in the queue (default 120000)
+ *   GRADER_JOB_TIMEOUT_MS     total wall-clock budget per job, shared fairly by the
+ *                             questions of one submission (see budget.ts; default 120000)
+ *   GRADER_QUEUE_TIMEOUT_MS   max time an interactive job may wait in the queue; background
+ *                             grading of submitted attempts waits as long as needed
+ *                             (default 120000)
  *   GRADER_MAX_OUTPUT         max captured output per run, characters (default 65536)
  *   GRADER_SNAPSHOT           "0" disables the Pyodide start-up snapshot (default on;
  *                             written read-only to the OS temp dir, see snapshot.ts)

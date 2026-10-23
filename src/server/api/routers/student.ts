@@ -1,17 +1,6 @@
 import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gt,
-  inArray,
-  isNull,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   ROLES,
@@ -39,20 +28,32 @@ import {
   attempts,
   classes,
   classMembers,
-  retentionHolds,
   session,
   studentPins,
   tests,
   user,
 } from "@/server/db/schema";
 import { eraseStudentById } from "@/server/privacy/erasure";
+import {
+  assertNotRestricted,
+  hasActiveRestriction,
+  RESTRICTED_MESSAGE,
+  restrictedSql,
+  restrictedUserIds,
+} from "@/server/privacy/restriction";
 import { clearStudentLoginThrottle } from "@/server/security/login-throttle";
 import {
   createStudentAccount,
   getStudentPin,
   resetStudentPin,
 } from "@/server/services/accounts";
-import { auditFromCtx, auditRead } from "@/server/services/audit";
+import {
+  type AuditEntry,
+  auditFromCtx,
+  auditManyFromCtx,
+  auditRead,
+  auditReadMany,
+} from "@/server/services/audit";
 
 /** Leerlingen (student accounts), PIN codes and import. Teachers only. */
 
@@ -122,21 +123,8 @@ async function getStudentOrThrow(db: DB, id: string) {
   return row;
 }
 
-/** An active AVG art. 18 restriction (retention hold of kind "restriction"). */
-async function hasActiveRestriction(db: DB, userId: string) {
-  const [row] = await db
-    .select({ id: retentionHolds.id })
-    .from(retentionHolds)
-    .where(
-      and(
-        eq(retentionHolds.userId, userId),
-        eq(retentionHolds.kind, "restriction"),
-        or(isNull(retentionHolds.until), gt(retentionHolds.until, sql`now()`)),
-      ),
-    )
-    .limit(1);
-  return !!row;
-}
+/** AVG art. 18: an active restriction on this user (see privacy/restriction). */
+const isRestricted = restrictedSql(sql`${user}.id`);
 
 /** Run `fn` over `items` with limited concurrency, keeping order. */
 async function mapLimit<T, R>(
@@ -338,6 +326,7 @@ export const studentRouter = createTRPCRouter({
             createdAt: user.createdAt,
             hasPin,
             lastLoginAt,
+            restricted: isRestricted,
           })
           .from(user)
           .where(condition)
@@ -390,6 +379,8 @@ export const studentRouter = createTRPCRouter({
           createdAt: user.createdAt,
           hasPin,
           lastLoginAt,
+          /** Processing restricted (AVG art. 18): show it, don't change data. */
+          restricted: isRestricted,
         })
         .from(user)
         .where(and(eq(user.id, input.id), eq(user.role, ROLES.student)));
@@ -657,11 +648,19 @@ export const studentRouter = createTRPCRouter({
         }
       });
 
-      // 4. Rename existing students when asked.
+      // 4. Rename existing students when asked, except while their
+      // processing is restricted (AVG art. 18).
       const renamed = new Set<string>();
+      const restricted =
+        input.onExisting === "update_name"
+          ? await restrictedUserIds(
+              ctx.db,
+              toLink.map((r) => r.id),
+            )
+          : new Set<string>();
       if (input.onExisting === "update_name") {
         for (const r of toLink) {
-          if (r.name !== r.previousName) {
+          if (r.name !== r.previousName && !restricted.has(r.id)) {
             await ctx.db
               .update(user)
               .set({ name: r.name })
@@ -705,6 +704,8 @@ export const studentRouter = createTRPCRouter({
             name: renamed.has(r.id) ? r.name : r.previousName,
             importedName: r.name,
             nameUpdated: renamed.has(r.id),
+            /** Not renamed: processing restricted (AVG art. 18). */
+            restricted: restricted.has(r.id),
             addedToClass: addedToClass.has(r.id),
           }))
           .sort(byInputOrder),
@@ -719,6 +720,11 @@ export const studentRouter = createTRPCRouter({
         id: userIdSchema,
         name: studentNameSchema.optional(),
         studentNumber: studentNumberSchema.optional(),
+        /**
+         * Change anyway while the processing is restricted (AVG art. 18),
+         * e.g. to rectify what the procedure is about. Recorded in the log.
+         */
+        overrideRestriction: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -748,6 +754,9 @@ export const studentRouter = createTRPCRouter({
           studentNumber: current.username ?? "",
         };
       }
+      const overridden = await assertNotRestricted(ctx.db, current.id, {
+        override: input.overrideRestriction,
+      });
       const fields: ("name" | "studentNumber")[] = [];
       if (patch.name !== undefined) fields.push("name");
       if (patch.username !== undefined) fields.push("studentNumber");
@@ -767,7 +776,10 @@ export const studentRouter = createTRPCRouter({
           subjectId: updated.id,
           subjectUserId: updated.id,
           subjectLabel: updated.username ?? null,
-          details: { fields },
+          details: {
+            fields,
+            ...(overridden ? { restrictionOverridden: true } : {}),
+          },
         });
         return {
           id: updated.id,
@@ -833,12 +845,27 @@ export const studentRouter = createTRPCRouter({
           };
         },
       );
-      await auditFromCtx(ctx, {
-        action: "student.pin_reset",
-        subjectType: "class",
-        subjectId: input.classId,
-        details: { classId: input.classId, count: result.length },
-      });
+      // One summary row for the class, and one per student so the reset
+      // appears in each student's access log (inzage) and filter.
+      const details = { classId: input.classId, count: result.length };
+      await auditManyFromCtx(ctx, [
+        {
+          action: "student.pin_reset",
+          subjectType: "class",
+          subjectId: input.classId,
+          details,
+        },
+        ...result.map(
+          (r): AuditEntry => ({
+            action: "student.pin_reset",
+            subjectType: "student",
+            subjectId: r.id,
+            subjectUserId: r.id,
+            subjectLabel: r.studentNumber || null,
+            details,
+          }),
+        ),
+      ]);
       return result;
     }),
 
@@ -887,30 +914,45 @@ export const studentRouter = createTRPCRouter({
           pin: await getStudentPin(s.id),
         })),
       );
+      // One row per student whose PIN was shown, so it appears in that
+      // student's access log (inzage) and under the "Leerling" filter; for a
+      // class or a selection also one summary row.
+      const details = {
+        ...(input.classId ? { classId: input.classId } : {}),
+        count: result.length,
+      };
+      const perStudent = result.map(
+        (r): AuditEntry => ({
+          action: "student.pins_viewed",
+          subjectType: "student",
+          subjectId: r.id,
+          subjectUserId: r.id,
+          subjectLabel: r.studentNumber || null,
+          details,
+        }),
+      );
       if (input.classId) {
-        auditRead(ctx, {
-          action: "student.pins_viewed",
-          subjectType: "class",
-          subjectId: input.classId,
-          details: { classId: input.classId, count: result.length },
-        });
-      } else if (result.length === 1) {
-        const [only] = result;
-        auditRead(ctx, {
-          action: "student.pins_viewed",
-          subjectType: "student",
-          subjectId: only.id,
-          subjectUserId: only.id,
-          subjectLabel: only.studentNumber || null,
-          details: { count: 1 },
-        });
+        auditReadMany(ctx, [
+          {
+            action: "student.pins_viewed",
+            subjectType: "class",
+            subjectId: input.classId,
+            details,
+          },
+          ...perStudent,
+        ]);
       } else if (result.length > 1) {
-        auditRead(ctx, {
-          action: "student.pins_viewed",
-          subjectType: "student",
-          subjectId: selectionId(result.map((r) => r.id)),
-          details: { count: result.length },
-        });
+        auditReadMany(ctx, [
+          {
+            action: "student.pins_viewed",
+            subjectType: "student",
+            subjectId: selectionId(result.map((r) => r.id)),
+            details,
+          },
+          ...perStudent,
+        ]);
+      } else {
+        auditReadMany(ctx, perStudent);
       }
       return result;
     }),
@@ -925,8 +967,7 @@ export const studentRouter = createTRPCRouter({
       if (input.active && (await hasActiveRestriction(ctx.db, student.id))) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message:
-            "Voor deze leerling is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
+          message: RESTRICTED_MESSAGE,
         });
       }
       await ctx.db

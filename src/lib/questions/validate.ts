@@ -10,6 +10,9 @@
  * prefixed: "Vraag 3: voeg minstens één test toe".
  */
 import { z } from "zod";
+import { compareOutput, normalizeLines } from "@/lib/grading/compare";
+import { siblingOutputs } from "@/lib/grading/grade";
+import { hasNestedQuantifier } from "@/lib/grading/regex-guard";
 import {
   type CodeQuestionData,
   codeQuestionDataSchema,
@@ -221,6 +224,98 @@ function testLabel(index: number): string {
   return `test ${index + 1}`;
 }
 
+/** One line, at most 60 characters, for showing an output in a message. */
+function shorten(text: string): string {
+  const flat = text.replace(/\s*\n\s*/g, " / ").trim();
+  return flat.length > 60 ? `${flat.slice(0, 60)}…` : flat;
+}
+
+type Overlap = { index: number; output: string };
+
+/** Recent overlap results: the editor re-validates on every keystroke. */
+const overlapCache = new Map<string, Overlap | null>();
+
+/**
+ * Another io test (with a different input) whose expected output would also
+ * pass test `index`, while the reverse is not true: "Niet geslaagd" passes
+ * a "Bevat: Geslaagd" test. A program that always prints that other answer
+ * then gets this test for free.
+ */
+function overlappingTest(
+  data: CodeQuestionData,
+  index: number,
+): Overlap | null {
+  const t = data.tests[index];
+  if (t?.kind !== "io" || t.match === "regex" || t.match === "exact")
+    return null;
+  if (!t.expectedOutput.trim()) return null;
+  const cacheKey = JSON.stringify([
+    index,
+    data.tests.map((x) =>
+      x.kind === "io"
+        ? [x.stdin, x.expectedOutput, x.match, x.ignoreCase, x.tolerance]
+        : null,
+    ),
+  ]);
+  const cached = overlapCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const result = findOverlap(data, t, index);
+  // Small and bounded (a few MB at most): it only has to cover the question
+  // being edited.
+  if (cacheKey.length <= 50_000) {
+    if (overlapCache.size >= 100) overlapCache.clear();
+    overlapCache.set(cacheKey, result);
+  }
+  return result;
+}
+
+function findOverlap(
+  data: CodeQuestionData,
+  t: Extract<CodeQuestionData["tests"][number], { kind: "io" }>,
+  index: number,
+): Overlap | null {
+  const key = (text: string) => normalizeLines(text).join("\n");
+  const passes = (
+    output: string,
+    test: Extract<CodeQuestionData["tests"][number], { kind: "io" }>,
+  ) => {
+    const options = {
+      ignoreCase: test.ignoreCase,
+      tolerance: test.tolerance,
+    };
+    // Cheap first: "Flexibel" needs every expected line inside the output.
+    if (
+      test.match === "flexible" &&
+      !compareOutput(output, test.expectedOutput, {
+        ...options,
+        match: "contains",
+      }).passed
+    )
+      return false;
+    return compareOutput(output, test.expectedOutput, {
+      ...options,
+      match: test.match,
+      stdin: test.stdin,
+      siblings: siblingOutputs(test, data.tests),
+    }).passed;
+  };
+  for (const [otherIndex, other] of data.tests.entries()) {
+    if (
+      otherIndex === index ||
+      other.kind !== "io" ||
+      other.match === "regex" ||
+      !other.expectedOutput.trim() ||
+      key(other.stdin) === key(t.stdin) ||
+      key(other.expectedOutput) === key(t.expectedOutput)
+    )
+      continue;
+    if (passes(other.expectedOutput, t) && !passes(t.expectedOutput, other)) {
+      return { index: otherIndex, output: other.expectedOutput.trim() };
+    }
+  }
+  return null;
+}
+
 function validateCode(
   data: CodeQuestionData,
   check: SolutionCheck | null | undefined,
@@ -252,6 +347,7 @@ function validateCode(
     ids.add(t.id);
 
     if (t.kind === "io") {
+      const errorsBefore = issues.filter((i) => i.severity === "error").length;
       if (!t.expectedOutput.trim()) {
         issues.push({
           severity: "error",
@@ -274,6 +370,34 @@ function validateCode(
           severity: "error",
           code: "code.io_no_numbers",
           message: `${label}: de verwachte uitvoer bevat geen getallen (vergelijking "${OUTPUT_MATCH_MODE_LABELS.numbers}")`,
+          target,
+        });
+      }
+      if (
+        t.match === "regex" &&
+        t.expectedOutput.trim() &&
+        isValidPattern(t.expectedOutput) &&
+        hasNestedQuantifier(t.expectedOutput)
+      ) {
+        issues.push({
+          severity: "warning",
+          code: "code.io_regex_slow",
+          message: `${label}: de reguliere expressie herhaalt iets dat zelf al herhaald wordt (zoals (\\w+)+). Bij sommige uitvoer rekent zo'n patroon heel lang; het nakijken stopt dan en de test telt als fout`,
+          target,
+        });
+      }
+      const valid =
+        issues.filter((i) => i.severity === "error").length === errorsBefore;
+      const overlap = valid ? overlappingTest(data, index) : null;
+      if (overlap) {
+        issues.push({
+          severity: "warning",
+          code: "code.io_expected_overlap",
+          message: `${label}: ook de verwachte uitvoer van ${testLabel(overlap.index)} ("${shorten(overlap.output)}") telt bij deze test als goed (vergelijking "${OUTPUT_MATCH_MODE_LABELS[t.match]}"). ${
+            t.match === "contains"
+              ? 'Kies "Flexibel" of "Exact", dan telt alleen het juiste antwoord'
+              : 'Kies "Exact" of maak de verwachte uitvoer specifieker'
+          }`,
           target,
         });
       }

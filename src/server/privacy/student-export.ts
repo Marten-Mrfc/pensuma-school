@@ -13,9 +13,13 @@ import {
   type ExportEventRow,
   type StudentExport,
 } from "@/lib/privacy/export-format";
-import { multipleChoiceDataSchema } from "@/lib/questions/schema";
+import {
+  codeQuestionDataSchema,
+  multipleChoiceDataSchema,
+} from "@/lib/questions/schema";
 import {
   answers,
+  assignmentStudents,
   assignments,
   attemptEvents,
   attempts,
@@ -23,6 +27,7 @@ import {
   classes,
   classMembers,
   questions,
+  retentionHolds,
   session,
   studentAccommodations,
   tests,
@@ -74,6 +79,9 @@ export async function loadStudentExport(
     accommodation,
     preferences,
     accessRows,
+    holdRows,
+    assignmentHoldRows,
+    targetedRows,
   ] = await Promise.all([
     getPrivacySettings(db),
     db
@@ -134,6 +142,54 @@ export async function loadStudentExport(
       .where(eq(auditLog.subjectUserId, userId))
       .orderBy(desc(auditLog.id))
       .limit(5000),
+    // Never who created a hold (teacher names stay out of the export).
+    db
+      .select({
+        kind: retentionHolds.kind,
+        reason: retentionHolds.reason,
+        until: retentionHolds.until,
+        createdAt: retentionHolds.createdAt,
+      })
+      .from(retentionHolds)
+      .where(eq(retentionHolds.userId, userId))
+      .orderBy(asc(retentionHolds.createdAt)),
+    db
+      .select({
+        kind: retentionHolds.kind,
+        until: retentionHolds.until,
+        createdAt: retentionHolds.createdAt,
+        assignmentTitle: assignments.title,
+        testTitle: tests.title,
+      })
+      .from(retentionHolds)
+      .innerJoin(assignments, eq(assignments.id, retentionHolds.assignmentId))
+      .innerJoin(tests, eq(tests.id, assignments.testId))
+      .where(
+        inArray(
+          retentionHolds.assignmentId,
+          db
+            .select({ id: attempts.assignmentId })
+            .from(attempts)
+            .where(eq(attempts.userId, userId)),
+        ),
+      )
+      .orderBy(asc(retentionHolds.createdAt)),
+    db
+      .select({
+        assignmentTitle: assignments.title,
+        testTitle: tests.title,
+        mode: assignments.mode,
+        opensAt: assignments.opensAt,
+        closesAt: assignments.closesAt,
+      })
+      .from(assignmentStudents)
+      .innerJoin(
+        assignments,
+        eq(assignments.id, assignmentStudents.assignmentId),
+      )
+      .innerJoin(tests, eq(tests.id, assignments.testId))
+      .where(eq(assignmentStudents.userId, userId))
+      .orderBy(asc(assignments.createdAt)),
   ]);
 
   const attemptIds = attemptRows.map((a) => a.id);
@@ -152,6 +208,7 @@ export async function loadStudentExport(
             maxScore: answers.maxScore,
             feedback: answers.feedback,
             result: answers.result,
+            hintsUsed: answers.hintsUsed,
           })
           .from(answers)
           .innerJoin(questions, eq(questions.id, answers.questionId))
@@ -173,6 +230,17 @@ export async function loadStudentExport(
   const answersByAttempt = new Map<string, ExportAnswerRow[]>();
   for (const a of answerRows) {
     let optionTexts: Record<string, string> | undefined;
+    let hints: { id: string; penalty: number }[] | undefined;
+    if (a.questionType === "code") {
+      // Ids and penalties only: hint texts and the model solution stay out.
+      const parsed = codeQuestionDataSchema.safeParse(a.questionData);
+      if (parsed.success) {
+        hints = parsed.data.hints.map((h) => ({
+          id: h.id,
+          penalty: h.penalty,
+        }));
+      }
+    }
     if (a.questionType === "multiple_choice") {
       const parsed = multipleChoiceDataSchema.safeParse(a.questionData);
       if (parsed.success) {
@@ -192,6 +260,8 @@ export async function loadStudentExport(
       feedback: a.feedback,
       result: a.result,
       optionTexts,
+      hintsUsed: a.hintsUsed,
+      hints,
     });
     answersByAttempt.set(a.attemptId, list);
   }
@@ -236,6 +306,9 @@ export async function loadStudentExport(
         events: eventsByAttempt.get(a.id) ?? [],
       })),
       accessLog: accessRows,
+      holds: holdRows,
+      assignmentHolds: assignmentHoldRows,
+      targetedAssignments: targetedRows,
     },
     { audience, now },
   );

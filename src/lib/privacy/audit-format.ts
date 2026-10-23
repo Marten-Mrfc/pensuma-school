@@ -14,6 +14,7 @@ const DETAIL_LABELS: Record<string, string> = {
   trigger: "aanleiding",
   kind: "soort",
   mode: "modus",
+  scope: "bereik",
   source: "bron",
   fields: "velden",
   count: "aantal",
@@ -43,9 +44,16 @@ const DETAIL_LABELS: Record<string, string> = {
   retentionConfirmed: "vastgesteld",
   restricted: "beperkt",
   passwordChangeRequired: "tijdelijk wachtwoord",
+  // Facilities: rows written before values were left out of the log.
   extraTimePercent: "extra tijd (%)",
   allowPaste: "plakken toegestaan",
-  ignoreFocusEvents: "geen logboek",
+  ignoreFocusEvents: "vensterwissels niet registreren",
+  // Facilities: which kind changed (never the values).
+  extraTimeChanged: "verlengde tijd gewijzigd",
+  allowPasteChanged: "plakken toegestaan gewijzigd",
+  focusLogChanged: "vensterwissels registreren gewijzigd",
+  facilityActive: "faciliteit actief",
+  restrictionOverridden: "ondanks beperking (AVG art. 18)",
   // Retention run and year-end close.
   verification: "verificatiecodes",
   rateLimit: "afremtellers",
@@ -55,6 +63,7 @@ const DETAIL_LABELS: Record<string, string> = {
   inactiveStudents: "leerlingaccounts",
   auditLog: "logboekregels docenten",
   retentionRuns: "opschoonrapporten",
+  expiredHolds: "verlopen bewaarblokkades",
   skippedByHold: "overgeslagen (bewaarblokkade)",
   archiveClasses: "klassen archiveren",
   deleteEvents: "logboeken verwijderen",
@@ -76,6 +85,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
   via: {
     retention: "automatische opschoning",
     school_year: "schooljaar afsluiten",
+    similarity: "code vergelijken",
   },
   trigger: {
     manual: "handmatig",
@@ -86,6 +96,10 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     dispute: "bezwaar of beroep",
     exam_dossier: "examendossier",
     restriction: "beperking (AVG art. 18)",
+  },
+  scope: {
+    assignment: "deze afname",
+    test: "alle afnames van de toets",
   },
   mode: {
     exam: "toets",

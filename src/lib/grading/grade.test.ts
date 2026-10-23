@@ -367,7 +367,7 @@ describe("buildGradingResult", () => {
   ];
   const checks = [check({ id: "c", kind: "requires", construct: "for_loop" })];
 
-  test("fraction over tests and checks", () => {
+  test("fraction over tests and checks: checks count in proportion to the passed tests", () => {
     const outcomes = new Map<string, TestOutcome>([
       ["a", ok({ stdout: "1" })],
       ["b", ok({ stdout: "3" })],
@@ -379,10 +379,119 @@ describe("buildGradingResult", () => {
       outcomes,
       timeLimitMs: 5000,
     });
-    expect(r.passedWeight).toBe(3);
+    // Tests: 2 of 3 weight passed; the check (weight 1) pays out 2/3.
+    expect(r.passedWeight).toBe(2.6667);
     expect(r.totalWeight).toBe(4);
-    expect(r.fraction).toBe(0.75);
+    expect(r.fraction).toBe(0.6667);
     expect(r.status).toBe("ok");
+  });
+
+  test("all tests passed: a missed check costs its weight", () => {
+    const outcomes = new Map<string, TestOutcome>([
+      ["a", ok({ stdout: "1" })],
+      ["b", ok({ stdout: "2" })],
+    ]);
+    const missed = buildGradingResult({
+      tests,
+      checks: [check({ id: "c", kind: "requires", construct: "while_loop" })],
+      analysis,
+      outcomes,
+      timeLimitMs: 5000,
+    });
+    expect(missed.fraction).toBe(0.75);
+    const met = buildGradingResult({
+      tests,
+      checks,
+      analysis,
+      outcomes,
+      timeLimitMs: 5000,
+    });
+    expect(met.fraction).toBe(1);
+    expect(met.passedWeight).toBe(4);
+  });
+
+  // Regression (F28): starter code + a comment, or `pass`, passes no test but
+  // met every check ("forbids" by doing nothing, "requires def" through the
+  // starter code) and used to earn 25-33% of the points.
+  test("code that passes no test gets nothing for its checks", () => {
+    const failing = new Map<string, TestOutcome>([
+      ["a", ok({ stdout: "" })],
+      ["b", ok({ stdout: "" })],
+    ]);
+    const forbidsOnly = buildGradingResult({
+      tests,
+      checks: [
+        check({
+          id: "c",
+          kind: "forbids",
+          construct: "function_call",
+          value: "max",
+        }),
+      ],
+      analysis,
+      outcomes: failing,
+      timeLimitMs: 5000,
+    });
+    expect(forbidsOnly.checks[0].passed).toBe(true);
+    expect(forbidsOnly.fraction).toBe(0);
+    expect(forbidsOnly.passedWeight).toBe(0);
+
+    const requiresAndForbids = buildGradingResult({
+      tests,
+      checks: [
+        check({
+          id: "c1",
+          kind: "requires",
+          construct: "function_def",
+          value: "gemiddelde",
+        }),
+        check({
+          id: "c2",
+          kind: "forbids",
+          construct: "import",
+          value: "statistics",
+        }),
+      ],
+      analysis,
+      outcomes: failing,
+      timeLimitMs: 5000,
+    });
+    expect(requiresAndForbids.checks.every((c) => c.passed)).toBe(true);
+    expect(requiresAndForbids.fraction).toBe(0);
+  });
+
+  test("a question with only checks still scores on its checks", () => {
+    const r = buildGradingResult({
+      tests: [],
+      checks: [
+        check({ id: "c1", kind: "requires", construct: "for_loop" }),
+        check({ id: "c2", kind: "requires", construct: "while_loop" }),
+      ],
+      analysis,
+      outcomes: new Map(),
+      timeLimitMs: 5000,
+    });
+    expect(r.fraction).toBe(0.5);
+  });
+
+  test("io tests are compared with the question's other tests as alternative answers", () => {
+    const evenOdd = [
+      io({ id: "t1", stdin: "4", expectedOutput: "even" }),
+      io({ id: "t2", stdin: "7", expectedOutput: "oneven" }),
+    ];
+    const both = (stdout: string) =>
+      buildGradingResult({
+        tests: evenOdd,
+        checks: [],
+        analysis,
+        outcomes: new Map<string, TestOutcome>([
+          ["t1", ok({ stdout })],
+          ["t2", ok({ stdout })],
+        ]),
+        timeLimitMs: 5000,
+      });
+    expect(both("even oneven\n").fraction).toBe(0);
+    expect(both("even:\noneven:\n").fraction).toBe(0);
   });
 
   test("status priority", () => {

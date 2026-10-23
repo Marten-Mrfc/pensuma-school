@@ -2,13 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { groupAnswers, groupKey } from "./answer-groups";
 
 describe("groupKey: open", () => {
-  test("ignores case, spacing and punctuation", () => {
+  test("ignores spacing and sentence punctuation after words", () => {
     const a = groupKey("open", { text: "Een lus herhaalt code!" });
-    const b = groupKey("open", { text: "  een LUS   herhaalt\ncode " });
+    const b = groupKey("open", { text: "  Een lus   herhaalt\ncode " });
     const c = groupKey("open", { text: "Een lus, herhaalt code." });
-    expect(a).toBe("een lus herhaalt code");
+    expect(a).toBe("Een lus herhaalt code");
     expect(b).toBe(a);
     expect(c).toBe(a);
+    expect(groupKey("open", { text: "print(x)." })).toBe("print(x)");
   });
 
   test("different words give different keys", () => {
@@ -17,8 +18,29 @@ describe("groupKey: open", () => {
     );
   });
 
+  // Regression (F39): symbols, signs and brackets carry the meaning in an
+  // informatica answer, so these pairs must NOT be "precies hetzelfde".
+  test.each([
+    ["4", "-4"],
+    ["x == 5 vergelijkt", "x = 5 vergelijkt"],
+    ["a < b", "a > b"],
+    ["x += 1", "x -= 1"],
+    ["3 * 2 = 6", "3 + 2 = 6"],
+    ["10 % 3", "10 / 3"],
+    ["[1, 2]", "(1, 2)"],
+    ["(1, 2)", "(1 2)"],
+    ["2**3", "2*3"],
+    ["True", "true"],
+    ["3.5", "35"],
+  ])("%p and %p get different keys", (a, b) => {
+    expect(groupKey("open", { text: a })).not.toBe(
+      groupKey("open", { text: b }),
+    );
+  });
+
   test("blank or missing text → empty key", () => {
-    expect(groupKey("open", { text: "  ?! " })).toBe("");
+    expect(groupKey("open", { text: "  \n\t " })).toBe("");
+    expect(groupKey("open", { text: "" })).toBe("");
     expect(groupKey("open", null)).toBe("");
   });
 });

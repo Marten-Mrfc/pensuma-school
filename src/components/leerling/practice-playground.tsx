@@ -19,6 +19,7 @@ import {
   CodeEditor,
   type CodeEditorHandle,
 } from "@/components/app/code-editor";
+import { useCurrentUser } from "@/components/app/current-user";
 import { PageHeader } from "@/components/app/page-header";
 import { LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -31,11 +32,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
+import { claimLocalData, practiceCodeKey } from "@/lib/local-data";
 import { CodeTipsButton } from "./exam/code-tips";
 import { CodeRunTab, type RunHandle } from "./exam/code-tools";
 import { readStorage, writeStorage } from "./exam/types";
-
-const STORAGE_KEY = "pensuma:oefenen:code";
 
 const SNIPPETS: { id: string; label: string; hint: string; code: string }[] = [
   {
@@ -87,9 +87,16 @@ const DEFAULT_CODE = SNIPPETS[1].code;
 /** No assignment here: only the general tips apply. */
 const PLAYGROUND_TIP_OPTIONS = {};
 
-function loadCode(): string {
+/**
+ * The user's own practice code from this browser. On a shared school
+ * computer the previous student may have closed the browser without signing
+ * out: claimLocalData first clears their local data (code, answer backups)
+ * so it is never shown to the next student.
+ */
+function loadCode(userId: string): string {
   if (typeof window === "undefined") return DEFAULT_CODE;
-  return readStorage<string>(STORAGE_KEY) ?? DEFAULT_CODE;
+  claimLocalData(userId);
+  return readStorage<string>(practiceCodeKey(userId)) ?? DEFAULT_CODE;
 }
 
 const subscribeNoop = () => () => {};
@@ -103,15 +110,17 @@ export function PracticePlayground() {
   );
   const tipsTitleId = useId();
   const outputTitleId = useId();
-  const [code, setCode] = useState<string>(loadCode);
+  const user = useCurrentUser();
+  const storageKey = practiceCodeKey(user.id);
+  const [code, setCode] = useState<string>(() => loadCode(user.id));
   const [runHandle, setRunHandle] = useState<RunHandle | null>(null);
   const editorRef = useRef<CodeEditorHandle>(null);
 
   // Persist (debounced) in this browser.
   useEffect(() => {
-    const t = setTimeout(() => writeStorage(STORAGE_KEY, code), 400);
+    const t = setTimeout(() => writeStorage(storageKey, code), 400);
     return () => clearTimeout(t);
-  }, [code]);
+  }, [code, storageKey]);
 
   const replaceCode = (next: string, message: string) => {
     const previous = code;

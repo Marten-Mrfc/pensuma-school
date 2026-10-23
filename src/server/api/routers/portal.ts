@@ -12,6 +12,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { accommodationMinutes } from "@/lib/accommodations";
 import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
@@ -64,7 +65,12 @@ import {
   parseAssignmentSettings,
   resultsVisible,
 } from "@/server/services/assignment-status";
-import { assignmentVisibleToStudent } from "@/server/services/assignment-targets";
+import {
+  assignmentVisibleToStudent,
+  ensureTargetingBackfill,
+  stillWorking,
+  stillWorkingByAssignment,
+} from "@/server/services/assignment-targets";
 import {
   AttemptStartError,
   autoSubmitIfExpired,
@@ -125,6 +131,9 @@ const INTERNAL_ERROR_MESSAGE =
   "Er ging iets mis bij het nakijken. Je docent kijkt deze vraag na.";
 const ANSWERS_HIDDEN_MESSAGE =
   "De juiste antwoorden zie je pas als je geen pogingen meer hebt of de toets gesloten is.";
+/** Classmates (e.g. with verlengde tijd) are still taking the exam. */
+const ANSWERS_HIDDEN_OTHERS_MESSAGE =
+  "De juiste antwoorden zie je zodra iedereen klaar is met de toets.";
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -188,9 +197,12 @@ function assignmentTitle(a: Pick<AssignmentRow, "title">, testTitle: string) {
 function hiddenResultMessage(
   showResults: ShowResults,
   closesAt: Date | null,
+  closedButOthersWorking = false,
 ): string {
   switch (showResults) {
     case "after_close":
+      if (closedButOthersWorking)
+        return "Je ziet je resultaat zodra iedereen klaar is met de toets.";
       return closesAt
         ? "Je ziet je resultaat zodra de toets gesloten is."
         : "Je ziet je resultaat zodra je docent de toets sluit.";
@@ -265,6 +277,17 @@ function studentCodeResult(
   };
 }
 
+/**
+ * For `saveAnswer`'s upsert: keep a column's value unless the stored
+ * response differs from the new one (jsonb compares by value).
+ */
+function keepUnlessChanged(column: AnyPgColumn) {
+  return sql`case when ${answers.response} is distinct from excluded.response then null else ${column} end`;
+}
+
+/** An auto hand-in this long before the deadline is too early (extra time). */
+const AUTO_SUBMIT_EARLY_MS = 10_000;
+
 /* --------------------------------- Router --------------------------------- */
 
 export const portalRouter = createTRPCRouter({
@@ -275,6 +298,8 @@ export const portalRouter = createTRPCRouter({
   dashboard: studentProcedure.query(async ({ ctx }) => {
     const userId = ctx.user.id;
     const now = new Date();
+    // Older targeted afnames get their flag (once per process).
+    await ensureTargetingBackfill(db);
 
     const rows = await db
       .select({
@@ -334,6 +359,20 @@ export const portalRouter = createTRPCRouter({
     const stats = await testStats([
       ...new Set(visibleRows.map((r) => r.assignment.testId)),
     ]);
+    // Closed afnames with a hand-in of mine: are classmates still busy?
+    const working = await stillWorkingByAssignment(
+      db,
+      visibleRows
+        .filter(
+          (r) =>
+            r.status === "closed" &&
+            myAttempts.some(
+              (t) => t.assignmentId === r.assignment.id && t.submittedAt,
+            ),
+        )
+        .map((r) => r.assignment),
+      now,
+    );
 
     const items = visibleRows.map(
       ({ assignment: a, testTitle, className, status }) => {
@@ -347,7 +386,7 @@ export const portalRouter = createTRPCRouter({
               (y.submittedAt?.getTime() ?? 0) - (x.submittedAt?.getTime() ?? 0),
           );
         const last = submitted[0] ?? null;
-        const visible = resultsVisible(a, now);
+        const visible = resultsVisible(a, now, working.get(a.id) ?? false);
         const s = stats.get(a.testId);
         return {
           id: a.id,
@@ -593,11 +632,13 @@ export const portalRouter = createTRPCRouter({
       const accommodation = await loadAccommodation(ctx.user.id);
 
       // Exam confidentiality: a handed-in exam shows no questions or
-      // answers until its results are visible.
+      // answers until its results are visible (for "after_close": also
+      // not while classmates with verlengde tijd are still busy).
+      const now = new Date();
       const contentHidden =
         attempt.status === "submitted" &&
         a.mode === "exam" &&
-        !resultsVisible(a);
+        !resultsVisible(a, now, await stillWorking(db, a, now));
 
       const order = contentHidden ? [] : (attempt.questionOrder ?? []);
       const qRows = order.length
@@ -709,7 +750,9 @@ export const portalRouter = createTRPCRouter({
         .from(questions)
         .where(eq(questions.id, input.questionId))
         .limit(1);
-      if (!q) throw notFound("Deze vraag bestaat niet meer.");
+      // The teacher deleted this question during the attempt: not an error
+      // (the attempt goes on), the page drops the question.
+      if (!q) return { savedAt: now, status: "removed" as const };
 
       const typed = typedData(q);
       const response = validateResponse(typed.type, typed.data, input.response);
@@ -730,7 +773,20 @@ export const portalRouter = createTRPCRouter({
         })
         .onConflictDoUpdate({
           target: [answers.attemptId, answers.questionId],
-          set: { response, status, savedAt: now },
+          set: {
+            response,
+            status,
+            savedAt: now,
+            // A reopened attempt: an answer the teacher already reviewed
+            // and that the student now changes loses its manual score,
+            // criteria and feedback, so it is graded and reviewed again.
+            // Saving the same answer again (autosave) keeps the review.
+            manualScore: keepUnlessChanged(answers.manualScore),
+            rubricChecked: keepUnlessChanged(answers.rubricChecked),
+            feedback: keepUnlessChanged(answers.feedback),
+            reviewedAt: keepUnlessChanged(answers.reviewedAt),
+            reviewedById: keepUnlessChanged(answers.reviewedById),
+          },
         });
       await db
         .update(attempts)
@@ -837,13 +893,33 @@ export const portalRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { attempt } = await loadOwnedAttempt(ctx.user.id, input.attemptId);
       if (attempt.status === "submitted") {
-        return { submittedAt: attempt.submittedAt, alreadySubmitted: true };
+        return {
+          submittedAt: attempt.submittedAt,
+          alreadySubmitted: true,
+          notYet: false as const,
+        };
+      }
+      const now = new Date();
+      // The page's timer ran out, but the teacher gave extra time that the
+      // page has not heard about yet: don't hand in, send the new deadline.
+      if (
+        input.auto &&
+        attempt.deadlineAt &&
+        attempt.deadlineAt.getTime() - now.getTime() > AUTO_SUBMIT_EARLY_MS
+      ) {
+        return {
+          submittedAt: null,
+          alreadySubmitted: false,
+          notYet: true as const,
+          deadlineAt: attempt.deadlineAt,
+          serverNow: now,
+        };
       }
       // Only believe "time is up" when the deadline is (nearly) there.
       const timeUp =
         !!input.auto &&
         !!attempt.deadlineAt &&
-        Date.now() >= attempt.deadlineAt.getTime() - 10_000;
+        now.getTime() >= attempt.deadlineAt.getTime() - AUTO_SUBMIT_EARLY_MS;
       await submitAttempt(attempt.id, {
         auto: timeUp,
         by: timeUp ? "timer" : "student",
@@ -853,8 +929,9 @@ export const portalRouter = createTRPCRouter({
         .from(attempts)
         .where(eq(attempts.id, attempt.id));
       return {
-        submittedAt: fresh?.submittedAt ?? new Date(),
+        submittedAt: fresh?.submittedAt ?? now,
         alreadySubmitted: false,
+        notYet: false as const,
       };
     }),
 
@@ -907,11 +984,21 @@ export const portalRouter = createTRPCRouter({
           closesAt: a.closesAt,
         };
       }
-      if (!resultsVisible(a, now)) {
+      // Classmates still taking the afname (verlengde tijd after the close,
+      // or anyone while it is open): results and right answers wait.
+      const othersWorking =
+        a.mode === "exam" || settings.showResults === "after_close"
+          ? await stillWorking(db, a, now)
+          : false;
+      if (!resultsVisible(a, now, othersWorking)) {
         return {
           ...base,
           visible: false as const,
-          message: hiddenResultMessage(settings.showResults, a.closesAt),
+          message: hiddenResultMessage(
+            settings.showResults,
+            a.closesAt,
+            status === "closed" && othersWorking,
+          ),
           closesAt: a.closesAt,
         };
       }
@@ -927,11 +1014,14 @@ export const portalRouter = createTRPCRouter({
       }
 
       // Exam confidentiality: while another attempt is possible (or
-      // running), the right answers stay hidden.
+      // running), or while classmates are still taking the exam, the right
+      // answers stay hidden (unless the teacher released the results).
+      const ownAttemptsLeft =
+        hasRunningAttempt ||
+        (status === "open" && attemptsUsed < settings.maxAttempts);
+      const othersHoldBack = othersWorking && !a.resultsReleased;
       const answersHidden =
-        a.mode === "exam" &&
-        (hasRunningAttempt ||
-          (status === "open" && attemptsUsed < settings.maxAttempts));
+        a.mode === "exam" && (ownAttemptsLeft || othersHoldBack);
 
       const order = attempt.questionOrder ?? [];
       const qRows = order.length
@@ -1090,7 +1180,11 @@ export const portalRouter = createTRPCRouter({
           (attempt.gradingStatus !== "graded" ||
             (status !== "closed" && !a.resultsReleased)),
         answersHidden,
-        answersHiddenMessage: answersHidden ? ANSWERS_HIDDEN_MESSAGE : null,
+        answersHiddenMessage: !answersHidden
+          ? null
+          : ownAttemptsLeft
+            ? ANSWERS_HIDDEN_MESSAGE
+            : ANSWERS_HIDDEN_OTHERS_MESSAGE,
         /** While pending: how many answers have been graded so far. */
         gradingProgress: {
           done: aRows.filter(
@@ -1138,8 +1232,21 @@ export const portalRouter = createTRPCRouter({
       )
       .orderBy(desc(attempts.submittedAt));
 
+    const working = await stillWorkingByAssignment(
+      db,
+      [
+        ...new Map(
+          rows
+            .filter(
+              (r) => effectiveAssignmentStatus(r.assignment, now) === "closed",
+            )
+            .map((r) => [r.assignment.id, r.assignment]),
+        ).values(),
+      ],
+      now,
+    );
     return rows.map(({ attempt: t, assignment: a, testTitle, className }) => {
-      const visible = resultsVisible(a, now);
+      const visible = resultsVisible(a, now, working.get(a.id) ?? false);
       const done = visible && t.gradingStatus !== "pending";
       return {
         attemptId: t.id,

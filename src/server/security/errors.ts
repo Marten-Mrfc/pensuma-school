@@ -115,3 +115,87 @@ export function formatErrorShape<TShape extends ShapeLike>(
     },
   };
 }
+
+export type TrpcErrorLog = {
+  level: "error" | "warn" | "info";
+  /** One JSON line for stdout. */
+  line: string;
+};
+
+/** Drizzle appends the bound parameters (personal data) to the message. */
+function withoutQueryParams(message: string): string {
+  return message.replace(/\nparams:[\s\S]*$/, "\nparams: [weggelaten]");
+}
+
+/**
+ * An error's message for a server log line: without Drizzle's query
+ * parameters (a leerlingnummer, a name) and at most `max` characters.
+ */
+export function loggableErrorMessage(error: unknown, max = 500): string {
+  if (!(error instanceof Error)) return "unknown";
+  return withoutQueryParams(error.message).slice(0, max);
+}
+
+/**
+ * SQLSTATE and constraint of a database error behind a wrapped error (the
+ * driver's message itself can quote a value, so it is left out).
+ */
+function databaseCause(
+  error: unknown,
+): { code: string; constraint?: string } | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth++) {
+    const e = current as Error & { code?: unknown; constraint?: unknown };
+    if (typeof e.code === "string" && /^[0-9A-Z]{5}$/.test(e.code)) {
+      return {
+        code: e.code,
+        constraint:
+          typeof e.constraint === "string"
+            ? e.constraint.slice(0, 100)
+            : undefined,
+      };
+    }
+    current = e.cause;
+  }
+  return undefined;
+}
+
+/**
+ * The server log line for a tRPC error, never with the input or a stack.
+ * Expected errors (NOT_FOUND, FORBIDDEN, a closed afname, a rate limit)
+ * log only path and code: no user id, so the log is no activity trail per
+ * pupil (rate limits are traceable through rate_limit and login_throttle).
+ * Internal errors (a fault to investigate) add the error code shown to the
+ * user, the user id and the message without query parameters.
+ */
+export function trpcErrorLog(input: {
+  error: TRPCError;
+  path: string | undefined;
+  userId: string | null | undefined;
+  now?: Date;
+}): TrpcErrorLog {
+  const { error } = input;
+  const internal = error.code === "INTERNAL_SERVER_ERROR";
+  const level = internal
+    ? "error"
+    : error.code === "TOO_MANY_REQUESTS"
+      ? "warn"
+      : "info";
+  const base = {
+    level,
+    ts: (input.now ?? new Date()).toISOString(),
+    event: "trpc_error",
+    path: input.path ?? null,
+    code: error.code,
+  };
+  const line = internal
+    ? {
+        ...base,
+        errorId: errorIdFor(error),
+        message: loggableErrorMessage(error),
+        db: databaseCause(error.cause),
+        userId: input.userId ?? null,
+      }
+    : base;
+  return { level, line: JSON.stringify(line) };
+}

@@ -5,7 +5,7 @@
  * register.test.ts fails when a new table is not classified.
  * Pure module (no server or browser imports).
  */
-import { formatDays, formatMonths } from "./retention";
+import { EXPIRED_HOLD_GRACE_DAYS, formatDays, formatMonths } from "./retention";
 import type { PrivacySettings } from "./settings";
 
 export type DataSubject = "leerlingen" | "docenten";
@@ -41,10 +41,30 @@ const TEACHERS_AND_STUDENT =
 const PROCESSOR_NOTE =
   "; de beheerder van Pensuma alleen voor technisch onderhoud";
 
+/**
+ * The facilities a teacher can switch on per student, as named to students
+ * and in the register. "Vensterwissels niet registreren" switches off the
+ * logging of leaving the window or tab only: runs and self-tests, leaving
+ * fullscreen and blocked paste attempts are still logged when the toets
+ * asks for them.
+ */
+export const FACILITY_LABELS = {
+  allowPaste: "plakken toegestaan",
+  ignoreFocusEvents: "vensterwissels niet registreren",
+} as const;
+
+/** Auto-delete of attempts and accounts: on, not yet confirmed, or off. */
+const autoDeleteOn = (s: PrivacySettings) =>
+  s.retention.autoDeleteAttempts && s.retention.confirmedAt != null;
+const autoDeleteOffText = (s: PrivacySettings) =>
+  s.retention.confirmedAt
+    ? "staat uit"
+    : "staat nog uit tot de school de bewaartermijnen vaststelt";
+
 const inactive = (s: PrivacySettings) =>
-  s.retention.autoDeleteAttempts && s.retention.confirmedAt
+  autoDeleteOn(s)
     ? `automatisch verwijderd ${formatMonths(s.retention.inactiveStudentMonths)} na de laatste keer inloggen, als de leerling in geen actieve klas meer zit`
-    : `verwijderd door de school (bijvoorbeeld bij het afsluiten van het schooljaar); automatisch verwijderen na ${formatMonths(s.retention.inactiveStudentMonths)} zonder inloggen staat nog uit`;
+    : `verwijderd door de school (bijvoorbeeld bij het afsluiten van het schooljaar); automatisch verwijderen na ${formatMonths(s.retention.inactiveStudentMonths)} zonder inloggen ${autoDeleteOffText(s)}`;
 
 export const DATA_CATEGORIES: readonly DataCategory[] = [
   {
@@ -109,9 +129,11 @@ export const DATA_CATEGORIES: readonly DataCategory[] = [
     purpose: "Toetsen afnemen, nakijken en terugkoppelen aan de leerling",
     legalBasis: PUBLIC_TASK,
     retention: (s) =>
-      s.retention.autoDeleteAttempts && s.retention.confirmedAt
-        ? `Automatisch verwijderd ${formatMonths(s.retention.attemptsMonths)} na het sluiten van de afname`
-        : `Advies: ${formatMonths(s.retention.attemptsMonths)} na het sluiten van de afname. Automatisch verwijderen staat nog uit tot de school de bewaartermijnen vaststelt`,
+      autoDeleteOn(s)
+        ? `Automatisch verwijderd ${formatMonths(s.retention.attemptsMonths)} na het sluiten van de afname (of na de laatste activiteit, als de afname niet sluit), ook als de poging nooit is ingeleverd`
+        : s.retention.confirmedAt
+          ? `Advies: ${formatMonths(s.retention.attemptsMonths)} na het sluiten van de afname. Automatisch verwijderen staat uit; de school verwijdert pogingen zelf (bijvoorbeeld bij het afsluiten van het schooljaar)`
+          : `Advies: ${formatMonths(s.retention.attemptsMonths)} na het sluiten van de afname. Automatisch verwijderen staat nog uit tot de school de bewaartermijnen vaststelt`,
     recipients: TEACHERS_AND_STUDENT + PROCESSOR_NOTE,
     tables: ["attempt", "answer"],
   },
@@ -119,7 +141,7 @@ export const DATA_CATEGORIES: readonly DataCategory[] = [
     id: "exam-log",
     label: "Logboek tijdens toetsen",
     examples:
-      "Alleen als de docent dit aanzet: wanneer de leerling het toetsvenster of volledig scherm verlaat, pogingen om te plakken (zonder inhoud), code uitvoeren en testen",
+      "Altijd: wanneer de leerling code uitvoert of test (vraag, duur, soort fout, aantal geslaagde tests; nooit de code zelf). Alleen als de docent dit aanzet: wanneer de leerling het toetsvenster of tabblad verlaat en hoe lang, het volledige scherm verlaat en pogingen om te plakken (zonder inhoud). Kopiëren wordt niet bijgehouden",
     subjects: ["leerlingen"],
     purpose:
       "Een eerlijke toetsafname: de docent kan het gesprek aangaan als er iets opvalt",
@@ -152,7 +174,7 @@ export const DATA_CATEGORIES: readonly DataCategory[] = [
     id: "audit-log",
     label: "Logboek docenthandelingen",
     examples:
-      "Welke docent wanneer welke leerlinggegevens heeft bekeken, gewijzigd, geëxporteerd of verwijderd (zonder inhoud), met een ingekort IP-adres; rapporten van de automatische opschoning",
+      "Welke docent wanneer een leerling, een poging of pincodes heeft bekeken en wie leerlinggegevens heeft gewijzigd, geëxporteerd of verwijderd, met een ingekort IP-adres. Nooit de inhoud van antwoorden; bij een scorewijziging wel de oude en nieuwe score (gewist als de leerling wordt verwijderd); rapporten van de automatische opschoning",
     subjects: ["docenten", "leerlingen"],
     purpose:
       "Verantwoording en beveiliging: nagaan wie welke leerlinggegevens heeft ingezien of gewijzigd",
@@ -172,15 +194,14 @@ export const DATA_CATEGORIES: readonly DataCategory[] = [
       "De bewaartermijnen toepassen en gegevens langer bewaren als dat nodig is",
     legalBasis: ACCOUNTABILITY,
     retention: () =>
-      "Instellingen zolang Pensuma in gebruik is; een bewaarblokkade tot de einddatum of tot de docent haar opheft",
+      `Instellingen zolang Pensuma in gebruik is; een bewaarblokkade tot de docent haar opheft, of automatisch ${formatDays(EXPIRED_HOLD_GRACE_DAYS)} na de einddatum`,
     recipients: TEACHERS,
     tables: ["app_setting", "retention_hold"],
   },
   {
     id: "accommodations",
     label: "Faciliteiten bij toetsen",
-    examples:
-      "Alleen een percentage verlengde tijd en twee schakelaars (plakken toegestaan, geen logboek). Nooit een reden of diagnose",
+    examples: `Alleen een percentage verlengde tijd en twee schakelaars (${FACILITY_LABELS.allowPaste}, ${FACILITY_LABELS.ignoreFocusEvents}). Nooit een reden of diagnose`,
     subjects: ["leerlingen"],
     purpose: "Leerlingen met een faciliteitenpas hun faciliteiten geven",
     legalBasis: PUBLIC_TASK,

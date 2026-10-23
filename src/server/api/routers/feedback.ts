@@ -19,6 +19,7 @@ import {
   attempts,
   feedbackSnippets,
   questions,
+  user,
 } from "@/server/db/schema";
 import { auditFromCtx } from "@/server/services/audit";
 import { recomputeAttemptScore } from "@/server/services/grading";
@@ -222,12 +223,16 @@ export const feedbackRouter = createTRPCRouter({
           id: answers.id,
           attemptId: answers.attemptId,
           maxScore: answers.maxScore,
+          previousScore: answers.manualScore,
           attemptStatus: attempts.status,
+          userId: attempts.userId,
+          studentNumber: user.username,
           questionType: questions.type,
           questionData: questions.data,
         })
         .from(answers)
         .innerJoin(attempts, eq(attempts.id, answers.attemptId))
+        .innerJoin(user, eq(user.id, attempts.userId))
         .innerJoin(questions, eq(questions.id, answers.questionId))
         .where(inArray(answers.id, ids));
       if (rows.length !== ids.length) {
@@ -287,16 +292,48 @@ export const feedbackRouter = createTRPCRouter({
               : {}),
           })
           .where(inArray(answers.id, ids));
-        await auditFromCtx(
-          ctx,
-          {
-            action: "answer.score_changed",
-            subjectType: "answer",
-            subjectId: ids.length === 1 ? ids[0] : null,
-            details: { answerIdsCount: ids.length, manualScore },
-          },
-          tx,
-        );
+        // One row per answer whose score changed, with the student, like
+        // review.setManualScore: it shows up under that student in the
+        // audit log and in their own inzage export.
+        let audited = 0;
+        for (const row of rows) {
+          if (row.previousScore === manualScore) continue;
+          audited++;
+          await auditFromCtx(
+            ctx,
+            {
+              action: "answer.score_changed",
+              subjectType: "answer",
+              subjectId: row.id,
+              subjectUserId: row.userId,
+              subjectLabel: row.studentNumber,
+              details: {
+                answerId: row.id,
+                attemptId: row.attemptId,
+                from: row.previousScore,
+                to: manualScore,
+                bulk: true,
+              },
+            },
+            tx,
+          );
+        }
+        if (audited === 0) {
+          // Only feedback or criteria changed: one summary row.
+          await auditFromCtx(
+            ctx,
+            {
+              action: "trpc.mutation",
+              subjectType: "answer",
+              subjectId: ids.length === 1 ? ids[0] : null,
+              details: {
+                path: "feedback.gradeMany",
+                answerIdsCount: ids.length,
+              },
+            },
+            tx,
+          );
+        }
       });
 
       const attemptIds = [...new Set(rows.map((r) => r.attemptId))];

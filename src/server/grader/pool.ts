@@ -2,32 +2,52 @@
  * Pool of pre-warmed sandbox processes + job scheduler.
  *
  * - Keeps `poolSize` sandboxes loading/ready in the background.
- * - Every job (one submission = all tests of one question, or one run) takes
- *   a fresh sandbox; it is killed when the job ends and replaced, so
- *   students never share an interpreter. After a timeout/crash inside a job
- *   the job continues in another fresh sandbox.
- * - At most `maxConcurrency` jobs run at once; others wait in a FIFO queue
- *   (up to `queueTimeoutMs`).
+ * - Every job (one submission = all code questions of one attempt, or one
+ *   run) takes a fresh sandbox; it is killed when the job ends and replaced,
+ *   so students never share an interpreter. After a timeout/crash inside a
+ *   job the job continues in another fresh sandbox.
+ * - At most `maxConcurrency` jobs run at once; others wait in a queue.
+ *   Interactive jobs (someone is waiting for the answer) start before
+ *   background jobs (grading of submitted attempts), each in FIFO order.
+ *   A job gives up after its queue timeout (default `queueTimeoutMs`);
+ *   background grading passes `null` and waits as long as needed, so a busy
+ *   grader delays results instead of losing them.
+ * - Infrastructure failures are thrown as GraderUnavailableError
+ *   (QueueTimeoutError, SandboxStartError; see ./errors.ts).
  */
 import fs from "node:fs";
 import { type GraderConfig, graderConfig } from "./config";
+import { QueueTimeoutError, SandboxStartError } from "./errors";
 import { SandboxProcess } from "./sandbox-process";
 import { makeSnapshot } from "./snapshot";
 
-export class QueueTimeoutError extends Error {
-  constructor() {
-    super("Het nakijken is op dit moment erg druk. Probeer het zo opnieuw.");
-    this.name = "QueueTimeoutError";
-  }
-}
+export { QueueTimeoutError, SandboxStartError };
+
+export type JobPriority = "interactive" | "background";
+
+export type JobOptions = {
+  /**
+   * Max time to wait for a free slot before failing with QueueTimeoutError.
+   * Default: GRADER_QUEUE_TIMEOUT_MS. `null`: wait as long as needed.
+   */
+  queueTimeoutMs?: number | null;
+  /** Default "interactive"; "background" jobs wait behind interactive ones. */
+  priority?: JobPriority;
+};
 
 export type PoolStats = {
   warm: number;
   ready: number;
   runningJobs: number;
   queuedJobs: number;
+  queuedBackgroundJobs: number;
   spawned: number;
   startupFailures: number;
+};
+
+type QueueEntry = {
+  start: () => void;
+  timer: ReturnType<typeof setTimeout> | null;
 };
 
 /** A job's handle on its current sandbox (replaced after timeouts/crashes). */
@@ -36,9 +56,16 @@ export class JobLease {
   private disposed = false;
   constructor(private readonly pool: SandboxPool) {}
 
+  /** The job's sandbox; throws SandboxStartError when none can be started. */
   async current(): Promise<SandboxProcess> {
     if (this.disposed) throw new Error("lease disposed");
-    if (!this.proc || !this.proc.alive) this.proc = await this.pool.take();
+    if (!this.proc || !this.proc.alive) {
+      try {
+        this.proc = await this.pool.take();
+      } catch (e) {
+        throw new SandboxStartError(e);
+      }
+    }
     return this.proc;
   }
 
@@ -57,8 +84,10 @@ export class JobLease {
 export class SandboxPool {
   private warm: SandboxProcess[] = [];
   private running = 0;
-  private queue: { start: () => void; timer: ReturnType<typeof setTimeout> }[] =
-    [];
+  private readonly queues: Record<JobPriority, QueueEntry[]> = {
+    interactive: [],
+    background: [],
+  };
   private spawned = 0;
   private startupFailures = 0;
   private recentFailures: number[] = [];
@@ -74,7 +103,9 @@ export class SandboxPool {
       warm: this.warm.length,
       ready: this.warm.filter((p) => p.isReady).length,
       runningJobs: this.running,
-      queuedJobs: this.queue.length,
+      queuedJobs:
+        this.queues.interactive.length + this.queues.background.length,
+      queuedBackgroundJobs: this.queues.background.length,
       spawned: this.spawned,
       startupFailures: this.startupFailures,
     };
@@ -173,37 +204,55 @@ export class SandboxPool {
     }
   }
 
-  private acquireSlot(): Promise<void> {
+  private acquireSlot(
+    priority: JobPriority,
+    timeoutMs: number | null,
+  ): Promise<void> {
+    // A free slot means nothing is queued (releaseSlot starts the next job).
     if (this.running < this.config.maxConcurrency) {
       this.running++;
       return Promise.resolve();
     }
     return new Promise<void>((resolve, reject) => {
-      const entry = {
+      const queue = this.queues[priority];
+      const entry: QueueEntry = {
         start: () => {
-          clearTimeout(entry.timer);
+          if (entry.timer) clearTimeout(entry.timer);
           this.running++;
           resolve();
         },
-        timer: setTimeout(() => {
-          this.queue = this.queue.filter((q) => q !== entry);
-          reject(new QueueTimeoutError());
-        }, this.config.queueTimeoutMs),
+        timer: null,
       };
-      this.queue.push(entry);
+      if (timeoutMs !== null) {
+        entry.timer = setTimeout(() => {
+          const idx = queue.indexOf(entry);
+          if (idx >= 0) queue.splice(idx, 1);
+          reject(new QueueTimeoutError());
+        }, timeoutMs);
+      }
+      queue.push(entry);
     });
   }
 
   private releaseSlot(): void {
     this.running--;
-    const next = this.queue.shift();
+    const next =
+      this.queues.interactive.shift() ?? this.queues.background.shift();
     if (next) next.start();
   }
 
   /** Run a job with exclusive sandboxes; they are killed when the job ends. */
-  async withJob<T>(fn: (lease: JobLease) => Promise<T>): Promise<T> {
+  async withJob<T>(
+    fn: (lease: JobLease) => Promise<T>,
+    options: JobOptions = {},
+  ): Promise<T> {
     this.warmUp();
-    await this.acquireSlot();
+    await this.acquireSlot(
+      options.priority ?? "interactive",
+      options.queueTimeoutMs === undefined
+        ? this.config.queueTimeoutMs
+        : options.queueTimeoutMs,
+    );
     const lease = new JobLease(this);
     try {
       return await fn(lease);

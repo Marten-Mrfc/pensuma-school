@@ -3,6 +3,9 @@
  * delete the account in one transaction. Foreign keys cascade to sessions,
  * accounts, class memberships, attempts, answers, events, PINs,
  * accommodations and preferences. Active retention holds block erasure.
+ * The audit log has no foreign keys: earlier rows about the student stay
+ * (who did what, when, with the leerlingnummer and without a name), but
+ * their scores and facilities are stripped (redactErasedStudentsAudit).
  */
 import { TRPCError } from "@trpc/server";
 import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
@@ -22,6 +25,7 @@ import {
   type AuditDb,
   auditFromCtx,
 } from "@/server/services/audit";
+import { redactErasedStudentsAudit } from "./audit-writer";
 
 export type ErasureCounts = {
   classes: number;
@@ -156,6 +160,7 @@ export async function eraseStudentById(
     }
     const counts = await countData(tx, userId);
     await tx.delete(user).where(eq(user.id, userId));
+    await redactErasedStudentsAudit(tx, [userId]);
     const studentNumber = student.username ?? "";
     if (studentNumber) await clearStudentLoginThrottle(tx, studentNumber);
     await auditFromCtx(

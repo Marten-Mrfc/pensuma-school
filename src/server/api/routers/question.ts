@@ -28,6 +28,7 @@ import {
   safeParseQuestionData,
   solutionFingerprint,
 } from "@/lib/questions/validate";
+import { assertNoActiveHolds } from "@/server/api/routers/assignment";
 import {
   countTestAttempts,
   requireTest,
@@ -36,12 +37,77 @@ import {
 } from "@/server/api/routers/test";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
-import { answers, questions } from "@/server/db/schema";
+import { answers, attempts, questions, user } from "@/server/db/schema";
 import { gradeCode } from "@/server/grader";
+import { type AuditContext, auditFromCtx } from "@/server/services/audit";
+import { recomputeAttemptScore } from "@/server/services/grading";
 import { copyQuestionsToTest } from "@/server/services/portable-tests";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 type Executor = DB | Tx;
+
+/**
+ * Audit a question deletion that removed students' answers: one summary
+ * row for the question plus one row per student, so it appears under that
+ * student in the audit log and in their own inzage export.
+ */
+async function auditQuestionDeleted(
+  ctx: AuditContext,
+  tx: Tx,
+  question: { id: string; testId: string },
+  rows: {
+    attemptId: string;
+    assignmentId: string;
+    userId: string;
+    studentNumber: string | null;
+  }[],
+) {
+  const perStudent = new Map<
+    string,
+    { studentNumber: string | null; answers: number }
+  >();
+  for (const r of rows) {
+    const entry = perStudent.get(r.userId);
+    if (entry) entry.answers++;
+    else
+      perStudent.set(r.userId, { studentNumber: r.studentNumber, answers: 1 });
+  }
+  const base = {
+    path: "question.delete",
+    questionId: question.id,
+    testId: question.testId,
+  };
+  await auditFromCtx(
+    ctx,
+    {
+      action: "trpc.mutation",
+      subjectType: "question",
+      subjectId: question.id,
+      details: {
+        ...base,
+        answersCount: rows.length,
+        attemptsAffected: new Set(rows.map((r) => r.attemptId)).size,
+        assignmentsAffected: new Set(rows.map((r) => r.assignmentId)).size,
+        studentsCount: perStudent.size,
+      },
+    },
+    tx,
+  );
+  for (const [userId, s] of perStudent) {
+    await auditFromCtx(
+      ctx,
+      {
+        action: "trpc.mutation",
+        subjectType: "question",
+        subjectId: question.id,
+        subjectUserId: userId,
+        subjectLabel: s.studentNumber,
+        details: { ...base, answersCount: s.answers },
+      },
+      tx,
+    );
+  }
+}
 
 async function requireQuestion(db: Executor, id: string) {
   const [question] = await db
@@ -262,7 +328,10 @@ export const questionRouter = createTRPCRouter({
 
   /**
    * Delete a question and re-number the rest. If students already answered
-   * it, `force: true` is required (their answers to it are removed).
+   * it, `force: true` is required (their answers to it are removed). Never
+   * while a retention hold covers an afname or student with an answer to
+   * it (`force` does not override that); the scores of handed-in attempts
+   * are recomputed afterwards, so students and teacher see the same total.
    */
   delete: adminProcedure
     .input(z.object({ id: z.uuid(), force: z.boolean().optional() }))
@@ -279,13 +348,66 @@ export const questionRouter = createTRPCRouter({
           message: `Deze vraag is al ${answerCount} keer beantwoord. Bij verwijderen gaan die antwoorden verloren.`,
         });
       }
-      await ctx.db.transaction(async (tx) => {
+      const affected = await ctx.db.transaction(async (tx) => {
+        // Every attempt with an answer row for this question (the cascade
+        // removes those rows).
+        const rows = await tx
+          .select({
+            attemptId: attempts.id,
+            attemptStatus: attempts.status,
+            assignmentId: attempts.assignmentId,
+            userId: attempts.userId,
+            studentNumber: user.username,
+          })
+          .from(answers)
+          .innerJoin(attempts, eq(attempts.id, answers.attemptId))
+          .innerJoin(user, eq(user.id, attempts.userId))
+          .where(eq(answers.questionId, input.id));
+        if (rows.length) {
+          await assertNoActiveHolds(
+            tx,
+            {
+              assignmentIds: rows.map((r) => r.assignmentId),
+              userIds: rows.map((r) => r.userId),
+            },
+            {
+              afname: "een afname met antwoorden op deze vraag",
+              consequence:
+                "Je kunt de vraag daarom niet verwijderen, want dan gaan die antwoorden verloren.",
+              remedy:
+                "Laat de vraag in plaats daarvan vervallen via de toetsanalyse van de afname, of hef de blokkade eerst op onder Privacy › Bewaarblokkades.",
+            },
+          );
+          await auditQuestionDeleted(ctx, tx, question, rows);
+        }
         await tx.delete(questions).where(eq(questions.id, input.id));
         await renumber(tx, question.testId);
         await touchTest(tx, question.testId);
+        return rows;
       });
+      // Students see the stored attempt score: recompute it for handed-in
+      // attempts (running ones are graded and totalled at the hand-in).
+      const submitted = [
+        ...new Set(
+          affected
+            .filter((r) => r.attemptStatus === "submitted")
+            .map((r) => r.attemptId),
+        ),
+      ];
+      for (const attemptId of submitted) {
+        try {
+          await recomputeAttemptScore(attemptId);
+        } catch (error) {
+          console.error("[question.delete] recompute failed", error);
+        }
+      }
       const attemptCount = await countTestAttempts(ctx.db, question.testId);
-      return { id: input.id, answerCount, hasAttempts: attemptCount > 0 };
+      return {
+        id: input.id,
+        answerCount,
+        hasAttempts: attemptCount > 0,
+        recomputedAttempts: submitted.length,
+      };
     }),
 
   /** Set the order of all questions of a test. */

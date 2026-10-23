@@ -108,7 +108,8 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
       }
     }
     expect(open).toEqual([]);
-  });
+    // 72 requests in a row: a busy dev server needs more than the default.
+  }, 60_000);
 
   test("students cannot sign in through the e-mail flow", async () => {
     const res = await fetch(`${BASE}/api/auth/sign-in/email`, {
@@ -143,6 +144,25 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     expect(body.session?.token).toBeUndefined();
     expect(body.session?.ipAddress).toBeUndefined();
     expect(body.session?.userAgent).toBeUndefined();
+  });
+
+  test("a student sign-in leaves no session_data cookie", async () => {
+    const res = await fetch(`${BASE}/api/auth/sign-in/username`, {
+      method: "POST",
+      headers: sameOrigin,
+      body: JSON.stringify({
+        username: STUDENT_NUMBER,
+        password: STUDENT_PIN,
+        rememberMe: false,
+      }),
+      redirect: "manual",
+    });
+    expect(res.status).toBe(200);
+    const cookies = res.headers.getSetCookie().join("\n");
+    expect(cookies).toContain("session_token");
+    // It would hold the pupil's name, leerlingnummer and IP address until
+    // the browser closes.
+    expect(cookies).not.toContain("session_data");
   });
 
   test("security headers are set on pages", async () => {

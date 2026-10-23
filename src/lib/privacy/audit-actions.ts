@@ -67,6 +67,10 @@ export const AUDIT_ACTIONS = {
     category: "access",
   },
   "attempt.viewed": { label: "Poging bekeken", category: "access" },
+  "similarity.viewed": {
+    label: "Code vergeleken (overzicht afname)",
+    category: "access",
+  },
 
   // change
   "student.created": { label: "Leerling aangemaakt", category: "change" },
