@@ -63,13 +63,19 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { GradeDistributionChart, QuestionAverageChart } from "./charts";
-import { passedSentence, regradeDescription, regradeToast } from "./copy";
+import {
+  exportToast,
+  passedSentence,
+  regradeAssignmentToast,
+  regradeDescription,
+} from "./copy";
 import {
   pendingReviewByQuestion,
   pendingReviewTotal,
   regradeCount,
 } from "./grading-logic";
 import { retakeGroups } from "./retake-groups";
+import { showToast } from "./show-toast";
 import {
   revealFocusedCell,
   STICKY_SCROLL_PADDING_CLASS,
@@ -159,7 +165,8 @@ export function ResultsContent({ data }: { data: Results }) {
     trpc.review.exportCsv.mutationOptions({
       onSuccess: (res) => {
         downloadTextFile(res.filename, res.csv);
-        toast.success("Export gedownload", { description: res.filename });
+        // Rows of students whose processing is restricted have no results.
+        showToast(exportToast(res));
       },
       onError: (err) => toast.error(getErrorMessage(err)),
     }),
@@ -658,13 +665,8 @@ export function ResultsContent({ data }: { data: Results }) {
           });
           // The server regrades in the background: the results refresh by
           // themselves (every 20 seconds). A failed attempt shows up there.
-          if (res.scheduled > 0) {
-            toast.success(regradeToast(res.scheduled), {
-              description: "Scores en cijfers worden vanzelf bijgewerkt.",
-            });
-          } else {
-            toast.info(regradeToast(res.scheduled));
-          }
+          // Attempts of restricted students (AVG art. 18) are skipped.
+          showToast(regradeAssignmentToast(res));
         }}
       />
     </div>

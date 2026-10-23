@@ -51,7 +51,12 @@ import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { focusInvalidField } from "../a11y/invalid-field-focus";
 import { useResultAnnouncement } from "../a11y/result-announcement";
 import { selectionMessage } from "../a11y/result-messages";
-import { formatGrade, formatNumber, formatRemaining } from "./format";
+import {
+  formatGrade,
+  formatNumber,
+  formatRemaining,
+  minutesLabel,
+} from "./format";
 import {
   MINUTES_ERROR,
   MinutesField,
@@ -533,7 +538,9 @@ function RemainingCell({
       {a.extraMinutes > 0 ? (
         <span className="rounded bg-info/10 px-1 font-sans text-[10px] font-semibold text-info-ink">
           +{a.extraMinutes}
-          <span className="sr-only"> minuten extra gegeven</span>
+          <span className="sr-only">
+            {a.extraMinutes === 1 ? " minuut" : " minuten"} extra gegeven
+          </span>
         </span>
       ) : null}
     </span>
@@ -690,9 +697,9 @@ function RowActions({
       onSuccess: async (res, vars) => {
         await invalidate();
         toast.success(
-          `${row.student.name} krijgt ${vars.minutes} minuten extra`,
+          `${row.student.name} krijgt ${minutesLabel(vars.minutes)} extra`,
           {
-            description: `Totaal ${res.extraMinutes} minuten extra.`,
+            description: `Totaal ${minutesLabel(res.extraMinutes)} extra.`,
           },
         );
       },
@@ -892,7 +899,7 @@ function ExtendTimeDialog({
       onSuccess: async (_res, vars) => {
         await invalidate();
         toast.success(
-          `${row?.student.name} krijgt ${vars.minutes} minuten extra`,
+          `${row?.student.name} krijgt ${minutesLabel(vars.minutes)} extra`,
         );
         onClose();
       },
@@ -973,7 +980,7 @@ function ReopenAttemptDialog({
       {row?.attempt && row.attempt.accommodationMinutes > 0 ? (
         <p className="rounded-md bg-info/10 px-3 py-2 text-sm text-info-ink">
           Deze leerling heeft verlengde tijd. De voorgestelde tijd is inclusief{" "}
-          {row.attempt.accommodationMinutes} minuten verlengde tijd.
+          {minutesLabel(row.attempt.accommodationMinutes)} verlengde tijd.
         </p>
       ) : null}
       {assignmentClosed ? (

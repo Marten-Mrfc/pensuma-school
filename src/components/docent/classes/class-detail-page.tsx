@@ -46,6 +46,7 @@ import { plural } from "../students/format";
 import { AddStudentsSheet } from "./add-students-sheet";
 import { ClassFormDialog } from "./class-form-dialog";
 import { ClassStudentsTable } from "./class-students-table";
+import { deleteClassDescription, resetPinsDescription } from "./copy";
 
 type DialogName = "edit" | "archive" | "delete" | "resetPins" | null;
 
@@ -213,7 +214,7 @@ export function ClassDetailPage({
           className="hidden sm:flex"
           hint={
             members.length > 0
-              ? `van de ${members.length} leerlingen (recent)`
+              ? `van de ${plural(members.length, "leerling", "leerlingen")} (recent)`
               : "Nog geen leerlingen"
           }
         />
@@ -302,11 +303,7 @@ export function ClassDetailPage({
         onOpenChange={close}
         destructive
         title={`${klas.name} definitief verwijderen?`}
-        description={
-          klas.assignmentCount > 0
-            ? `Alle ${plural(klas.assignmentCount, "afname", "afnames")} van deze klas worden verwijderd, inclusief alle pogingen, antwoorden en cijfers. De leerlingaccounts blijven bestaan. Dit kun je niet ongedaan maken. Overweeg archiveren.`
-            : "De klas wordt verwijderd. De leerlingaccounts blijven bestaan. Dit kun je niet ongedaan maken."
-        }
+        description={deleteClassDescription(klas.assignmentCount)}
         confirmLabel="Klas verwijderen"
         onConfirm={async () => {
           await remove.mutateAsync({ id: klas.id });
@@ -322,7 +319,7 @@ export function ClassDetailPage({
         open={dialog === "resetPins"}
         onOpenChange={close}
         title={`Alle pincodes van ${klas.name} resetten?`}
-        description={`Alle ${plural(members.length, "leerling", "leerlingen")} krijgen een nieuwe pincode en worden uitgelogd. Hun oude inlogkaarten werken daarna niet meer.`}
+        description={resetPinsDescription(members.length)}
         confirmLabel="Nieuwe pincodes maken"
         onConfirm={async () => {
           const res = await resetPins.mutateAsync({ classId: klas.id });

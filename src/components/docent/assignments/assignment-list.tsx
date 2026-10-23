@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
-import { formatMinutes, formatWindow } from "./format";
+import { formatMinutes, formatWindow, pluralize } from "./format";
 import { SelectStudentsDialogById } from "./select-students-dialog";
 import { AssignmentProgress, ModeBadge, TargetingBadges } from "./shared";
 
@@ -221,7 +221,8 @@ function AssignmentRow({ row }: { row: Row }) {
           <AssignmentProgress counts={row.counts} className="flex-1" />
         ) : (
           <p className="flex-1 text-sm text-muted-foreground">
-            {row.counts.students} leerlingen · {row.questionCount} vragen
+            {pluralize(row.counts.students, "leerling", "leerlingen")} ·{" "}
+            {pluralize(row.questionCount, "vraag", "vragen")}
           </p>
         )}
         <div className="relative z-10 flex items-center">

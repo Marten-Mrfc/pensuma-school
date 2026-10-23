@@ -20,7 +20,7 @@ export async function fillStudentLogin(
 ) {
   await openLoginTab(page, "Leerling");
   await page.getByLabel("Leerlingnummer").fill(number);
-  const pinField = page.getByLabel("PIN-code", { exact: true });
+  const pinField = page.getByLabel("Pincode", { exact: true });
   await pinField.click();
   await pinField.pressSequentially(pin);
 }

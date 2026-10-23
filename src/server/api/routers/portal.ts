@@ -214,6 +214,20 @@ function hiddenResultMessage(
   }
 }
 
+/**
+ * Why a hand-in's result is hidden (dashboard and Resultaten): "never" when
+ * the toets never shows results online (the teacher discusses it), otherwise
+ * "pending" (waiting for the close or the teacher's release). Null when the
+ * result is visible.
+ */
+function hiddenResultReason(
+  visible: boolean,
+  showResults: ShowResults,
+): "never" | "pending" | null {
+  if (visible) return null;
+  return showResults === "never" ? "never" : "pending";
+}
+
 /** Validate a response against its question type; returns the clean response. */
 function validateResponse(
   type: QuestionType,
@@ -417,6 +431,7 @@ export const portalRouter = createTRPCRouter({
                 ).length,
                 submittedAt: last.submittedAt,
                 resultsVisible: visible,
+                hiddenReason: hiddenResultReason(visible, settings.showResults),
                 gradingStatus: visible ? last.gradingStatus : null,
                 score: visible ? last.score : null,
                 maxScore: visible ? last.maxScore : null,
@@ -1277,6 +1292,10 @@ export const portalRouter = createTRPCRouter({
         submittedAt: t.submittedAt,
         autoSubmitted: t.autoSubmitted,
         visible,
+        hiddenReason: hiddenResultReason(
+          visible,
+          parseAssignmentSettings(a.settings).showResults,
+        ),
         gradingStatus: visible ? t.gradingStatus : null,
         score: done ? t.score : null,
         maxScore: done ? t.maxScore : null,

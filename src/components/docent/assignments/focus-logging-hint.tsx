@@ -24,7 +24,7 @@ export function FocusLoggingHint({
       <span>
         Leerlingen zien vóór de start dat dit wordt bijgehouden. Zet het alleen
         aan als het nodig is voor een eerlijke toets; bij oefenen staat het
-        standaard uit. Een focusverlies betekent niet automatisch dat iemand
+        standaard uit. Een vensterwissel betekent niet automatisch dat iemand
         fraudeert: bespreek het altijd eerst met de leerling.
       </span>
     </p>

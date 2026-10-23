@@ -50,10 +50,16 @@ import { describeScale } from "@/lib/grading/grade-scale";
 import { SHOW_RESULTS_LABELS } from "@/lib/questions/schema";
 import { routes } from "@/lib/routes";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { plural } from "../students/format";
 import { AccessCodePresenter } from "./access-code-presenter";
 import { AssignmentNav, useNow } from "./assignment-nav";
 import { DuplicateAssignmentDialog } from "./duplicate-assignment-dialog";
-import { formatMinutes, formatMoment, formatWindow } from "./format";
+import {
+  deleteAssignmentDescription,
+  formatMinutes,
+  formatMoment,
+  formatWindow,
+} from "./format";
 import { MonitorTable } from "./monitor-table";
 import { SelectStudentsDialog } from "./select-students-dialog";
 import { SettingsSheet } from "./settings-sheet";
@@ -211,7 +217,7 @@ export function AssignmentMonitor({
           label="Niet begonnen"
           value={monitor.data?.summary.notStarted ?? "–"}
           icon={UserRoundX}
-          hint={`van ${monitor.data?.summary.students ?? a.counts.students} leerlingen`}
+          hint={`van ${plural(monitor.data?.summary.students ?? a.counts.students, "leerling", "leerlingen")}`}
         />
         <StatCard
           label="Bezig"
@@ -583,11 +589,7 @@ function MonitorHeader({
         onOpenChange={(o) => !o && setConfirm(null)}
         destructive
         title="Afname verwijderen?"
-        description={
-          a.counts.started > 0
-            ? `Alle ${a.counts.started} pogingen met antwoorden en scores worden ook verwijderd. Dit kun je niet ongedaan maken.`
-            : "De afname wordt verwijderd. De toets zelf blijft bestaan."
-        }
+        description={deleteAssignmentDescription(a.counts.started)}
         confirmLabel="Verwijderen"
         onConfirm={async () => {
           await m.remove.mutateAsync({ id: a.id });

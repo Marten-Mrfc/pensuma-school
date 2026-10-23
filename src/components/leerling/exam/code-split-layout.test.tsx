@@ -25,8 +25,9 @@ describe("resizable handles of a code question (A07)", () => {
     expect(promptEditor).toContain(
       `aria-label="${PROMPT_EDITOR_HANDLE_LABEL}"`,
     );
-    // Between stacked panels: the default (horizontal) orientation.
-    expect(promptEditor).not.toContain("aria-orientation");
+    // Between stacked panels: a horizontal line (V12: set by
+    // ResizableHandle from its group, not by hand at each call site).
+    expect(promptEditor).toContain('aria-orientation="horizontal"');
     expect(editorTools).toContain(`aria-label="${EDITOR_TOOLS_HANDLE_LABEL}"`);
     expect(editorTools).toContain('aria-orientation="vertical"');
     expect(PROMPT_EDITOR_HANDLE_LABEL).toBe(

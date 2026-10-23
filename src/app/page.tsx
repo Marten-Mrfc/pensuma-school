@@ -231,7 +231,7 @@ export default function HomePage() {
                   Klaar om te beginnen?
                 </h2>
                 <p className="max-w-xl text-lg text-[oklch(0.88_0.015_130)]">
-                  Leerlingen loggen in met hun leerlingnummer en PIN-code.
+                  Leerlingen loggen in met hun leerlingnummer en pincode.
                   Docenten met hun e-mailadres.
                 </p>
               </div>

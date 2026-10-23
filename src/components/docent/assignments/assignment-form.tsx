@@ -64,6 +64,7 @@ import {
   formatMinutes,
   formatMoment,
   fromDateTimeLocal,
+  pluralize,
   toDateTimeLocal,
 } from "./format";
 import { Notice } from "./notice";
@@ -167,6 +168,8 @@ function AssignmentFormInner({ options }: { options: Options }) {
   const students = effectiveStudentIds(state);
   const mode = presetMode(state.preset);
   const retakeOf = state.retakeOfId;
+  // A retake must use the original toets (the server refuses another one).
+  const testLockedForRetake = !!retakeOf && !!test;
 
   const create = useMutation(
     trpc.assignment.create.mutationOptions({
@@ -340,11 +343,16 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 label="Toets"
                 htmlFor={ids.test}
                 error={errors.test}
-                hint="Alleen gepubliceerde toetsen."
+                hint={
+                  testLockedForRetake
+                    ? "Een herkansing gebruikt dezelfde toets als de oorspronkelijke afname."
+                    : "Alleen gepubliceerde toetsen."
+                }
               >
                 <NativeSelect
                   id={ids.test}
                   value={state.testId}
+                  disabled={testLockedForRetake}
                   onChange={(e) => set("testId", e.target.value)}
                   aria-invalid={!!errors.test}
                   aria-describedby={fieldDescribedBy(ids.test, {
@@ -358,7 +366,8 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   </option>
                   {options.tests.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.title} ({t.questionCount} vragen)
+                      {t.title} ({pluralize(t.questionCount, "vraag", "vragen")}
+                      )
                     </option>
                   ))}
                 </NativeSelect>

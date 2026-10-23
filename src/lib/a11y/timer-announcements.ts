@@ -25,6 +25,38 @@ export const TIME_WARNING_TOASTS: Readonly<Record<TimerThreshold, string>> = {
   1: "Nog 1 minuut. Je werk wordt straks automatisch ingeleverd.",
 };
 
+export interface UpcomingTimeWarning {
+  /** Milliseconds from now until the threshold is reached. */
+  inMs: number;
+  text: string;
+}
+
+/**
+ * Longest delay setTimeout can wait (about 24.8 days). A longer one fires
+ * at once, so a practice afname that stays open for a month would show
+ * every warning the moment it opens.
+ */
+export const MAX_TIMEOUT_MS = 2_147_483_647;
+
+/**
+ * The visible warnings still ahead with `remainingMs` left (ten, five and
+ * one minute): when each one is due and what it says. Thresholds already
+ * reached are left out, so a reload never shows an old warning; so are
+ * warnings too far ahead to schedule (see MAX_TIMEOUT_MS).
+ */
+export function upcomingTimeWarnings(
+  remainingMs: number,
+): UpcomingTimeWarning[] {
+  return TIMER_THRESHOLDS_MIN.filter(
+    (minutes) => remainingMs > minutes * 60_000,
+  )
+    .map((minutes) => ({
+      inMs: remainingMs - minutes * 60_000,
+      text: TIME_WARNING_TOASTS[minutes],
+    }))
+    .filter((warning) => warning.inMs <= MAX_TIMEOUT_MS);
+}
+
 /** The thresholds as Dutch text: "10, 5 en 1 minuut". */
 export function timerThresholdsText(
   thresholds: readonly number[] = TIMER_THRESHOLDS_MIN,

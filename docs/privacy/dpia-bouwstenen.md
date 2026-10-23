@@ -42,7 +42,7 @@ gebruiken. Wat altijd wordt vastgelegd, ook zonder logboek: wanneer een leerling
 | Risico | Toelichting | Kans · impact |
 | --- | --- | --- |
 | Stigmatiserende focusgegevens | Een leerling krijgt het stempel "fraudeur" op basis van focusmeldingen | [[ ]] |
-| Valse positieven | Focusverlies door een melding, pop-up, trage computer of een faciliteit, niet door fraude | [[ ]] |
+| Valse positieven | Een vensterwissel door een melding, pop-up, trage computer of een faciliteit, niet door fraude | [[ ]] |
 | Function creep | Logboeken of resultaten gebruikt voor andere doelen (gedrag, beoordeling van docenten) | [[ ]] |
 | Te ruime toegang | Elke docent met een account kan alle klassen zien; er is nog geen koppeling klas–docent | [[ ]] |
 | Automatisch nakijken | Een fout in testgevallen geeft een te lage score die zonder controle het cijfer wordt | [[ ]] |
@@ -57,8 +57,8 @@ gebruiken. Wat altijd wordt vastgelegd, ook zonder logboek: wanneer een leerling
 - **Geen inhoud vastgelegd:** geen toetsaanslagen, scherm, camera, microfoon of klembordinhoud; bij
   plakken alleen de lengte.
 - **Faciliteit "vensterwissels niet registreren"** per leerling, bijvoorbeeld bij een aandoening die tot
-  veel focusverlies leidt (zonder de reden vast te leggen). Het verlaten van het venster of tabblad wordt
-  dan niet vastgelegd en een verlaten volledig scherm telt niet als focusverlies. Als de toets erom
+  veel vensterwissels leidt (zonder de reden vast te leggen). Het verlaten van het venster of tabblad wordt
+  dan niet vastgelegd en een verlaten volledig scherm telt niet als vensterwissel. Als de toets erom
   vraagt, worden het verlaten van het volledige scherm en geblokkeerde plakpogingen wel vastgelegd
   (de faciliteit "plakken toegestaan" heft het blokkeren van plakken op).
 - **Korte bewaartermijn** voor het logboek (standaard 90 dagen), automatisch verwijderd.

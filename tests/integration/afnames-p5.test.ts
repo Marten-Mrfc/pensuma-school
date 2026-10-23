@@ -511,7 +511,7 @@ describe("grading", () => {
 });
 
 describe("export and audits", () => {
-  test("no Focusverlies column by default; the export is audited", async () => {
+  test("no Vensterwissels column by default; the export is audited", async () => {
     const w = await world();
     const a = await createAssignment({
       testId: w.toets.id,
@@ -520,12 +520,13 @@ describe("export and audits", () => {
     });
     const t = callerFor(w.teacher);
     const plain = await t.review.exportCsv({ assignmentId: a.id });
-    expect(plain.csv).not.toContain("Focusverlies");
+    expect(plain.csv).not.toContain("Vensterwissels");
     const withFocus = await t.review.exportCsv({
       assignmentId: a.id,
       includeFocus: true,
     });
-    expect(withFocus.csv).toContain("Focusverlies");
+    expect(withFocus.csv).toContain("Vensterwissels");
+    expect(withFocus.csv).not.toContain("Focusverlies");
     const audits = await db
       .select()
       .from(auditLog)
@@ -547,7 +548,7 @@ describe("export and audits", () => {
       assignmentId: a.id,
       includeFocus: true,
     });
-    expect(res.csv).not.toContain("Focusverlies");
+    expect(res.csv).not.toContain("Vensterwissels");
     expect(res.includeFocus).toBe(false);
   });
 });

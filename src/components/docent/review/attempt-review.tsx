@@ -29,7 +29,6 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor } from "@/components/app/code-editor";
-import { getErrorMessage } from "@/components/app/get-error-message";
 import { HighlightedCode } from "@/components/app/highlighted-code";
 import { Markdown } from "@/components/app/markdown";
 import { PageHeader } from "@/components/app/page-header";
@@ -68,6 +67,7 @@ import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { CodeResultView } from "./code-result-view";
 import { secondsLabel, wordCountLabel } from "./copy";
 import { FocusLossCaveat } from "./focus-loss-caveat";
+import { regradeAttemptCallbacks } from "./regrade-callbacks";
 import { scoreTone } from "./results-view";
 import { ScoreBox } from "./score-box";
 
@@ -142,20 +142,22 @@ function AttemptContent({
   }, [uid]);
 
   const regrade = useMutation(
-    trpc.review.regradeAttempt.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: trpc.review.pathKey(),
-        });
-        await queryClient.invalidateQueries({
-          queryKey: trpc.assignment.pathKey(),
-        });
-        toast.success("Opnieuw nagekeken", {
-          description: "Handmatige scores en feedback zijn bewaard.",
-        });
-      },
-      onError: (err) => toast.error(getErrorMessage(err)),
-    }),
+    trpc.review.regradeAttempt.mutationOptions(
+      regradeAttemptCallbacks({
+        refresh: () =>
+          Promise.all([
+            queryClient.invalidateQueries({ queryKey: trpc.review.pathKey() }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.assignment.pathKey(),
+            }),
+          ]),
+        onDone: () =>
+          toast.success("Opnieuw nagekeken", {
+            description: "Handmatige scores en feedback zijn bewaard.",
+          }),
+        onFailed: (message) => toast.error(message),
+      }),
+    ),
   );
 
   const durationMin =

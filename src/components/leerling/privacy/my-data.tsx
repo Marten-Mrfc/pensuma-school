@@ -6,6 +6,7 @@ import {
   Clock,
   Download,
   Eye,
+  FileJson,
   Loader2,
   type LucideIcon,
   NotebookPen,
@@ -175,10 +176,28 @@ export function RetentionSection({
   );
 }
 
+/** What the student gets from "Download mijn gegevens" (a JSON file). */
+export const EXPORT_EXPLANATION =
+  "Je krijgt een JSON-bestand: een vorm die vooral voor computers bedoeld is. Bovenin staat een onderdeel “uitleg” dat in gewone taal vertelt wat alles betekent; op deze pagina zie je dezelfde gegevens overzichtelijk.";
+
+/** Under the page header, next to the download button it describes. */
+export function DownloadExplanation({ id }: { id?: string }) {
+  return (
+    <p
+      id={id}
+      className="flex max-w-2xl items-start gap-2 text-sm text-pretty text-muted-foreground"
+    >
+      <FileJson className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span>{EXPORT_EXPLANATION}</span>
+    </p>
+  );
+}
+
 /** /leerling/mijn-gegevens: what Pensuma stores about the student. */
 export function MyData() {
   const trpc = useTRPC();
   const announce = useAnnounce();
+  const explanationId = useId();
   const query = useQuery(trpc.privacy.myData.queryOptions());
   const exportMine = useMutation(trpc.privacy.exportMyData.mutationOptions());
 
@@ -199,24 +218,32 @@ export function MyData() {
   }
 
   const header = (
-    <PageHeader
-      title="Mijn gegevens"
-      description="Dit bewaart Pensuma over jou."
-      actions={
-        <Button
-          onClick={handleDownload}
-          disabled={exportMine.isPending || !query.data}
-          aria-busy={exportMine.isPending}
-        >
-          {exportMine.isPending ? (
-            <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
-          ) : (
-            <Download aria-hidden="true" />
-          )}
-          Download mijn gegevens
-        </Button>
-      }
-    />
+    <div className="flex flex-col gap-2">
+      <PageHeader
+        title="Mijn gegevens"
+        description="Dit bewaart Pensuma over jou."
+        className="pb-0"
+        actions={
+          <Button
+            onClick={handleDownload}
+            disabled={exportMine.isPending || !query.data}
+            aria-busy={exportMine.isPending}
+            aria-describedby={explanationId}
+          >
+            {exportMine.isPending ? (
+              <Loader2
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+            ) : (
+              <Download aria-hidden="true" />
+            )}
+            Download mijn gegevens
+          </Button>
+        }
+      />
+      <DownloadExplanation id={explanationId} />
+    </div>
   );
 
   if (query.isPending) {

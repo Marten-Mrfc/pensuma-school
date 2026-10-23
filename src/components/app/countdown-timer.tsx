@@ -48,13 +48,14 @@ function format(totalSeconds: number) {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-function spokenRemaining(totalSeconds: number) {
+/** The time left as the timer's accessible name: "Nog 1 uur en 1 minuut". */
+export function spokenRemaining(totalSeconds: number) {
   if (totalSeconds <= 0) return "De tijd is om";
   const minutes = Math.ceil(totalSeconds / 60);
   if (minutes >= 60) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return `Nog ${h} uur${m ? ` en ${m} minuten` : ""}`;
+    return `Nog ${h} uur${m ? ` en ${m === 1 ? "1 minuut" : `${m} minuten`}` : ""}`;
   }
   return minutes === 1 ? "Nog minder dan 1 minuut" : `Nog ${minutes} minuten`;
 }

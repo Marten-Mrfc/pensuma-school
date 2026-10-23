@@ -5,7 +5,7 @@
  * teacher sees and edits only their own snippets.
  */
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { groupKey } from "@/lib/grading/answer-groups";
 import { unknownRubricIds } from "@/lib/grading/rubric";
@@ -203,6 +203,8 @@ export const feedbackRouter = createTRPCRouter({
    * one answer with rubric criteria). Every answer is checked first; any
    * problem rejects the whole request. Answers of students whose
    * processing is restricted (AVG art. 18) are skipped and counted.
+   * The first id is the answer being graded; the other (identical) answers
+   * are skipped and counted when they already have a manual score.
    */
   gradeMany: adminProcedure
     .input(
@@ -260,10 +262,20 @@ export const feedbackRouter = createTRPCRouter({
         allRows.map((r) => r.userId),
       );
       const overridden = !!input.overrideRestriction && restricted.size > 0;
-      const rows = overridden
+      const allowed = overridden
         ? allRows
         : allRows.filter((r) => !restricted.has(r.userId));
+      // The first id is the answer the teacher grades directly; the others
+      // (identical answers) only get this score while nobody has scored them
+      // yet, so a bulk save never overwrites a score another teacher (or an
+      // earlier pass) gave.
+      const sourceId = requested[0];
+      const position = new Map(requested.map((id, i) => [id, i]));
+      const rows = allowed
+        .filter((r) => r.id === sourceId || r.previousScore == null)
+        .sort((x, y) => (position.get(x.id) ?? 0) - (position.get(y.id) ?? 0));
       if (rows.length === 0) {
+        // Only possible when the answer being graded itself is restricted.
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
@@ -272,7 +284,6 @@ export const feedbackRouter = createTRPCRouter({
               : "Voor deze leerlingen is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
         });
       }
-      const ids = rows.map((r) => r.id);
       const manualScore = round2(input.manualScore);
       for (const row of rows) {
         if (row.attemptStatus !== "submitted") {
@@ -310,8 +321,10 @@ export const feedbackRouter = createTRPCRouter({
             ? input.feedback
             : null;
       const now = new Date();
-      await ctx.db.transaction(async (tx) => {
-        await tx
+      const graded = await ctx.db.transaction(async (tx) => {
+        // The "not scored yet" condition is repeated here, so a score that
+        // another teacher saved in the meantime is not overwritten either.
+        const updatedIds = await tx
           .update(answers)
           .set({
             manualScore,
@@ -323,12 +336,23 @@ export const feedbackRouter = createTRPCRouter({
               ? { rubricChecked: [...new Set(input.rubricChecked)] }
               : {}),
           })
-          .where(inArray(answers.id, ids));
+          .where(
+            and(
+              inArray(
+                answers.id,
+                rows.map((r) => r.id),
+              ),
+              or(eq(answers.id, sourceId), isNull(answers.manualScore)),
+            ),
+          )
+          .returning({ id: answers.id });
+        const done = new Set(updatedIds.map((r) => r.id));
+        const updatedRows = rows.filter((r) => done.has(r.id));
         // One row per answer whose score changed, with the student, like
         // review.setManualScore: it shows up under that student in the
         // audit log and in their own inzage export.
         let audited = 0;
-        for (const row of rows) {
+        for (const row of updatedRows) {
           if (row.previousScore === manualScore) continue;
           audited++;
           await auditFromCtx(
@@ -353,26 +377,27 @@ export const feedbackRouter = createTRPCRouter({
             tx,
           );
         }
-        if (audited === 0) {
+        if (audited === 0 && updatedRows.length > 0) {
           // Only feedback or criteria changed: one summary row.
           await auditFromCtx(
             ctx,
             {
               action: "trpc.mutation",
               subjectType: "answer",
-              subjectId: ids.length === 1 ? ids[0] : null,
+              subjectId: updatedRows.length === 1 ? updatedRows[0].id : null,
               details: {
                 path: "feedback.gradeMany",
-                answerIdsCount: ids.length,
+                answerIdsCount: updatedRows.length,
                 ...(overridden ? { restrictionOverridden: true } : {}),
               },
             },
             tx,
           );
         }
+        return updatedRows;
       });
 
-      const attemptIds = [...new Set(rows.map((r) => r.attemptId))];
+      const attemptIds = [...new Set(graded.map((r) => r.attemptId))];
       let recomputed = true;
       for (const attemptId of attemptIds) {
         try {
@@ -385,12 +410,16 @@ export const feedbackRouter = createTRPCRouter({
         }
       }
       return {
-        updated: ids.length,
+        updated: graded.length,
+        /** The answers that got this score, in the requested order. */
+        answerIds: graded.map((r) => r.id),
         attemptIds,
         manualScore,
         recomputed,
         /** Answers left alone: the student's processing is restricted. */
-        skippedRestricted: requested.length - ids.length,
+        skippedRestricted: allRows.length - allowed.length,
+        /** Identical answers left alone: they already had a manual score. */
+        skippedGraded: allowed.length - graded.length,
       };
     }),
 

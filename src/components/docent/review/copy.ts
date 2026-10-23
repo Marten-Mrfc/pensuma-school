@@ -86,3 +86,124 @@ export function secondsLabel(ms: number): string {
   const seconds = Math.round(ms / 1000);
   return seconds === 1 ? "1 seconde" : `${n(seconds)} seconden`;
 }
+
+/* ------------------------- Restricted processing ------------------------- */
+// AVG art. 18: bulk actions leave students whose processing is restricted
+// alone, and say so, instead of a count that silently doesn't add up.
+
+const RESTRICTED = "de verwerking is beperkt (AVG art. 18)";
+
+/** feedback.gradeMany: answers left alone. Empty when none. */
+export function restrictedAnswersSkipNote(skipped: number): string {
+  if (skipped <= 0) return "";
+  return skipped === 1
+    ? `1 antwoord overgeslagen: ${RESTRICTED}. Dat antwoord houdt zijn huidige score.`
+    : `${n(skipped)} antwoorden overgeslagen: ${RESTRICTED}. Die antwoorden houden hun huidige score.`;
+}
+
+/** review.regradeAssignment: attempts not regraded. Empty when none. */
+export function restrictedAttemptsSkipNote(skipped: number): string {
+  if (skipped <= 0) return "";
+  return skipped === 1
+    ? `1 poging overgeslagen: ${RESTRICTED}. Die score blijft zoals hij was.`
+    : `${n(skipped)} pogingen overgeslagen: ${RESTRICTED}. Die scores blijven zoals ze waren.`;
+}
+
+/** review.exportCsv: rows without results. Empty when none. */
+export function restrictedExportNote(count: number): string {
+  if (count <= 0) return "";
+  return count === 1
+    ? `Bij 1 leerling staan geen resultaten: ${RESTRICTED}.`
+    : `Bij ${n(count)} leerlingen staan geen resultaten: ${RESTRICTED}.`;
+}
+
+export interface ToastCopy {
+  tone: "success" | "warning" | "info";
+  title: string;
+  description?: string;
+}
+
+/** After saving one score for several answers (feedback.gradeMany). */
+export function gradeManyToast(res: {
+  updated: number;
+  recomputed: boolean;
+  skippedRestricted: number;
+  /** Identical answers that another review already scored (left alone). */
+  skippedGraded?: number;
+}): ToastCopy {
+  const graded = res.skippedGraded ?? 0;
+  const gradedNote =
+    graded > 0
+      ? graded === 1
+        ? "1 antwoord met een eerdere beoordeling is overgeslagen."
+        : `${n(graded)} antwoorden met een eerdere beoordeling zijn overgeslagen.`
+      : "";
+  const skipped =
+    [restrictedAnswersSkipNote(res.skippedRestricted), gradedNote]
+      .filter(Boolean)
+      .join(" ") || undefined;
+  if (res.updated <= 0)
+    return {
+      tone: "warning",
+      title: "Er is niets opgeslagen",
+      description: skipped,
+    };
+  if (!res.recomputed)
+    return {
+      tone: "warning",
+      title: "Score opgeslagen, maar een totaal kon niet worden bijgewerkt",
+      description: skipped,
+    };
+  const title =
+    res.updated === 1
+      ? "Beoordeling opgeslagen"
+      : `Beoordeling opgeslagen voor ${n(res.updated)} antwoorden`;
+  return skipped
+    ? { tone: "warning", title, description: skipped }
+    : { tone: "success", title };
+}
+
+/** After "Alles opnieuw nakijken" (review.regradeAssignment). */
+export function regradeAssignmentToast(res: {
+  scheduled: number;
+  skippedRestricted: number;
+}): ToastCopy {
+  const skipped = restrictedAttemptsSkipNote(res.skippedRestricted);
+  if (res.scheduled <= 0)
+    return {
+      tone: skipped ? "warning" : "info",
+      title: regradeToast(0),
+      description: skipped || undefined,
+    };
+  const refresh = "Scores en cijfers worden vanzelf bijgewerkt.";
+  return skipped
+    ? {
+        tone: "warning",
+        title: regradeToast(res.scheduled),
+        description: `${refresh} ${skipped}`,
+      }
+    : {
+        tone: "success",
+        title: regradeToast(res.scheduled),
+        description: refresh,
+      };
+}
+
+/** After downloading the results (review.exportCsv). */
+export function exportToast(res: {
+  filename: string;
+  restrictedCount: number;
+}): ToastCopy {
+  const restricted = restrictedExportNote(res.restrictedCount);
+  return restricted
+    ? {
+        tone: "warning",
+        title: "Export gedownload",
+        description: `${res.filename}. ${restricted}`,
+      }
+    : {
+        tone: "success",
+        title: "Export gedownload",
+        description: res.filename,
+      };
+}

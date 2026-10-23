@@ -62,6 +62,7 @@ import {
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { archiveInsteadDescription, testAttemptsNote } from "./copy";
 import { CopyToTestDialog } from "./copy-to-test-dialog";
 import { deleteQuestionKeepingEdits } from "./delete-question";
 import { downloadTestJson } from "./download";
@@ -745,7 +746,7 @@ function Builder({ test }: { test: BuilderTest }) {
                 maxLength={200}
                 placeholder="Titel van de toets"
                 className={cn(
-                  "-ml-2 max-w-full min-w-48 resize-none overflow-hidden rounded-md border text-balance [field-sizing:content] border-transparent bg-transparent px-2 py-0.5 font-display text-2xl leading-tight font-bold tracking-tight text-foreground transition-colors outline-none placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring sm:text-[1.75rem]",
+                  "-ml-2 max-w-full min-w-48 resize-none overflow-hidden rounded-md border text-balance [field-sizing:content] border-transparent bg-transparent px-2 py-0.5 font-display text-2xl leading-tight font-bold tracking-tight text-foreground transition-colors outline-none placeholder:text-muted-foreground hover:border-border focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring sm:text-[1.75rem]",
                   !settings.title.trim() && "border-destructive/50",
                 )}
               />
@@ -883,7 +884,7 @@ function Builder({ test }: { test: BuilderTest }) {
           />
           <p className="text-pretty">
             <span className="font-medium text-warning-ink">
-              Deze toets is al gemaakt ({test.attemptCount} pogingen).
+              {testAttemptsNote(test.attemptCount)}
             </span>{" "}
             Je kunt hem nog aanpassen.{" "}
             {EDIT_WITH_ATTEMPTS_WARNING.replace("Er zijn al pogingen; l", "L")}{" "}
@@ -1183,7 +1184,7 @@ function Builder({ test }: { test: BuilderTest }) {
         }
         description={
           test.hasAttempts
-            ? `Deze toets is al ${test.attemptCount} keer gemaakt door leerlingen en kan daarom niet worden verwijderd. Archiveer hem; dan verdwijnt hij uit je lijst en blijven alle resultaten bewaard.`
+            ? archiveInsteadDescription(test.attemptCount)
             : test.assignmentCount > 0
               ? `“${settings.title}” en ${test.assignmentCount === 1 ? "de geplande afname" : `de ${test.assignmentCount} geplande afnames`} worden definitief verwijderd.`
               : `“${settings.title}” en ${questions.length === 1 ? "de vraag" : `alle ${questions.length} vragen`} worden definitief verwijderd.`

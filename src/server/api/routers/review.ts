@@ -987,7 +987,7 @@ export const reviewRouter = createTRPCRouter({
     .input(
       z.object({
         assignmentId: idSchema,
-        /** Include the "Focusverlies" column (default: the school's privacy setting). */
+        /** Include the "Vensterwissels" column (default: the school's privacy setting). */
         includeFocus: z.boolean().optional(),
       }),
     )
@@ -1018,7 +1018,7 @@ export const reviewRouter = createTRPCRouter({
         "Max",
         "Cijfer",
         "Ingeleverd op",
-        ...(includeFocus ? ["Focusverlies"] : []),
+        ...(includeFocus ? ["Vensterwissels"] : []),
       ];
       const body: CsvCell[][] = data.rows.map((r) =>
         restricted.has(r.student.id)

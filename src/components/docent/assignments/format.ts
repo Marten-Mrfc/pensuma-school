@@ -1,5 +1,7 @@
 /** Dutch formatting helpers for the afnames (assignments) screens. */
 
+import { plural } from "../students/format";
+
 const dateTimeFormat = new Intl.DateTimeFormat("nl-NL", {
   weekday: "short",
   day: "numeric",
@@ -139,4 +141,19 @@ export function greeting(now = new Date()): string {
 
 export function pluralize(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
+}
+
+/** "1 minuut" / "10 minuten" (extra time, verlengde tijd). */
+export function minutesLabel(minutes: number): string {
+  return plural(minutes, "minuut", "minuten");
+}
+
+/**
+ * Confirm text for deleting an afname. `startedStudents` is the number of
+ * students who started (a practice afname can hold several attempts each).
+ */
+export function deleteAssignmentDescription(startedStudents: number): string {
+  if (startedStudents <= 0)
+    return "De afname wordt verwijderd. De toets zelf blijft bestaan.";
+  return `Het werk van ${plural(startedStudents, "leerling", "leerlingen")} (pogingen, antwoorden en scores) wordt ook verwijderd. Dit kun je niet ongedaan maken.`;
 }

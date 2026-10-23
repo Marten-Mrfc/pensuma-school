@@ -43,7 +43,7 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 | Gegevens | Altijd: code uitvoeren en testen (vraag, duur, soort fout, aantal geslaagde tests; nooit de code zelf). Alleen als de docent het per afname aanzet: venster of tabblad verlaten (met duur), volledig scherm verlaten, plakpogingen (lengte, geen inhoud). Kopiëren wordt niet bijgehouden |
 | Ontvangers | Docenten informatica |
 | Bewaartermijn | Standaard 90 dagen na het einde van de poging (instelbaar 7–730), automatisch |
-| Waarborgen | Vooraf zichtbaar voor de leerling, nooit inhoud of toetsaanslagen, geen automatische gevolgen. Vensterwissels, volledig scherm en plakpogingen: standaard uit; het registreren van vensterwissels is per leerling uit te zetten (faciliteit), het verlaten van het volledige scherm en geblokkeerde plakpogingen worden dan nog vastgelegd als de toets erom vraagt, maar tellen niet als focusverlies |
+| Waarborgen | Vooraf zichtbaar voor de leerling, nooit inhoud of toetsaanslagen, geen automatische gevolgen. Vensterwissels, volledig scherm en plakpogingen: standaard uit; het registreren van vensterwissels is per leerling uit te zetten (faciliteit), het verlaten van het volledige scherm en geblokkeerde plakpogingen worden dan nog vastgelegd als de toets erom vraagt, maar tellen niet als vensterwissel |
 
 ## Verwerking 4: Faciliteiten
 

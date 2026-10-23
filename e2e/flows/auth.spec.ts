@@ -59,7 +59,7 @@ test.describe("student sign-in", () => {
     await fillStudentLogin(page, student.number, "000417");
     const alert = page.getByRole("tabpanel").getByRole("alert");
     await expect(alert).toContainText("klopt niet");
-    const pin = page.getByLabel("PIN-code", { exact: true });
+    const pin = page.getByLabel("Pincode", { exact: true });
     await expect(pin).toBeFocused();
     await expect(pin).toHaveAttribute("aria-invalid", "true");
   });

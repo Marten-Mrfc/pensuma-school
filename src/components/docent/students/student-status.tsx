@@ -44,7 +44,7 @@ const timeFormat = new Intl.DateTimeFormat("nl-NL", {
 });
 
 const LOCK_HELP =
-  "Te veel verkeerde PIN-codes. Hef de blokkade op of wacht tot de tijd voorbij is.";
+  "Te veel verkeerde pincodes. Hef de blokkade op of wacht tot de tijd voorbij is.";
 
 /** Is the login lock still active? */
 export function isLoginLocked(

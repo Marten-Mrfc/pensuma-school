@@ -416,7 +416,7 @@ function AttemptRow({ attempt: a }: { attempt: Attempt }) {
     <li>
       <Link
         href={routes.docent.attempt(a.assignmentId, a.id)}
-        className="group flex items-center gap-4 px-5 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/50"
+        className="group flex items-center gap-4 px-5 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset forced-colors:focus-visible:-outline-offset-2!"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="truncate text-sm font-medium">

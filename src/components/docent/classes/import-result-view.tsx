@@ -1,18 +1,60 @@
 "use client";
 
-import { CircleAlert, CircleCheck, Printer, UsersRound } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  Printer,
+  ShieldAlert,
+  UsersRound,
+} from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 import { CopyButton } from "@/components/app/copy-button";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
-import { formatPin, plural } from "../students/format";
-import type { ImportResult } from "./import-students-panel";
+import { cn } from "@/lib/utils";
+import { formatPin, plural, restrictedSkipNote } from "../students/format";
+import type { ImportContext, ImportResult } from "./import-students-panel";
+
+type ExistingRow = ImportResult["existing"][number];
+
+/**
+ * Did the import leave this student alone because their processing is
+ * restricted (AVG art. 18)? Not when they were already in the class and no
+ * new name was asked for: then nothing would have changed anyway. Without
+ * a context every restricted student counts as skipped.
+ */
+export function skippedForRestriction(
+  e: ExistingRow,
+  context?: ImportContext,
+): boolean {
+  if (!e.restricted) return false;
+  if (!context?.alreadyInClass.has(e.id)) return true;
+  return context.renameAsked && e.importedName !== e.name;
+}
+
+/** What the import did with a student who already had an account. */
+export function existingStatusText(
+  e: ExistingRow,
+  context?: ImportContext,
+): string {
+  // AVG art. 18: neither the name nor the klasindeling may change.
+  if (e.restricted && !context?.alreadyInClass.has(e.id))
+    return "Niet toegevoegd en niet hernoemd: verwerking beperkt (AVG art. 18)";
+  if (skippedForRestriction(e, context))
+    return "Zat al in de klas · naam niet bijgewerkt: verwerking beperkt (AVG art. 18)";
+  const status = e.addedToClass
+    ? "Toegevoegd aan de klas"
+    : "Zat al in de klas";
+  return e.nameUpdated ? `${status} · naam bijgewerkt` : status;
+}
 
 export interface ImportResultViewProps {
   classId: string;
   className: string;
   result: ImportResult;
+  /** Who was already in the class and whether names were to be updated. */
+  context?: ImportContext;
   onImportMore: () => void;
   onDone: () => void;
 }
@@ -22,12 +64,16 @@ export function ImportResultView({
   classId,
   className,
   result,
+  context,
   onImportMore,
   onDone,
 }: ImportResultViewProps) {
   const uid = useId();
   const { created, existing, errors } = result;
   const addedExisting = existing.filter((e) => e.addedToClass);
+  const restrictedCount = existing.filter((e) =>
+    skippedForRestriction(e, context),
+  ).length;
   const total = created.length + addedExisting.length;
   const printIds = [
     ...created.map((c) => c.id),
@@ -67,6 +113,19 @@ export function ImportResultView({
             </p>
           </div>
         </div>
+
+        {restrictedCount > 0 ? (
+          <p className="flex items-start gap-2 rounded-lg border border-warning/35 bg-warning/10 px-3 py-2 text-sm text-pretty">
+            <ShieldAlert
+              className="mt-0.5 size-4 shrink-0 text-warning-ink"
+              aria-hidden="true"
+            />
+            <span>
+              {restrictedSkipNote(restrictedCount)} Naam en klassen blijven
+              ongewijzigd.
+            </span>
+          </p>
+        ) : null}
 
         {total > 0 ? (
           <Button asChild size="lg" className="h-12 w-full text-base">
@@ -164,11 +223,15 @@ export function ImportResultView({
                       {e.studentNumber}
                     </span>
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    {e.addedToClass
-                      ? "Toegevoegd aan de klas"
-                      : "Zat al in de klas"}
-                    {e.nameUpdated ? " · naam bijgewerkt" : ""}
+                  <span
+                    className={cn(
+                      "text-xs",
+                      skippedForRestriction(e, context)
+                        ? "font-medium text-warning-ink"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {existingStatusText(e, context)}
                   </span>
                 </li>
               ))}

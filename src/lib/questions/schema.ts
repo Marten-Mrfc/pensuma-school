@@ -200,11 +200,24 @@ export const rubricItemSchema = z.object({
 });
 export type RubricItem = z.infer<typeof rubricItemSchema>;
 
+/** Longest open answer a student can save (see `openResponseSchema`). */
+export const OPEN_ANSWER_MAX_LENGTH = 20_000;
+
 export const openQuestionDataSchema = z.object({
   /** Shown to teachers while grading. Never sent to students. */
   modelAnswer: z.string().default(""),
   rubric: z.string().default(""),
-  maxLength: z.number().int().positive().optional(),
+  /**
+   * Character limit for the answer. Clamped (not rejected) to
+   * OPEN_ANSWER_MAX_LENGTH: stored questions with a larger value still
+   * parse, and students are never promised more than they can save.
+   */
+  maxLength: z
+    .number()
+    .int()
+    .positive()
+    .transform((n) => Math.min(n, OPEN_ANSWER_MAX_LENGTH))
+    .optional(),
   /** Scoring criteria for teachers. Never sent to students. */
   rubricItems: z.array(rubricItemSchema).max(20).default([]),
 });
@@ -261,7 +274,9 @@ export const codeResponseSchema = z.object({ code: z.string().max(100_000) });
 export const multipleChoiceResponseSchema = z.object({
   selected: z.array(z.string()).max(50),
 });
-export const openResponseSchema = z.object({ text: z.string().max(20_000) });
+export const openResponseSchema = z.object({
+  text: z.string().max(OPEN_ANSWER_MAX_LENGTH),
+});
 
 export const answerResponseSchema = z.union([
   codeResponseSchema,

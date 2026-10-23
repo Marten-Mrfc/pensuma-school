@@ -26,9 +26,10 @@ import {
 } from "@/lib/grading/rubric";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
-import { applyToSameLabel } from "./copy";
+import { applyToSameLabel, gradeManyToast } from "./copy";
 import { FeedbackSnippets } from "./feedback-snippets";
 import { RubricChecklist } from "./rubric-checklist";
+import { showToast } from "./show-toast";
 
 export type ScoreBoxAnswer = {
   id: string;
@@ -164,17 +165,9 @@ export function ScoreBox({
     trpc.feedback.gradeMany.mutationOptions({
       onSuccess: async (res, variables) => {
         await afterSave();
-        if (!res.recomputed) {
-          toast.warning(
-            "Score opgeslagen, maar een totaal kon niet worden bijgewerkt",
-          );
-        } else {
-          toast.success(
-            res.updated === 1
-              ? "Beoordeling opgeslagen"
-              : `Beoordeling opgeslagen voor ${res.updated} antwoorden`,
-          );
-        }
+        // Also says how many answers were skipped because the student's
+        // processing is restricted (AVG art. 18).
+        showToast(gradeManyToast(res));
         setApplyToSame(false);
         onSaved?.({ answerIds: variables.answerIds });
       },

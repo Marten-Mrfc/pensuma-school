@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddExistingPanel } from "./add-existing-panel";
 import { ImportResultView } from "./import-result-view";
 import {
+  type ImportContext,
   type ImportResult,
   ImportStudentsPanel,
 } from "./import-students-panel";
@@ -34,6 +35,7 @@ export function AddStudentsSheet({
   const uid = useId();
   const [tab, setTab] = useState("import");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [importContext, setImportContext] = useState<ImportContext>();
   // Bumped to reset the import panel ("Nog een lijst importeren").
   const [importKey, setImportKey] = useState(0);
 
@@ -74,6 +76,7 @@ export function AddStudentsSheet({
             classId={classId}
             className={className}
             result={result}
+            context={importContext}
             onImportMore={() => {
               setResult(null);
               setImportKey((k) => k + 1);
@@ -108,7 +111,10 @@ export function AddStudentsSheet({
                 classId={classId}
                 className={className}
                 onCancel={() => handleOpenChange(false)}
-                onImported={setResult}
+                onImported={(next, context) => {
+                  setImportContext(context);
+                  setResult(next);
+                }}
               />
             </TabsContent>
             <TabsContent

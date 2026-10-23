@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Maximize,
   Send,
   Timer,
 } from "lucide-react";
@@ -32,12 +31,6 @@ import { ExamShell } from "@/components/layout/exam-shell";
 import { DisplayPreferencesButton } from "@/components/preferences/display-preferences-dialog";
 import { usePreferences } from "@/components/preferences/use-preferences";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import {
   Sheet,
@@ -47,6 +40,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useShortcut } from "@/lib/a11y/shortcuts";
+import { upcomingTimeWarnings } from "@/lib/a11y/timer-announcements";
 import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { countWarnings, getCodeTips } from "@/lib/python/code-tips";
 import type { AnswerResponse } from "@/lib/questions/schema";
@@ -61,6 +55,7 @@ import {
 } from "./activity-logger";
 import { AnswerSaver, REMOVED_STATUS, type SaveState } from "./answer-saver";
 import { focusAfterDialogs } from "./focus-after-dialogs";
+import { FULLSCREEN_FAILED, FullscreenOverlay } from "./fullscreen-overlay";
 import {
   HandInSummary,
   handInDescription,
@@ -304,6 +299,7 @@ function ExamRunner({
   const [navOpen, setNavOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [timerRevealed, setTimerRevealed] = useState(false);
   const [finishing, setFinishing] = useState<null | "manual" | "auto">(null);
   const finishingRef = useRef(false);
@@ -646,22 +642,14 @@ function ExamRunner({
     return () => clearInterval(id);
   }, [trpcClient, attemptId]);
 
-  // Five- and one-minute warnings (visual; the timer announces them).
+  // Ten-, five- and one-minute warnings (visual, also when the timer is
+  // hidden; the timer announces the same moments to screen readers).
   useEffect(() => {
     if (!deadlineAt) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
     const remaining = deadlineAt.getTime() - (Date.now() + offset);
-    const warn = (ms: number, text: string) => {
-      if (remaining > ms)
-        timers.push(
-          setTimeout(
-            () => toast.warning(text, { ...TOAST, duration: 8000 }),
-            remaining - ms,
-          ),
-        );
-    };
-    warn(5 * 60_000, "Nog 5 minuten! Rond je antwoorden af.");
-    warn(60_000, "Nog 1 minuut. Je werk wordt straks automatisch ingeleverd.");
+    const timers = upcomingTimeWarnings(remaining).map(({ inMs, text }) =>
+      setTimeout(() => toast.warning(text, { ...TOAST, duration: 8000 }), inMs),
+    );
     return () => timers.forEach(clearTimeout);
   }, [deadlineAt, offset]);
 
@@ -765,6 +753,8 @@ function ExamRunner({
   });
 
   const enterFullscreen = () => {
+    // Cleared first, so the same failure twice is announced again.
+    setFullscreenError(null);
     void document.documentElement
       .requestFullscreen({ navigationUI: "hide" })
       .then(() => {
@@ -774,10 +764,8 @@ function ExamRunner({
         focusAfterDialogs(target?.isConnected ? target : headingId);
       })
       .catch(() => {
-        toast.error(
-          "Volledig scherm lukte niet. Probeer F11 of vraag je docent om hulp.",
-          TOAST,
-        );
+        // Inline in the overlay: a toast sits outside its focus trap.
+        setFullscreenError(FULLSCREEN_FAILED);
       });
   };
 
@@ -1021,51 +1009,16 @@ function ExamRunner({
         />
       </ConfirmDialog>
 
-      <Dialog open={showOverlay}>
-        <DialogContent
-          role="alertdialog"
-          showCloseButton={false}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => {
-            // Focus goes back to where the student was (see enterFullscreen),
-            // or into the hand-in dialog.
-            e.preventDefault();
-          }}
-          className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
-        >
-          <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
-            <Maximize className="size-7" aria-hidden="true" />
-          </span>
-          <DialogTitle className="font-display text-2xl leading-tight font-bold tracking-tight">
-            Ga terug naar volledig scherm om verder te gaan
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            Deze toets werkt alleen in volledig scherm. Het verlaten ervan wordt
-            bijgehouden. Je antwoorden zijn veilig opgeslagen.
-          </DialogDescription>
-          <Button
-            size="lg"
-            className="h-12 px-6 text-base"
-            onClick={enterFullscreen}
-            autoFocus
-          >
-            <Maximize aria-hidden="true" />
-            Volledig scherm
-          </Button>
-          <Button
-            variant="link"
-            className="text-muted-foreground"
-            onClick={() => {
-              setOverlayDismissed(true);
-              setSubmitOpen(true);
-            }}
-          >
-            Ik ben klaar en wil inleveren
-          </Button>
-        </DialogContent>
-      </Dialog>
+      <FullscreenOverlay
+        open={showOverlay}
+        error={fullscreenError}
+        onEnter={enterFullscreen}
+        onHandIn={() => {
+          setFullscreenError(null);
+          setOverlayDismissed(true);
+          setSubmitOpen(true);
+        }}
+      />
 
       {finishing ? (
         <div

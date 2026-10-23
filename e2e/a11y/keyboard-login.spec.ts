@@ -61,10 +61,10 @@ test("a keyboard-only login lands on /leerling", async ({ page }) => {
   await page.goto("/inloggen");
   await expect(page.getByLabel("Leerlingnummer")).toBeFocused();
   await page.keyboard.type(DEFAULT_STUDENT.number);
-  await tabTo(page, (f) => f.tag === "input" && f.name.includes("PIN"), {
+  await tabTo(page, (f) => f.tag === "input" && f.name.includes("Pincode"), {
     max: 4,
   });
-  await expect(page.getByLabel("PIN-code", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("Pincode", { exact: true })).toBeFocused();
   await page.keyboard.type(DEFAULT_STUDENT.pin);
   await expect(page).toHaveURL(/\/leerling$/, { timeout: 30_000 });
 });
@@ -93,13 +93,13 @@ test.describe("failed sign-in", () => {
     await page.goto("/inloggen");
     await expect(page.getByLabel("Leerlingnummer")).toBeFocused();
     await page.keyboard.type(student.number);
-    await tabTo(page, (f) => f.tag === "input" && f.name.includes("PIN"), {
+    await tabTo(page, (f) => f.tag === "input" && f.name.includes("Pincode"), {
       max: 4,
     });
     await page.keyboard.type("000417");
     const alert = page.getByRole("tabpanel").getByRole("alert");
     await expect(alert).toContainText("klopt niet");
-    const pin = page.getByLabel("PIN-code", { exact: true });
+    const pin = page.getByLabel("Pincode", { exact: true });
     await expect(pin).toBeFocused();
     await expect(pin).toHaveAttribute("aria-invalid", "true");
     // The right PIN still works (and clears the failure counter).

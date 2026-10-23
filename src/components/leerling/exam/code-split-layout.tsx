@@ -10,8 +10,8 @@ import {
 /**
  * Names of the two drag handles (role="separator", focusable, arrow keys
  * resize). Without a name a screen reader only says "scheidingslijn".
- * The handle between the side-by-side editor and tools is a vertical line,
- * so it says so (a separator is horizontal by default).
+ * ResizableHandle sets the orientation from its group: the handle between
+ * the side-by-side editor and tools is a vertical line.
  */
 export const PROMPT_EDITOR_HANDLE_LABEL =
   "Hoogte van opdracht en code aanpassen";
@@ -55,11 +55,7 @@ export function CodeSplitLayout({
       </ResizablePanel>
       {hasTools ? (
         <>
-          <ResizableHandle
-            withHandle
-            aria-label={EDITOR_TOOLS_HANDLE_LABEL}
-            aria-orientation="vertical"
-          />
+          <ResizableHandle withHandle aria-label={EDITOR_TOOLS_HANDLE_LABEL} />
           <ResizablePanel defaultSize={42} minSize={25}>
             {tools}
           </ResizablePanel>

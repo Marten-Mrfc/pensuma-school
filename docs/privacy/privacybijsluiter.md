@@ -139,7 +139,7 @@ Deze maatregelen zijn in de software gebouwd:
   uit en slaat nooit geplakte of gekopieerde tekst op; kopiëren wordt niet bijgehouden. Code uitvoeren en
   testen wordt altijd vastgelegd, zonder de code zelf. Met de faciliteit "vensterwissels niet registreren"
   wordt per leerling het verlaten van het venster of tabblad niet bijgehouden en telt een verlaten
-  volledig scherm niet als focusverlies; als de toets erom vraagt worden het verlaten van het volledige
+  volledig scherm niet als vensterwissel; als de toets erom vraagt worden het verlaten van het volledige
   scherm en geblokkeerde plakpogingen wel vastgelegd (de faciliteit "plakken toegestaan" heft het
   blokkeren van plakken op).
 - **Faciliteiten in het logboek van docenthandelingen:** alleen welke soort faciliteit is gewijzigd,

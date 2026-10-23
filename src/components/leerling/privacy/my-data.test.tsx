@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FACILITY_LABELS } from "@/lib/privacy/register";
 import { autoDeleteNotice } from "@/lib/privacy/retention";
-import { ExamLogSection, facilitiesText, RetentionSection } from "./my-data";
+import { createRenderer } from "../../docent/a11y/render-for-test";
+import {
+  EXPORT_EXPLANATION,
+  ExamLogSection,
+  facilitiesText,
+  MyData,
+  RetentionSection,
+} from "./my-data";
 
 function textOf(html: string): string {
   return html
@@ -74,6 +81,26 @@ describe("Mijn gegevens (X05)", () => {
     expect(text).toContain("toetsaanslagen");
     expect(text).toContain(
       "Op de vrije oefenplek (Oefenen) komt niets in het logboek",
+    );
+  });
+});
+
+describe("Download mijn gegevens: what a JSON file is (V11)", () => {
+  test("the explanation sits under the header and describes the button", () => {
+    expect(EXPORT_EXPLANATION).toBe(
+      "Je krijgt een JSON-bestand: een vorm die vooral voor computers bedoeld is. Bovenin staat een onderdeel “uitleg” dat in gewone taal vertelt wat alles betekent; op deze pagina zie je dezelfde gegevens overzichtelijk.",
+    );
+    // Also while the page is still loading (the button is in the header).
+    const html = createRenderer().render(<MyData />);
+    expect(textOf(html)).toContain(EXPORT_EXPLANATION);
+    const describedBy = html.match(
+      /<button[^>]*aria-describedby="([^"]+)"[^>]*>/,
+    )?.[1];
+    expect(describedBy).toBeTruthy();
+    expect(html).toMatch(
+      new RegExp(
+        `<p id="${describedBy}"[^>]*>(?:(?!</p>).)*Je krijgt een JSON-bestand`,
+      ),
     );
   });
 });

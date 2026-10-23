@@ -24,7 +24,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,6 +34,14 @@ import { useResultAnnouncement } from "../a11y/result-announcement";
 import { existingLabel, importPreviewSummary } from "../a11y/result-messages";
 
 export type ImportResult = RouterOutputs["student"]["import"];
+
+/** What the panel knew when the teacher pressed import (for the result). */
+export interface ImportContext {
+  /** Ids of the students who were already in the class (from the preview). */
+  alreadyInClass: ReadonlySet<string>;
+  /** "Namen bijwerken" was on. */
+  renameAsked: boolean;
+}
 
 const EXAMPLE = "17053\tJan Jansen\n17054\tSem de Vries\n17061\tLotte Bakker";
 
@@ -56,6 +63,33 @@ async function readTextFile(file: File): Promise<string> {
 }
 
 const SPREADSHEET_EXT = /\.(xlsx|xls|ods|numbers)$/i;
+const MAX_FILE_BYTES = 2_000_000;
+
+export interface ImportProblem {
+  title: string;
+  description?: string;
+}
+
+/** Why a chosen or dropped file can't be read in; null when it can. */
+export function importFileProblem(file: {
+  name: string;
+  size: number;
+}): ImportProblem | null {
+  if (SPREADSHEET_EXT.test(file.name))
+    return {
+      title: "Excel-bestanden kun je niet direct inlezen",
+      description:
+        "Kopieer de cellen in Excel en plak ze hier, of sla het bestand op als CSV.",
+    };
+  if (file.size > MAX_FILE_BYTES)
+    return { title: "Dit bestand is te groot (maximaal 2 MB)." };
+  return null;
+}
+
+export const UNREADABLE_FILE: ImportProblem = {
+  title: "Dit bestand kon niet worden gelezen.",
+  description: "Sla het op als CSV-bestand of plak de lijst hierboven.",
+};
 
 type PreviewStatus =
   | { kind: "new" }
@@ -74,7 +108,7 @@ export interface ImportStudentsPanelProps {
   classId: string;
   className: string;
   onCancel: () => void;
-  onImported: (result: ImportResult) => void;
+  onImported: (result: ImportResult, context: ImportContext) => void;
 }
 
 /** Paste/CSV import with a live, validated preview. */
@@ -93,6 +127,18 @@ export function ImportStudentsPanel({
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [updateNames, setUpdateNames] = useState(false);
+  // Captured on submit: once the import is done everyone is in the class.
+  const importContext = useRef<ImportContext | null>(null);
+  // Shown inline: the panel is a sheet with a focus trap, so a toast can't
+  // be reached by keyboard or screen-reader users. `seq` remounts the alert,
+  // so the same problem twice in a row is announced again.
+  const [fileError, setFileError] = useState<
+    (ImportProblem & { seq: number }) | null
+  >(null);
+  const showFileError = (problem: ImportProblem | null) =>
+    setFileError((current) =>
+      problem ? { ...problem, seq: (current?.seq ?? 0) + 1 } : null,
+    );
 
   const parsed = useMemo(() => parseStudentList(text), [text]);
   const numbers = useMemo(
@@ -184,30 +230,31 @@ export function ImportStudentsPanel({
           queryClient.invalidateQueries({ queryKey: trpc.class.pathKey() }),
           queryClient.invalidateQueries({ queryKey: trpc.student.pathKey() }),
         ]);
-        onImported(result);
+        onImported(
+          result,
+          importContext.current ?? {
+            alreadyInClass: new Set(),
+            renameAsked: updateNames,
+          },
+        );
       },
-      onError: (e) => toast.error(getErrorMessage(e)),
     }),
   );
 
   async function loadFile(file: File | undefined) {
     if (!file) return;
-    if (SPREADSHEET_EXT.test(file.name)) {
-      toast.error("Excel-bestanden kun je niet direct inlezen", {
-        description:
-          "Kopieer de cellen in Excel en plak ze hier, of sla het bestand op als CSV.",
-      });
-      return;
-    }
-    if (file.size > 2_000_000) {
-      toast.error("Dit bestand is te groot (maximaal 2 MB).");
+    const problem = importFileProblem(file);
+    if (problem) {
+      showFileError(problem);
       return;
     }
     try {
       setText(await readTextFile(file));
       setFileName(file.name);
+      showFileError(null);
+      if (importMutation.error) importMutation.reset();
     } catch {
-      toast.error("Dit bestand kon niet worden gelezen.");
+      showFileError(UNREADABLE_FILE);
     }
   }
 
@@ -218,6 +265,12 @@ export function ImportStudentsPanel({
   }
 
   function submit() {
+    importContext.current = {
+      alreadyInClass: new Set(
+        [...existing.values()].filter((e) => e.inClass).map((e) => e.id),
+      ),
+      renameAsked: updateNames,
+    };
     importMutation.mutate({
       classId,
       onExisting: updateNames ? "update_name" : "skip",
@@ -289,16 +342,21 @@ export function ImportStudentsPanel({
               onChange={(e) => {
                 setText(e.target.value);
                 if (fileName) setFileName(null);
+                if (fileError) showFileError(null);
+                if (importMutation.error) importMutation.reset();
               }}
               rows={7}
               spellCheck={false}
               placeholder={`Bijvoorbeeld:\n${EXAMPLE.replaceAll("\t", "  ")}`}
               className={cn(
-                "block min-h-36 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
+                "block min-h-36 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
                 dragging && "border-primary ring-[3px] ring-primary/40",
               )}
             />
           </div>
+          {fileError ? (
+            <ImportAlert key={fileError.seq} problem={fileError} />
+          ) : null}
           <p className="text-xs leading-relaxed text-muted-foreground">
             Eén leerling per regel: leerlingnummer en naam. Kopieer de kolommen
             uit Excel, Magister of SOMtoday, of sleep een CSV-bestand hierheen.
@@ -418,7 +476,22 @@ export function ImportStudentsPanel({
         ) : null}
       </div>
 
-      <div className="flex flex-col-reverse gap-2 border-t bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      {importMutation.error ? (
+        <div className="border-t bg-background px-4 pt-3 sm:px-6">
+          <ImportAlert
+            problem={{
+              title: "Importeren is niet gelukt.",
+              description: getErrorMessage(importMutation.error),
+            }}
+          />
+        </div>
+      ) : null}
+      <div
+        className={cn(
+          "flex flex-col-reverse gap-2 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6",
+          !importMutation.error && "border-t",
+        )}
+      >
         <Button
           variant="outline"
           onClick={onCancel}
@@ -452,6 +525,24 @@ export function ImportStudentsPanel({
               : `${toAdd} ${toAdd === 1 ? "leerling" : "leerlingen"} toevoegen aan ${className}`}
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Inline error (role="alert"), readable inside the sheet's focus trap. */
+export function ImportAlert({ problem }: { problem: ImportProblem }) {
+  return (
+    <div
+      role="alert"
+      className="flex gap-2.5 rounded-lg bg-destructive/[0.07] px-3 py-2.5 text-sm text-destructive-ink"
+    >
+      <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <div className="flex flex-col gap-0.5">
+        <p className="font-medium">{problem.title}</p>
+        {problem.description ? (
+          <p className="text-foreground/80">{problem.description}</p>
+        ) : null}
       </div>
     </div>
   );

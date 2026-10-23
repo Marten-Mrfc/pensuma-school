@@ -1186,8 +1186,18 @@ export const assignmentRouter = createTRPCRouter({
           input.studentIds,
         );
       }
-      if (input.retakeOfId)
-        await getAssignmentOrThrow(ctx.db, input.retakeOfId);
+      if (input.retakeOfId) {
+        const original = await getAssignmentOrThrow(ctx.db, input.retakeOfId);
+        // A herkansing replaces a result of the same toets; another toets
+        // would make "the best/last result counts" meaningless.
+        if (original.testId !== test.id) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Een herkansing gebruikt dezelfde toets als de oorspronkelijke afname.",
+          });
+        }
+      }
 
       const now = new Date();
       const opensAt = input.openNow ? now : (input.opensAt ?? null);

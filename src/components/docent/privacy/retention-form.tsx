@@ -36,7 +36,7 @@ const FIELDS = [
   {
     key: "attemptEventsDays",
     label:
-      "Logboek tijdens toetsen (focus, tabbladen, plakken): verwijderen na",
+      "Logboek tijdens toetsen (vensterwissels, volledig scherm, plakken, code uitvoeren): verwijderen na",
     unit: "dagen",
     min: 7,
     max: 730,

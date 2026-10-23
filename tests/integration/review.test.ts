@@ -219,7 +219,7 @@ describe("exportCsv", () => {
     const header = lines[0];
     expect(header.startsWith("Leerlingnummer;Naam;Status;")).toBe(true);
     expect(header).toContain(";Totaal;Max;Cijfer;Ingeleverd op");
-    expect(header).not.toContain("Focusverlies");
+    expect(header).not.toContain("Vensterwissels");
     // 2 + 0 + (open not yet reviewed) → "2"; grade with a decimal comma.
     const s1Line = lines.find((l) => l.startsWith(w.s1.username ?? "?"));
     expect(s1Line).toBeDefined();
@@ -235,7 +235,11 @@ describe("exportCsv", () => {
       includeFocus: true,
     });
     expect(out.includeFocus).toBe(true);
-    expect(out.csv).toContain("Focusverlies");
+    // Same word as the review screens (W02): "Vensterwissels", never
+    // "Focusverlies".
+    const header = out.csv.replace(/^\uFEFF/, "").split("\r\n")[0];
+    expect(header.endsWith(";Vensterwissels")).toBe(true);
+    expect(out.csv).not.toContain("Focusverlies");
 
     await db
       .update(assignments)
@@ -247,6 +251,6 @@ describe("exportCsv", () => {
       assignmentId: w.assignment.id,
       includeFocus: true,
     });
-    expect(off.csv).not.toContain("Focusverlies");
+    expect(off.csv).not.toContain("Vensterwissels");
   });
 });

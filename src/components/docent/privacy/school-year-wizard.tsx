@@ -319,7 +319,7 @@ const OPTION_ROWS: {
   {
     key: "deleteEvents",
     label: "Logboeken van toetsen verwijderen",
-    help: "Focus-, tabblad- en plakmeldingen van alle pogingen in dit schooljaar.",
+    help: "Het toetslogboek (vensterwissels, volledig scherm, plakpogingen, code uitvoeren) van alle pogingen in dit schooljaar.",
   },
   {
     key: "deleteAttempts",
