@@ -291,6 +291,8 @@ async function gradeInJob(
   const budget = new JobBudget(
     config.jobTimeoutMs,
     runnable.map((item) => item.timeLimitMs),
+    Date.now,
+    runnable.map((item) => item.tests.length),
   );
   const execute = async (i: number, test: CodeTest): Promise<boolean> => {
     const item = runnable[i];
