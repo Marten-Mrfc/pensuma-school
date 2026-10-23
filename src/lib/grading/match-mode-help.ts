@@ -22,7 +22,7 @@ export type MatchModeHelp = {
 export const MATCH_MODE_HELP: Record<OutputMatchMode, MatchModeHelp> = {
   flexible: {
     summary:
-      "Hoofdletters, spaties en leestekens tellen niet mee; getallen worden op waarde vergeleken (108.50 = 108.5). Elke verwachte regel moet in volgorde in de uitvoer staan. Een label of zin eromheen mag, maar ‘niet’ of ‘geen’ bij het antwoord, het antwoord van een andere test op dezelfde regel of een extra getal ernaast maakt het fout. Extra regels mogen alleen als het een paar kopjes of vragen zijn (eindigend op : of ?).",
+      "Hoofdletters, spaties en leestekens tellen niet mee; getallen worden op waarde vergeleken (108.50 = 108.5). Elke verwachte regel moet in volgorde in de uitvoer staan. Een label of zin eromheen mag, maar ‘niet’ of ‘geen’ bij het antwoord, het antwoord van een andere test op dezelfde regel, een extra getal ernaast of (als het antwoord een van de invoerwaarden is) de andere invoerwaarden erachter maken het fout. Extra regels mogen alleen als het een paar kopjes of vragen zijn (eindigend op : of ?).",
     examples: [
       {
         expected: "Hallo Mark",

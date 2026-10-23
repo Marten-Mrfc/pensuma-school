@@ -147,11 +147,11 @@ export function ChecksEditor({
             ))}
           </ul>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Zo tellen eisen mee: een eis die niet gehaald wordt, kost punten
-            naar zijn gewicht. Een gehaalde eis levert alleen punten op naar
-            verhouding van de geslaagde tests, dus code die geen enkele test
-            haalt, krijgt 0 punten. Heeft de vraag geen tests, dan tellen alleen
-            de eisen.
+            Zo tellen de eisen mee: een eis die niet gehaald wordt, kost punten
+            (naar het gewicht van de eis). Een gehaalde eis levert alleen punten
+            op naar verhouding van de geslaagde tests: code die geen enkele test
+            haalt, krijgt dus 0 punten. Heeft de vraag geen tests, dan tellen
+            alleen de eisen.
           </p>
         </>
       )}

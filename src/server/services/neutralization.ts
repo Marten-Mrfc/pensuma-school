@@ -24,8 +24,10 @@ import {
  *                 saved, then manualScore = maxScore and status graded;
  *  - drop         the question no longer counts: maxScore 0, autoScore 0,
  *                 manualScore null, status graded (previous values saved);
- *  - null         undo: restore the saved manual scores, delete the row and
- *                 rescore the affected answers.
+ *  - null         undo: restore the saved manual scores (only where the
+ *                 review they belong to still stands, see
+ *                 restoredManualScore), delete the row and rescore the
+ *                 affected answers.
  *
  * Only submitted attempts are touched; attempts that are still running get
  * the neutralisation when they are graded (see grading.ts). Afterwards every
@@ -69,17 +71,91 @@ async function submittedAnswers(
     );
 }
 
-/** Put the saved manual scores back (answers not in `previous` keep theirs). */
+type SavedNeutralization = {
+  mode: NeutralizationMode;
+  previous: Record<string, number | null>;
+  createdAt: Date;
+};
+
+/**
+ * The manual score an answer gets back when its question no longer
+ * "vervalt" (undo, or before switching modes); undefined = keep the
+ * current one. The saved score belongs to the review the teacher did
+ * before the neutralisation, so it only comes back while that review
+ * still stands:
+ *  - reviewedAt is null: the student changed the answer in a reopened
+ *    attempt, which clears the review (portal.saveAnswer). The saved score
+ *    was for an answer that no longer exists → no manual score (the new
+ *    answer is graded and reviewed again);
+ *  - reviewed before the neutralisation: that review still stands → the
+ *    saved score;
+ *  - reviewed again since: after the student saved again in a reopened
+ *    attempt, the newer review is for the newer answer and stays. On the
+ *    same answer, a different score than the full points the question gave
+ *    is a deliberate new grade and stays; the unchanged full points (e.g.
+ *    only feedback added) make way for the saved score.
+ */
+export function restoredManualScore(
+  answer: {
+    manualScore: number | null;
+    maxScore: number;
+    reviewedAt: Date | null;
+    savedAt: Date | null;
+  },
+  saved: number | null,
+  neutralization: Pick<SavedNeutralization, "mode" | "createdAt">,
+): number | null | undefined {
+  const since = neutralization.createdAt;
+  if (answer.reviewedAt == null) return null;
+  if (answer.reviewedAt <= since) return saved;
+  if (answer.savedAt && answer.savedAt > since) return undefined;
+  if (
+    neutralization.mode === "full_points" &&
+    answer.manualScore !== answer.maxScore
+  ) {
+    return undefined;
+  }
+  return saved;
+}
+
+/**
+ * Put the saved manual scores back where the review they belong to still
+ * stands (see restoredManualScore; answers not in `previous` keep theirs).
+ * Returns the manual score of every saved answer afterwards.
+ */
 async function restoreManualScores(
   tx: Tx,
-  previous: Record<string, number | null>,
-) {
-  for (const [answerId, manualScore] of Object.entries(previous)) {
-    await tx
-      .update(answers)
-      .set({ manualScore })
-      .where(eq(answers.id, answerId));
+  neutralization: SavedNeutralization,
+): Promise<Record<string, number | null>> {
+  const ids = Object.keys(neutralization.previous);
+  const now: Record<string, number | null> = {};
+  if (ids.length === 0) return now;
+  const rows = await tx
+    .select({
+      id: answers.id,
+      manualScore: answers.manualScore,
+      maxScore: answers.maxScore,
+      reviewedAt: answers.reviewedAt,
+      savedAt: answers.savedAt,
+    })
+    .from(answers)
+    .where(inArray(answers.id, ids));
+  for (const row of rows) {
+    const saved = neutralization.previous[row.id] ?? null;
+    const value = restoredManualScore(row, saved, neutralization);
+    if (value === undefined) {
+      now[row.id] = row.manualScore;
+      continue;
+    }
+    now[row.id] = value;
+    if (value !== row.manualScore) {
+      await tx
+        .update(answers)
+        .set({ manualScore: value })
+        .where(eq(answers.id, row.id));
+    }
   }
+  return now;
 }
 
 export async function neutralizeQuestion(
@@ -135,7 +211,7 @@ export async function neutralizeQuestion(
           message: "Deze vraag is niet vervallen.",
         });
       }
-      await restoreManualScores(tx, existing.previous);
+      await restoreManualScores(tx, existing);
       await tx
         .delete(questionNeutralizations)
         .where(
@@ -148,12 +224,13 @@ export async function neutralizeQuestion(
       if (existing?.mode === input.mode) {
         return { changed: false, previous: existing.previous };
       }
-      // Switching modes: start again from the teacher's original scores.
-      if (existing) await restoreManualScores(tx, existing.previous);
-      const rows = await submittedAnswers(tx, assignment.id, question.id);
+      // Switching modes: start again from the teacher's scores, as far as
+      // their reviews still stand (an answer changed in a reopened attempt
+      // has none any more).
       const previous: Record<string, number | null> = existing
-        ? { ...existing.previous }
+        ? await restoreManualScores(tx, existing)
         : {};
+      const rows = await submittedAnswers(tx, assignment.id, question.id);
       for (const r of rows) {
         if (!(r.id in previous)) previous[r.id] = r.manualScore;
       }

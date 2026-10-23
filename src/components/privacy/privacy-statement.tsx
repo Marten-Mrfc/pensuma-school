@@ -308,8 +308,9 @@ export function PrivacyStatement() {
               Heb je de faciliteit ‘vensterwissels niet registreren’? Dan houden
               we niet bij wanneer je het toetsvenster of tabblad verlaat. Als de
               toets erom vraagt, zien we wel wanneer je het volledige scherm
-              verlaat of probeert te plakken, en ook dan houden we bij wanneer
-              je je code uitvoert of test.
+              verlaat of probeert te plakken, maar dat telt dan niet als het
+              verlaten van het venster. Ook dan houden we bij wanneer je je code
+              uitvoert of test.
             </p>
             <p>
               Alleen je docenten informatica kunnen het logboek zien. Het wordt{" "}
@@ -375,9 +376,17 @@ export function PrivacyStatement() {
                 .
               </li>
               <li>
-                <strong>Inloggegevens:</strong> een sessie verloopt 12 uur nadat
-                je Pensuma voor het laatst hebt gebruikt; tellers van
-                inlogpogingen verdwijnen na 24 uur.
+                <strong>Inloggegevens:</strong> als leerling blijf je hoogstens
+                12 uur na het inloggen ingelogd, of korter als je uitlogt. Bij
+                docenten verloopt de sessie 12 uur na het laatste gebruik.
+                Tellers van inlogpogingen verdwijnen na 24 uur.
+              </li>
+              <li>
+                <strong>Technische foutmeldingen:</strong> gaat er iets mis, dan
+                noteert de server het tijdstip, waar het misging en een
+                foutcode, bij een storing ook je gebruikers-id (een willekeurige
+                code). Nooit je antwoorden of je pincode. Die regels worden na
+                een tijdje vanzelf overschreven.
               </li>
               <li>
                 <strong>Logboek van docenthandelingen:</strong>{" "}

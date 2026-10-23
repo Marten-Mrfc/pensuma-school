@@ -38,6 +38,11 @@ import {
   tests,
   user,
 } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
+import {
+  assertNotRestricted,
+  restrictedUserIds,
+} from "@/server/privacy/restriction";
 import { getPrivacySettings } from "@/server/privacy/settings-store";
 import {
   dutchGrade,
@@ -322,6 +327,9 @@ export async function computeResults(db: DB, assignmentId: string) {
   };
 }
 
+/** CSV status of a student whose processing is restricted (AVG art. 18). */
+export const RESTRICTED_STATUS_LABEL = "Verwerking beperkt (AVG art. 18)";
+
 function attemptStatusLabel(
   attempt: { status: string; gradingStatus: string } | null,
 ) {
@@ -600,6 +608,11 @@ export const reviewRouter = createTRPCRouter({
           .max(20_000, "De feedback is te lang.")
           .nullable()
           .optional(),
+        /**
+         * Change anyway while the processing is restricted (AVG art. 18),
+         * e.g. to rectify the disputed score. Recorded in the log.
+         */
+        overrideRestriction: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -612,6 +625,9 @@ export const reviewRouter = createTRPCRouter({
             "De leerling is nog bezig met deze poging. Beoordeel na het inleveren.",
         });
       }
+      const overridden = await assertNotRestricted(ctx.db, attemptUserId, {
+        override: input.overrideRestriction,
+      });
       if (
         input.manualScore != null &&
         input.manualScore > answer.maxScore + 1e-9
@@ -655,6 +671,22 @@ export const reviewRouter = createTRPCRouter({
             attemptId,
             from: answer.manualScore,
             to: manualScore,
+            ...(overridden ? { restrictionOverridden: true } : {}),
+          },
+        });
+      } else if (overridden) {
+        // Only the feedback changed, despite the restriction.
+        await auditFromCtx(ctx, {
+          action: "trpc.mutation",
+          subjectType: "answer",
+          subjectId: answer.id,
+          subjectUserId: attemptUserId,
+          subjectLabel: studentNumber,
+          details: {
+            path: "review.setManualScore",
+            answerId: answer.id,
+            attemptId,
+            restrictionOverridden: true,
           },
         });
       }
@@ -664,7 +696,7 @@ export const reviewRouter = createTRPCRouter({
         await recomputeAttemptScore(attemptId);
       } catch (err) {
         recomputed = false;
-        console.error("[review] recomputeAttemptScore failed", err);
+        logServerError("review.recompute_failed", err, { attemptId });
       }
       return {
         answerId: answer.id,
@@ -677,11 +709,24 @@ export const reviewRouter = createTRPCRouter({
     }),
 
   regradeAttempt: adminProcedure
-    .input(z.object({ attemptId: idSchema }))
+    .input(
+      z.object({
+        attemptId: idSchema,
+        /** Regrade anyway while the processing is restricted (AVG art. 18). */
+        overrideRestriction: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const [at] = await ctx.db
-        .select({ id: attempts.id, status: attempts.status })
+        .select({
+          id: attempts.id,
+          status: attempts.status,
+          userId: attempts.userId,
+          assignmentId: attempts.assignmentId,
+          studentNumber: user.username,
+        })
         .from(attempts)
+        .innerJoin(user, eq(user.id, attempts.userId))
         .where(eq(attempts.id, input.attemptId));
       if (!at)
         throw new TRPCError({
@@ -694,24 +739,49 @@ export const reviewRouter = createTRPCRouter({
           message: "Deze poging is nog niet ingeleverd.",
         });
       }
+      const overridden = await assertNotRestricted(ctx.db, at.userId, {
+        override: input.overrideRestriction,
+      });
       try {
         await gradeAttempt(at.id);
       } catch (err) {
-        console.error("[review] regradeAttempt failed", err);
+        logServerError("review.regrade_attempt_failed", err, {
+          attemptId: at.id,
+        });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Opnieuw nakijken is mislukt. Probeer het later nog eens.",
         });
       }
+      if (overridden) {
+        await auditFromCtx(ctx, {
+          action: "trpc.mutation",
+          subjectType: "attempt",
+          subjectId: at.id,
+          subjectUserId: at.userId,
+          subjectLabel: at.studentNumber,
+          details: {
+            path: "review.regradeAttempt",
+            attemptId: at.id,
+            assignmentId: at.assignmentId,
+            restrictionOverridden: true,
+          },
+        });
+      }
       return { attemptId: at.id };
     }),
 
+  /**
+   * Regrade every handed-in attempt of an afname, except those of
+   * students whose processing is restricted (AVG art. 18): their scores
+   * stay as they are (`skippedRestricted`).
+   */
   regradeAssignment: adminProcedure
     .input(z.object({ assignmentId: idSchema }))
     .mutation(async ({ ctx, input }) => {
       const a = await getAssignmentOrThrow(ctx.db, input.assignmentId);
       const rows = await ctx.db
-        .select({ id: attempts.id })
+        .select({ id: attempts.id, userId: attempts.userId })
         .from(attempts)
         .where(
           and(
@@ -719,11 +789,21 @@ export const reviewRouter = createTRPCRouter({
             eq(attempts.status, "submitted"),
           ),
         );
+      const restricted = await restrictedUserIds(
+        ctx.db,
+        rows.map((r) => r.userId),
+      );
+      const allowed = rows.filter((r) => !restricted.has(r.userId));
       const { graded, failed } = await gradeAttemptsSafely(
-        rows.map((r) => r.id),
+        allowed.map((r) => r.id),
         3,
       );
-      return { total: rows.length, graded, failed };
+      return {
+        total: rows.length,
+        graded,
+        failed,
+        skippedRestricted: rows.length - allowed.length,
+      };
     }),
 
   /** Answers that wait for the teacher (open questions), question by question. */
@@ -854,6 +934,13 @@ export const reviewRouter = createTRPCRouter({
           .includeFocusByDefault;
       // Only an afname that logged focus events has anything to export.
       const includeFocus = requested && data.assignment.logFocusEvents;
+      // AVG art. 18: a restricted student's results may only be stored, not
+      // passed on. Their row stays (so a missing grade is explained), with
+      // only the number, the name and the restriction.
+      const restricted = await restrictedUserIds(
+        ctx.db,
+        data.rows.map((r) => r.student.id),
+      );
       const header: CsvCell[] = [
         "Leerlingnummer",
         "Naam",
@@ -868,20 +955,40 @@ export const reviewRouter = createTRPCRouter({
         "Ingeleverd op",
         ...(includeFocus ? ["Focusverlies"] : []),
       ];
-      const body: CsvCell[][] = data.rows.map((r) => [
-        r.student.studentNumber ?? "",
-        r.student.name,
-        attemptStatusLabel(r.attempt),
-        ...data.questions.map((q) => {
-          const cell = r.perQuestion[q.id];
-          return r.attempt?.status === "submitted" && cell ? cell.score : null;
-        }),
-        r.attempt?.status === "submitted" ? r.attempt.score : null,
-        r.attempt ? r.attempt.maxScore : data.assignment.totalPoints,
-        r.attempt?.grade != null ? formatFixedNl(r.attempt.grade, 1) : "",
-        r.attempt?.submittedAt ? formatDateTimeNl(r.attempt.submittedAt) : "",
-        ...(includeFocus ? [r.attempt ? r.attempt.focusLossCount : null] : []),
-      ]);
+      const body: CsvCell[][] = data.rows.map((r) =>
+        restricted.has(r.student.id)
+          ? [
+              r.student.studentNumber ?? "",
+              r.student.name,
+              RESTRICTED_STATUS_LABEL,
+              ...data.questions.map(() => null),
+              null,
+              null,
+              "",
+              "",
+              ...(includeFocus ? [null] : []),
+            ]
+          : [
+              r.student.studentNumber ?? "",
+              r.student.name,
+              attemptStatusLabel(r.attempt),
+              ...data.questions.map((q) => {
+                const cell = r.perQuestion[q.id];
+                return r.attempt?.status === "submitted" && cell
+                  ? cell.score
+                  : null;
+              }),
+              r.attempt?.status === "submitted" ? r.attempt.score : null,
+              r.attempt ? r.attempt.maxScore : data.assignment.totalPoints,
+              r.attempt?.grade != null ? formatFixedNl(r.attempt.grade, 1) : "",
+              r.attempt?.submittedAt
+                ? formatDateTimeNl(r.attempt.submittedAt)
+                : "",
+              ...(includeFocus
+                ? [r.attempt ? r.attempt.focusLossCount : null]
+                : []),
+            ],
+      );
       const date = new Date().toISOString().slice(0, 10);
       const filename = `${slugifyFilename(data.assignment.title, "afname")}-${slugifyFilename(
         data.assignment.className,
@@ -895,8 +1002,15 @@ export const reviewRouter = createTRPCRouter({
           assignmentId: data.assignment.id,
           rows: body.length,
           includeFocus,
+          restrictedRows: restricted.size,
         },
       });
-      return { filename, csv: toCsv([header, ...body]), includeFocus };
+      return {
+        filename,
+        csv: toCsv([header, ...body]),
+        includeFocus,
+        /** Rows without results because the processing is restricted. */
+        restrictedCount: restricted.size,
+      };
     }),
 });

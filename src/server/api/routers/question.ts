@@ -42,6 +42,7 @@ import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
 import { answers, attempts, questions, user } from "@/server/db/schema";
 import { gradeCode } from "@/server/grader";
+import { logServerError } from "@/server/privacy/error-log";
 import { type AuditContext, auditFromCtx } from "@/server/services/audit";
 import { recomputeAttemptScore } from "@/server/services/grading";
 import { copyQuestionsToTest } from "@/server/services/portable-tests";
@@ -50,9 +51,9 @@ type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 type Executor = DB | Tx;
 
 /**
- * Audit a question deletion that removed students' answers: one summary
- * row for the question plus one row per student, so it appears under that
- * student in the audit log and in their own inzage export.
+ * Audit a question deletion: one summary row for the question plus, when
+ * students' answers were removed, one row per student, so it appears under
+ * that student in the audit log and in their own inzage export.
  */
 async function auditQuestionDeleted(
   ctx: AuditContext,
@@ -75,15 +76,11 @@ async function auditQuestionDeleted(
     else
       perStudent.set(r.userId, { studentNumber: r.studentNumber, answers: 1 });
   }
-  const base = {
-    path: "question.delete",
-    questionId: question.id,
-    testId: question.testId,
-  };
+  const base = { questionId: question.id, testId: question.testId };
   await auditFromCtx(
     ctx,
     {
-      action: "trpc.mutation",
+      action: "question.deleted",
       subjectType: "question",
       subjectId: question.id,
       details: {
@@ -100,7 +97,7 @@ async function auditQuestionDeleted(
     await auditFromCtx(
       ctx,
       {
-        action: "trpc.mutation",
+        action: "question.deleted",
         subjectType: "question",
         subjectId: question.id,
         subjectUserId: userId,
@@ -380,8 +377,8 @@ export const questionRouter = createTRPCRouter({
               remedy: `Laat de vraag in plaats daarvan vervallen via Analyse bij de afname (‘Vraag laten vervallen’), of hef de blokkade eerst op onder ${HOLDS_LOCATION}.`,
             },
           );
-          await auditQuestionDeleted(ctx, tx, question, rows);
         }
+        await auditQuestionDeleted(ctx, tx, question, rows);
         await tx.delete(questions).where(eq(questions.id, input.id));
         await renumber(tx, question.testId);
         await touchTest(tx, question.testId);
@@ -400,7 +397,9 @@ export const questionRouter = createTRPCRouter({
         try {
           await recomputeAttemptScore(attemptId);
         } catch (error) {
-          console.error("[question.delete] recompute failed", error);
+          logServerError("question.delete_recompute_failed", error, {
+            attemptId,
+          });
         }
       }
       const attemptCount = await countTestAttempts(ctx.db, question.testId);
@@ -547,7 +546,7 @@ export const questionRouter = createTRPCRouter({
           timeLimitMs: data.timeLimitMs,
         });
       } catch (error) {
-        console.error("[question.checkSolution] grader failed", error);
+        logServerError("question.check_solution_failed", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message:

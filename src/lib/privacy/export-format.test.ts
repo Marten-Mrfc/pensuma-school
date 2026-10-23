@@ -317,6 +317,53 @@ describe("buildStudentExport", () => {
     ]);
   });
 
+  test("student export: after_close results wait while classmates are still working", () => {
+    // Closed, but a classmate with verlengde tijd is still busy.
+    const busy = attempt({
+      assignment: { ...attempt().assignment, othersWorking: true },
+    });
+    const forStudent = (a: ExportAttemptRow) =>
+      buildStudentExport(rows([a]), { audience: "student", now: NOW });
+    expect(forStudent(busy).attempts).toHaveLength(0);
+    // The teacher's export (inzageverzoek) always has everything.
+    expect(
+      buildStudentExport(rows([busy]), { audience: "admin", now: NOW })
+        .attempts,
+    ).toHaveLength(1);
+    // Everyone done (or the flag left out): visible.
+    expect(
+      forStudent(
+        attempt({
+          assignment: { ...attempt().assignment, othersWorking: false },
+        }),
+      ).attempts,
+    ).toHaveLength(1);
+    expect(forStudent(attempt()).attempts).toHaveLength(1);
+    // Released by the teacher, or shown immediately: nothing to wait for.
+    expect(
+      forStudent(
+        attempt({
+          assignment: {
+            ...attempt().assignment,
+            othersWorking: true,
+            resultsReleased: true,
+          },
+        }),
+      ).attempts,
+    ).toHaveLength(1);
+    expect(
+      forStudent(
+        attempt({
+          assignment: {
+            ...attempt().assignment,
+            othersWorking: true,
+            settings: { showResults: "immediately" },
+          },
+        }),
+      ).attempts,
+    ).toHaveLength(1);
+  });
+
   test("banned student is not active; invalid results are dropped", () => {
     const r = rows([
       attempt({

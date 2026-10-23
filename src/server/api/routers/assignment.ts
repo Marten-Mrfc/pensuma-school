@@ -48,6 +48,8 @@ import {
   tests,
   user,
 } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
+import { assertNotRestricted } from "@/server/privacy/restriction";
 import {
   computeAttemptDeadline,
   effectiveAssignmentStatus,
@@ -87,7 +89,7 @@ export function runInBackground(label: string, task: () => Promise<void>) {
     try {
       await task();
     } catch (err) {
-      console.error(`[${label}]`, err);
+      logServerError(label, err);
     }
   };
   try {
@@ -114,7 +116,7 @@ export async function gradeAttemptsSafely(
         graded++;
       } catch (err) {
         failed++;
-        console.error(`[grading] attempt ${id} failed`, err);
+        logServerError("grading.attempt_failed", err, { attemptId: id });
       }
     }
   };
@@ -737,7 +739,7 @@ export async function autoSubmitAttempts(
     })),
   );
   const ids = submitted.map((s) => s.id);
-  runInBackground("auto-submit grading", async () => {
+  runInBackground("grading.auto_submit_failed", async () => {
     await gradeAttemptsSafely(ids);
   });
   return ids;
@@ -1870,13 +1872,12 @@ export const assignmentRouter = createTRPCRouter({
         await auditFromCtx(
           ctx,
           {
-            action: "trpc.mutation",
+            action: "attempt.time_extended",
             subjectType: "attempt",
             subjectId: attempt.id,
             subjectUserId: attempt.userId,
             subjectLabel: studentNumber,
             details: {
-              path: "assignment.extendTime",
               attemptId: attempt.id,
               assignmentId: attempt.assignmentId,
               minutes: input.minutes,
@@ -1895,6 +1896,11 @@ export const assignmentRouter = createTRPCRouter({
       z.object({
         attemptId: idSchema,
         minutes: z.number().int().min(1).max(600).optional(),
+        /**
+         * Reopen anyway while the processing is restricted (AVG art. 18):
+         * reopening changes a handed-in result. Recorded in the log.
+         */
+        overrideRestriction: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1908,6 +1914,9 @@ export const assignmentRouter = createTRPCRouter({
           message: "Deze poging is nog bezig.",
         });
       }
+      const overridden = await assertNotRestricted(ctx.db, attempt.userId, {
+        override: input.overrideRestriction,
+      });
       const [newer] = await ctx.db
         .select({ id: attempts.id })
         .from(attempts)
@@ -1987,17 +1996,17 @@ export const assignmentRouter = createTRPCRouter({
         await auditFromCtx(
           ctx,
           {
-            action: "trpc.mutation",
+            action: "attempt.reopened",
             subjectType: "attempt",
             subjectId: attempt.id,
             subjectUserId: attempt.userId,
             subjectLabel: studentNumber,
             details: {
-              path: "assignment.reopenAttempt",
               attemptId: attempt.id,
               assignmentId: attempt.assignmentId,
               minutes: input.minutes ?? null,
               deadlineAt,
+              ...(overridden ? { restrictionOverridden: true } : {}),
             },
           },
           tx,

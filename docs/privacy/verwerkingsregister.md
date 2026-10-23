@@ -31,7 +31,7 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 | Betrokkenen | Leerlingen, docenten |
 | Gegevens | Naam, leerlingnummer of e-mailadres, gehashte pincode of wachtwoord, versleutelde pincode, sessies met IP-adres en browser, laatste keer inloggen, tellers van mislukte inlogpogingen |
 | Ontvangers | Docenten (accountbeheer); het systeem |
-| Bewaartermijn | Sessies bij verlopen (12 uur na laatste gebruik); tellers 24 uur; accounts zolang de leerling in een actieve klas zit, daarna standaard 12 maanden zonder inloggen (na vaststelling) of bij het afsluiten van het schooljaar |
+| Bewaartermijn | Sessies bij verlopen (leerlingen: 12 uur na het inloggen, of eerder bij uitloggen; docenten: 12 uur na het laatste gebruik); tellers 24 uur; accounts zolang de leerling in een actieve klas zit, daarna standaard 12 maanden zonder inloggen (na vaststelling) of bij het afsluiten van het schooljaar |
 
 ## Verwerking 3: Logboek tijdens toetsen
 
@@ -76,6 +76,18 @@ download je in Pensuma: Privacy & gegevens → Register & schoolgegevens → Dow
 | Gegevens | Thema, lettergrootte, contrast en vergelijkbare keuzes |
 | Ontvangers | Alleen de gebruiker |
 | Bewaartermijn | Zolang het account bestaat |
+
+## Verwerking 7: Technische foutmeldingen (serverlogboek)
+
+| Onderdeel | Invulling |
+| --- | --- |
+| Doel | Storingen opsporen en verhelpen en het systeem beveiligen |
+| Grondslag | Wettelijke verplichting tot beveiliging (art. 6 lid 1 sub c, met art. 32) |
+| Betrokkenen | Leerlingen, docenten |
+| Gegevens | Tijdstip, functie en foutcode; bij een storing ook de gebruikers-id (een willekeurige code, geen naam of leerlingnummer) en de foutcode die de gebruiker ziet. Bij een databasefout alleen de foutcode van de database. Nooit invoer, antwoorden, pincodes of wachtwoorden |
+| Ontvangers | Alleen de beheerder van Pensuma, voor technisch onderhoud |
+| Bewaartermijn | Tot de logrotatie van de server de regels overschrijft: met de meegeleverde `docker-compose.yml` hoogstens 5 bestanden van 10 MB per container. Bij een andere installatie (zoals een Dokploy-Application) stelt de beheerder de logrotatie van Docker in |
+| Opmerking | Geen databasetabel: de regels staan in de standaarduitvoer van de container |
 
 ---
 

@@ -20,8 +20,14 @@ import {
   user,
   userActivity,
 } from "@/server/db/schema";
+import {
+  assertNotRestricted,
+  RESTRICTED_MESSAGE,
+  restrictedUserIds,
+} from "@/server/privacy/restriction";
 import { studentThrottleKeys } from "@/server/security/login-throttle";
 import { effectiveAssignmentStatus } from "@/server/services/assignment-status";
+import { auditFromCtx } from "@/server/services/audit";
 
 /** Klassen (classes) and their members. Teachers only. */
 
@@ -400,7 +406,11 @@ export const classRouter = createTRPCRouter({
       return { id: input.id };
     }),
 
-  /** Add existing students to a class (already-members are ignored). */
+  /**
+   * Add existing students to a class (already-members are ignored).
+   * Students whose processing is restricted (AVG art. 18) are skipped and
+   * counted: their klasindeling stays as it is until the restriction ends.
+   */
   addMembers: adminProcedure
     .input(
       z.object({
@@ -424,38 +434,91 @@ export const classRouter = createTRPCRouter({
           message: "Een of meer gekozen leerlingen bestaan niet (meer).",
         });
       }
+      const restricted = await restrictedUserIds(ctx.db, ids);
+      const allowed = students.filter((s) => !restricted.has(s.id));
+      if (allowed.length === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            students.length === 1
+              ? RESTRICTED_MESSAGE
+              : "Voor deze leerlingen is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
+        });
+      }
       const inserted = await ctx.db
         .insert(classMembers)
-        .values(students.map((s) => ({ classId: input.classId, userId: s.id })))
+        .values(allowed.map((s) => ({ classId: input.classId, userId: s.id })))
         .onConflictDoNothing()
         .returning({ userId: classMembers.userId });
       return {
         added: inserted.length,
-        alreadyMember: ids.length - inserted.length,
+        alreadyMember: allowed.length - inserted.length,
+        skippedRestricted: students.length - allowed.length,
       };
     }),
 
-  /** Remove a student from a class (the account itself stays). */
+  /**
+   * Remove a student from a class (the account itself stays). Refused
+   * while the student's processing is restricted (AVG art. 18), unless
+   * the teacher overrides it (recorded in the log).
+   */
   removeMember: adminProcedure
     .input(
-      z.object({ classId: classIdSchema, userId: z.string().min(1).max(64) }),
+      z.object({
+        classId: classIdSchema,
+        userId: z.string().min(1).max(64),
+        /** Remove anyway while the processing is restricted (AVG art. 18). */
+        overrideRestriction: z.boolean().optional(),
+      }),
     )
     .mutation(async ({ ctx, input }) => {
-      const removed = await ctx.db
-        .delete(classMembers)
+      const [member] = await ctx.db
+        .select({ userId: classMembers.userId, studentNumber: user.username })
+        .from(classMembers)
+        .innerJoin(user, eq(user.id, classMembers.userId))
         .where(
           and(
             eq(classMembers.classId, input.classId),
             eq(classMembers.userId, input.userId),
           ),
-        )
-        .returning({ userId: classMembers.userId });
-      if (removed.length === 0) {
+        );
+      if (!member) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Deze leerling zit niet (meer) in deze klas.",
         });
       }
+      const overridden = await assertNotRestricted(ctx.db, input.userId, {
+        override: input.overrideRestriction,
+      });
+      await ctx.db.transaction(async (tx) => {
+        await tx
+          .delete(classMembers)
+          .where(
+            and(
+              eq(classMembers.classId, input.classId),
+              eq(classMembers.userId, input.userId),
+            ),
+          );
+        if (overridden) {
+          await auditFromCtx(
+            ctx,
+            {
+              action: "trpc.mutation",
+              subjectType: "class",
+              subjectId: input.classId,
+              subjectUserId: input.userId,
+              subjectLabel: member.studentNumber,
+              details: {
+                path: "class.removeMember",
+                classId: input.classId,
+                restrictionOverridden: true,
+              },
+            },
+            tx,
+          );
+        }
+      });
       return { classId: input.classId, userId: input.userId };
     }),
 });

@@ -212,11 +212,91 @@ describe("flexible: printing every candidate answer does not pass (F03, F27)", (
     expect(flex("25 is het kwadraat van 5", "25", { stdin: "5" }).passed).toBe(
       true,
     );
-    expect(
-      flex("9 is groter dan 3 en 5", "9", { stdin: "9\n3\n5" }).passed,
-    ).toBe(true);
     expect(flex("9 3 5", "9", { stdin: "9\n3\n5" }).passed).toBe(false);
     expect(flex("8 en 9 en 10", "8", { stdin: "4" }).passed).toBe(false);
+    // One extra number after some words is fine, unless it is another
+    // test's answer or there are more.
+    expect(
+      flex("De som is 51, uit 3 getallen", "51", {
+        stdin: "10\n20\n21\nstop",
+        siblings: ["20", "0"],
+      }).passed,
+    ).toBe(true);
+    expect(flex("Je wordt 16 in 2024", "16", { stdin: "2008" }).passed).toBe(
+      true,
+    );
+    expect(
+      flex("Prijs: 8.5 euro (incl. 21% btw)", "8.5", { stdin: "7" }).passed,
+    ).toBe(true);
+    expect(
+      flex("a 7 a 8 a 9", "8", { stdin: "3\n5", siblings: ["9", "350"] })
+        .passed,
+    ).toBe(false);
+    expect(
+      flex("a 7 a 8 a 9 a 10", "8", { stdin: "3\n5", siblings: ["350"] })
+        .passed,
+    ).toBe(false);
+  });
+
+  // The answer is one of the inputs ("which number is the largest?"):
+  // printing all inputs, in any form, must not pass every test.
+  test("printing every input does not choose one", () => {
+    const max = [
+      ["4\n1\n2", "4"],
+      ["1\n7\n3", "7"],
+      ["2\n3\n8", "8"],
+    ];
+    const longest = [
+      ["kat\nolifant\nhond", "olifant"],
+      ["giraffe\nmuis\nkoe", "giraffe"],
+      ["aap\nbeer\nzebra", "zebra"],
+    ];
+    const printAll: ((inputs: string[]) => string)[] = [
+      (i) => i.join(" en "),
+      (i) => `Je getallen: ${i.join(" en ")}`,
+      (i) => i.join(", "),
+      (i) => i.map((x) => `${x}:`).join("\n"),
+      (i) => i.map((x) => `Getal ${x}:`).join("\n"),
+    ];
+    for (const tests of [max, longest]) {
+      for (const program of printAll) {
+        const passed = tests.map(
+          ([stdin, expected], index) =>
+            flex(program(stdin.split("\n")), expected, {
+              stdin,
+              siblings: tests.filter((_, k) => k !== index).map((t) => t[1]),
+            }).passed,
+        );
+        // At most the test whose answer happens to be printed last.
+        expect(passed.slice(0, 2)).toEqual([false, false]);
+      }
+    }
+    // Honest answers keep passing.
+    for (const output of [
+      "9",
+      "Het grootste getal is 9",
+      "De grootste van 3, 9 en 5 is 9",
+      "Grootste: 9",
+      "Geef getal 1:\nGeef getal 2:\nGeef getal 3:\nGrootste: 9",
+    ]) {
+      expect(
+        flex(output, "9", { stdin: "3\n9\n5", siblings: ["4", "8"] }).passed,
+      ).toBe(true);
+    }
+    expect(
+      flex("Het langste woord is olifant", "olifant", {
+        stdin: "kat\nolifant\nhond",
+        siblings: ["giraffe"],
+      }).passed,
+    ).toBe(true);
+    // Trade-off: an input listed after the chosen answer is ambiguous.
+    expect(
+      flex("9 is groter dan 3 en 5", "9", { stdin: "9\n3\n5" }).passed,
+    ).toBe(false);
+    // An expected line that ends like a prompt may be matched by one.
+    expect(flex("Naam:\nMark:", "Naam:\nMark:", { stdin: "Mark" }).passed).toBe(
+      true,
+    );
   });
 
   test("both answers on one line", () => {
@@ -320,7 +400,7 @@ describe("flexible: printing every candidate answer does not pass (F03, F27)", (
     const lines = upTo(31)
       .map((n) => `Getal ${n}:`)
       .join("\n");
-    const r = flex(lines, "2\n4\n6\n8\n10", { stdin: "10" });
+    const r = flex(lines, "2\n4\n6\n8\n10", { stdin: "5" });
     expect(r.passed).toBe(false);
     expect(r.feedback).toContain("meer extra regels dan verwacht");
     expect(
@@ -341,6 +421,22 @@ describe("flexible: printing every candidate answer does not pass (F03, F27)", (
     ).toBe(
       "Je programma printte een regel die niet verwacht werd (regel 2): `oneven:`.",
     );
+  });
+});
+
+describe("flexible: crafted output stays fast", () => {
+  // Grading runs in the server process: checking every occurrence of the
+  // answer must not rescan the rest of the line (that took over a second
+  // for 64 KB of "a 8 a 8 …").
+  test.each([
+    ["a 8 ".repeat(16_000), "8", "5", ["3"]],
+    ["hond kat ".repeat(7_000), "kat", "kat\nhond", ["hond"]],
+    ["a 8 oneven ".repeat(6_000), "8", "4", ["oneven"]],
+    [`${"a 8 ".repeat(8_000)}\n${"a 8 ".repeat(8_000)}`, "8\n8", "5", ["3"]],
+  ])("%#", (output, expected, stdin, siblings) => {
+    const started = performance.now();
+    flex(output.slice(0, 64 * 1024), expected, { stdin, siblings });
+    expect(performance.now() - started).toBeLessThan(600);
   });
 });
 

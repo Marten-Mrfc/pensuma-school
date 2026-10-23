@@ -21,6 +21,11 @@ import {
   questions,
   user,
 } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
+import {
+  RESTRICTED_MESSAGE,
+  restrictedUserIds,
+} from "@/server/privacy/restriction";
 import { auditFromCtx } from "@/server/services/audit";
 import { recomputeAttemptScore } from "@/server/services/grading";
 
@@ -196,7 +201,8 @@ export const feedbackRouter = createTRPCRouter({
   /**
    * Grade one or more answers with the same score (identical answers, or
    * one answer with rubric criteria). Every answer is checked first; any
-   * problem rejects the whole request.
+   * problem rejects the whole request. Answers of students whose
+   * processing is restricted (AVG art. 18) are skipped and counted.
    */
   gradeMany: adminProcedure
     .input(
@@ -214,11 +220,17 @@ export const feedbackRouter = createTRPCRouter({
           .max(10_000, "De feedback is te lang (maximaal 10.000 tekens).")
           .nullish(),
         rubricChecked: z.array(z.string().min(1).max(64)).max(20).optional(),
+        /**
+         * Also grade the answers of students whose processing is restricted
+         * (AVG art. 18), e.g. to rectify a disputed score. Recorded in the
+         * log. Without it those answers are skipped (`skippedRestricted`).
+         */
+        overrideRestriction: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const ids = [...new Set(input.answerIds)];
-      const rows = await ctx.db
+      const requested = [...new Set(input.answerIds)];
+      const allRows = await ctx.db
         .select({
           id: answers.id,
           attemptId: answers.attemptId,
@@ -234,13 +246,33 @@ export const feedbackRouter = createTRPCRouter({
         .innerJoin(attempts, eq(attempts.id, answers.attemptId))
         .innerJoin(user, eq(user.id, attempts.userId))
         .innerJoin(questions, eq(questions.id, answers.questionId))
-        .where(inArray(answers.id, ids));
-      if (rows.length !== ids.length) {
+        .where(inArray(answers.id, requested));
+      if (allRows.length !== requested.length) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Een of meer antwoorden bestaan niet (meer).",
         });
       }
+      // AVG art. 18: a restricted student's scores stay as they are, unless
+      // the teacher explicitly overrides the restriction.
+      const restricted = await restrictedUserIds(
+        ctx.db,
+        allRows.map((r) => r.userId),
+      );
+      const overridden = !!input.overrideRestriction && restricted.size > 0;
+      const rows = overridden
+        ? allRows
+        : allRows.filter((r) => !restricted.has(r.userId));
+      if (rows.length === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            restricted.size === 1
+              ? RESTRICTED_MESSAGE
+              : "Voor deze leerlingen is de verwerking beperkt (AVG art. 18). Hef de beperking op via Privacy & gegevens.",
+        });
+      }
+      const ids = rows.map((r) => r.id);
       const manualScore = round2(input.manualScore);
       for (const row of rows) {
         if (row.attemptStatus !== "submitted") {
@@ -313,6 +345,9 @@ export const feedbackRouter = createTRPCRouter({
                 from: row.previousScore,
                 to: manualScore,
                 bulk: true,
+                ...(overridden && restricted.has(row.userId)
+                  ? { restrictionOverridden: true }
+                  : {}),
               },
             },
             tx,
@@ -329,6 +364,7 @@ export const feedbackRouter = createTRPCRouter({
               details: {
                 path: "feedback.gradeMany",
                 answerIdsCount: ids.length,
+                ...(overridden ? { restrictionOverridden: true } : {}),
               },
             },
             tx,
@@ -343,7 +379,9 @@ export const feedbackRouter = createTRPCRouter({
           await recomputeAttemptScore(attemptId);
         } catch (error) {
           recomputed = false;
-          console.error("[feedback.gradeMany] recompute failed", error);
+          logServerError("feedback.grade_many_recompute_failed", error, {
+            attemptId,
+          });
         }
       }
       return {
@@ -351,6 +389,8 @@ export const feedbackRouter = createTRPCRouter({
         attemptIds,
         manualScore,
         recomputed,
+        /** Answers left alone: the student's processing is restricted. */
+        skippedRestricted: requested.length - ids.length,
       };
     }),
 

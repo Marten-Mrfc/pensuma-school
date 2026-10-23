@@ -35,6 +35,7 @@ import {
   userActivity,
   userPreferences,
 } from "@/server/db/schema";
+import { stillWorkingByAssignment } from "@/server/services/assignment-targets";
 import type { AuditDb } from "./audit-writer";
 import { getPrivacySettings } from "./settings-store";
 
@@ -98,6 +99,7 @@ export async function loadStudentExport(
     db
       .select({
         id: attempts.id,
+        assignmentId: attempts.assignmentId,
         attemptNumber: attempts.attemptNumber,
         status: attempts.status,
         startedAt: attempts.startedAt,
@@ -193,6 +195,21 @@ export async function loadStudentExport(
   ]);
 
   const attemptIds = attemptRows.map((a) => a.id);
+  // Only the student's own export hides results; it holds them back while
+  // a classmate with verlengde tijd is still working (as the portal does).
+  const working =
+    audience === "student"
+      ? await stillWorkingByAssignment(
+          db,
+          attemptRows.map((a) => ({
+            id: a.assignmentId,
+            status: a.assignmentStatus,
+            opensAt: a.opensAt,
+            closesAt: a.closesAt,
+          })),
+          now,
+        )
+      : new Map<string, boolean>();
   const [answerRows, eventRows] = attemptIds.length
     ? await Promise.all([
         db
@@ -300,6 +317,7 @@ export async function loadStudentExport(
           closesAt: a.closesAt,
           settings: a.settings,
           resultsReleased: a.resultsReleased,
+          othersWorking: working.get(a.assignmentId) ?? false,
         },
         testTitle: a.testTitle,
         answers: answersByAttempt.get(a.id) ?? [],

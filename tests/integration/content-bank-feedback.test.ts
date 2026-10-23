@@ -354,15 +354,28 @@ describe("feedback.gradeMany", () => {
       expect(a.gradingStatus).toBe("graded");
     }
 
+    // One row per answer, under the student it belongs to (inzage export,
+    // audit filter per student), with the old and the new score.
     const audits = await db
       .select()
       .from(auditLog)
       .where(eq(auditLog.action, "answer.score_changed"));
-    expect(audits).toHaveLength(1);
-    expect(audits[0].details).toMatchObject({
-      answerIdsCount: 5,
-      manualScore: 1,
-    });
+    expect(audits).toHaveLength(5);
+    expect(audits.map((a) => a.subjectId).sort()).toEqual(
+      [...w.answerIds].sort(),
+    );
+    const owners = await db
+      .select({ userId: attempts.userId })
+      .from(attempts)
+      .where(inArray(attempts.id, w.attemptIds));
+    expect(audits.map((a) => a.subjectUserId).sort()).toEqual(
+      owners.map((o) => o.userId).sort(),
+    );
+    for (const a of audits) {
+      expect(a.subjectUserId).toBeTruthy();
+      expect(a.subjectLabel).toBeTruthy();
+      expect(a.details).toMatchObject({ from: null, to: 1, bulk: true });
+    }
   });
 
   test("an unknown rubric id or a score above the maximum is a BAD_REQUEST", async () => {

@@ -244,9 +244,15 @@ een machine met 2 vCPU en 2–4 GB met de standaardinstellingen (`mem_limit: 4g`
 - **Wat de app zelf doet:** een Content-Security-Policy die alleen bronnen van de eigen server
   toestaat, HSTS, cross-origin-isolatie, `no-store` op alle API-antwoorden, alleen de nodige
   better-auth-endpoints,
-  sessietokens nooit in JSON, inlogblokkade per account (8 pogingen) en per netwerk
-  (`LOGIN_IP_MAX_FAILURES`), rate limits per gebruiker, een wachtwoordbeleid voor docenten
-  (minstens 12 tekens, geen veelgebruikte wachtwoorden) en een logboek van beheeracties.
+  sessietokens nooit in JSON, inlogblokkade per account (8 verkeerde pogingen), rate limits per
+  gebruiker, een wachtwoordbeleid voor docenten (minstens 12 tekens, geen veelgebruikte
+  wachtwoorden) en een logboek van beheeracties.
+- **Veel mislukte inlogpogingen vanaf één netwerk:** komen er binnen 10 minuten
+  `LOGIN_IP_MAX_FAILURES` (standaard 100) mislukte pogingen van één IP-adres, dan worden
+  leerlingaccounts die vanaf dat adres inloggen al na 5 verkeerde pincodes geblokkeerd in plaats
+  van na 8 (tot 10 minuten na de laatste mislukte poging boven de grens). Het adres zelf wordt
+  nooit geblokkeerd, want een hele school logt vaak in vanaf één IP-adres, en docenten worden
+  nooit beperkt door het netwerk.
 - **Beveiligingscontact:** `public/.well-known/security.txt` bevat een voorbeeldadres
   (`ict@school.example`). Vervang het door het adres van de ICT-afdeling en vernieuw `Expires`
   elk jaar.

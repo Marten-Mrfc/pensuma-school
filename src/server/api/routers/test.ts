@@ -30,6 +30,11 @@ import {
   type TestProblem,
   validateTest,
 } from "@/lib/questions/validate";
+import {
+  assertNoActiveHolds,
+  HOLDS_LOCATION,
+  studentsWithAttempts,
+} from "@/server/api/routers/assignment";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
 import type { DB } from "@/server/db";
 import {
@@ -39,6 +44,7 @@ import {
   tests,
   user,
 } from "@/server/db/schema";
+import { auditFromCtx } from "@/server/services/audit";
 import { insertPortableTest } from "@/server/services/portable-tests";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
@@ -415,19 +421,67 @@ export const testRouter = createTRPCRouter({
       });
     }),
 
-  /** Delete a test. Refused once students have made attempts (archive instead). */
+  /**
+   * Delete a test that nobody has made yet. Cascades to its afnames and
+   * to retention holds on them, so it is refused while a hold covers one
+   * of its afnames (or a student with work in them), and once students
+   * have made it (archive it instead).
+   */
   delete: adminProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       await requireTest(ctx.db, input.id);
-      const attemptCount = await countTestAttempts(ctx.db, input.id);
-      if (attemptCount > 0) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `Deze toets is al ${attemptCount} keer gemaakt door leerlingen. Archiveer de toets in plaats van hem te verwijderen; dan blijven de resultaten bewaard.`,
-        });
-      }
-      await ctx.db.delete(tests).where(eq(tests.id, input.id));
+      await ctx.db.transaction(async (tx) => {
+        // Lock the test and its afnames: a student starting an attempt or
+        // a teacher setting a hold meanwhile waits for us (and then finds
+        // nothing) instead of being removed by the cascade unseen.
+        await tx
+          .select({ id: tests.id })
+          .from(tests)
+          .where(eq(tests.id, input.id))
+          .for("update");
+        const afnames = await tx
+          .select({ id: assignments.id })
+          .from(assignments)
+          .where(eq(assignments.testId, input.id))
+          .for("update");
+        const assignmentIds = afnames.map((a) => a.id);
+        const students = await studentsWithAttempts(tx, assignmentIds);
+        await assertNoActiveHolds(
+          tx,
+          { assignmentIds, userIds: students.map((s) => s.userId) },
+          {
+            afname: "een afname van deze toets",
+            consequence: "Je kunt de toets daarom niet verwijderen.",
+            remedy: `Hef de blokkade eerst op onder ${HOLDS_LOCATION}, of archiveer de toets in plaats van hem te verwijderen.`,
+          },
+        );
+        const attemptCount = students.reduce(
+          (sum, s) => sum + s.attemptsCount,
+          0,
+        );
+        if (attemptCount > 0) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Deze toets is al ${attemptCount} keer gemaakt door leerlingen. Archiveer de toets in plaats van hem te verwijderen; dan blijven de resultaten bewaard.`,
+          });
+        }
+        await auditFromCtx(
+          ctx,
+          {
+            action: "trpc.mutation",
+            subjectType: "test",
+            subjectId: input.id,
+            details: {
+              path: "test.delete",
+              testId: input.id,
+              assignmentsCount: assignmentIds.length,
+            },
+          },
+          tx,
+        );
+        await tx.delete(tests).where(eq(tests.id, input.id));
+      });
       return { id: input.id };
     }),
 

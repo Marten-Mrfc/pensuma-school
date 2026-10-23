@@ -17,10 +17,18 @@
  *               - a negation right before/after a word answer ("Niet
  *                 geslaagd" is not "Geslaagd", "even: nee" is not "even");
  *               - another number glued to a numeric answer ("7 8 9" is not
- *                 "8"; a number before it needs a label such as ":" or "=");
+ *                 "8"). A number before it needs a label such as ":" or
+ *                 "="; after it, only after some words, and then besides
+ *                 units and echoed input at most one number that is not
+ *                 another test's answer ("De som is 51, uit 3 getallen");
  *               - the expected line of ANOTHER test of the same question
  *                 (`siblings`) next to the answer ("even oneven", "Je mag
- *                 stemmen / Je mag nog niet stemmen").
+ *                 stemmen / Je mag nog niet stemmen");
+ *               - when the answer is itself one of the inputs ("which number
+ *                 is the largest?"): other inputs after it ("3 en 9 en 5"
+ *                 for 9), or a prompt-like line ending in ":" or "?" ("9:"),
+ *                 because then the line lists the inputs instead of
+ *                 choosing one.
  *             Extra output lines are allowed when they contain no
  *             words/numbers, or when they look like a prompt or heading:
  *             they end with ":" or "?", contain a word, don't carry another
@@ -216,6 +224,9 @@ const isNegation = (t: Token) => t.word && NEGATIONS.has(t.text.toLowerCase());
 /** Text between two tokens that makes the part before it a label: "3 + 4 = 7", "Stap 2: 8". */
 const LABEL_SEPARATOR = /[:=?>→⇒]/u;
 
+/** A line that looks like a prompt or heading ("Geef een getal:", "Even of oneven?"). */
+const PROMPT_END = /[:?]\s*$/u;
+
 /* -------------------------- Flexible: line matching ------------------------ */
 
 type ExpectedLines = { raw: string[]; tokens: Token[][] };
@@ -265,6 +276,23 @@ type ForeignHit = {
   wordy: boolean;
 };
 
+/** Per output line, see FlexibleContext.lineInfo (index: token position). */
+type LineInfo = {
+  /** First word token at or after the index (token count when none). */
+  nextWord: Int32Array;
+  /** First number at or after the index, not glued to a letter. */
+  nextNumber: Int32Array;
+  /** 1 when another test's numeric answer (not echoed input) follows. */
+  siblingNumberAfter: Uint8Array;
+  /** Other numbers (not input, not another test's answer) from here, at most 2. */
+  otherNumbersAfter: Uint8Array;
+  /** Last position of each input value (by token key) on the line. */
+  lastInput: Map<string, number>;
+  /** Span covering every worded answer of another test on the line. */
+  wordyStart: number;
+  wordyEnd: number;
+};
+
 /**
  * Everything the flexible comparison of ONE test needs to know besides the
  * output: its expected lines, the other tests' expected lines and the input.
@@ -273,6 +301,16 @@ class FlexibleContext {
   readonly expected: Token[][];
   /** Per expected line: it contains a negation itself ("Niet geslaagd"). */
   private readonly negated: boolean[];
+  /**
+   * Per expected line: it consists of input values only (the answer is one
+   * of the inputs, e.g. the largest number or the longest word), with the
+   * keys of its tokens. Null for other lines.
+   */
+  private readonly select: (Set<string> | null)[];
+  /** Per expected line: it ends like a prompt itself ("Uitslag:"). */
+  private readonly promptLike: boolean[];
+  /** Keys of the tokens of this test's stdin. */
+  private readonly inputKeys: Set<string>;
   /**
    * The sibling tests' expected lines that this test does not also expect,
    * indexed by their first token and then their second.
@@ -283,16 +321,19 @@ class FlexibleContext {
   >();
   /** Per sibling test: the keys of all its expected lines. */
   private readonly siblingKeys: Set<string>[];
+  /** Keys of the sibling tests' answers that are a single number ("350"). */
+  private readonly siblingNumbers = new Set<string>();
   private readonly echo: Token[];
   private readonly stdinLines: number;
   /** At most this many prompt/heading lines (with words) may be skipped. */
   readonly maxPromptLines: number;
   /** Per raw output line (outputs often repeat lines). */
   private readonly hitCache = new Map<string, ForeignHit[]>();
+  private readonly infoCache = new Map<string, LineInfo>();
   private readonly skipCache = new Map<string, number>();
 
   constructor(
-    expected: Token[][],
+    { raw, tokens: expected }: ExpectedLines,
     options: {
       ignoreCase: boolean;
       stdin?: string;
@@ -301,6 +342,17 @@ class FlexibleContext {
   ) {
     this.expected = expected;
     this.negated = expected.map((e) => e.some(isNegation));
+    const stdin = options.stdin ?? "";
+    this.stdinLines = normalizeLines(stdin).length;
+    this.echo = tokenize(stdin, options.ignoreCase);
+    this.maxPromptLines = this.stdinLines + 2;
+    this.inputKeys = new Set(this.echo.map((t) => tokenKey(t)));
+    this.select = expected.map((e) =>
+      e.every((t) => this.inputKeys.has(tokenKey(t)))
+        ? new Set(e.map((t) => tokenKey(t)))
+        : null,
+    );
+    this.promptLike = raw.map((r) => PROMPT_END.test(r));
     const siblingLines = (options.siblings ?? []).map(
       (text) => expectedLineTokens(text, options.ignoreCase).tokens,
     );
@@ -313,6 +365,8 @@ class FlexibleContext {
         if (own.has(lineKey(tokens))) continue;
         // Indexed by the first two tokens (one for a one-token line).
         const keys = tokens.map((t) => tokenKey(t));
+        if (keys.length === 1 && isNumberToken(tokens[0]))
+          this.siblingNumbers.add(keys[0]);
         const entry = { keys, sibling, wordy: tokens.some(isWordToken) };
         let bucket = this.foreign.get(keys[0]);
         if (!bucket) {
@@ -327,10 +381,6 @@ class FlexibleContext {
         }
       }
     });
-    const stdin = options.stdin ?? "";
-    this.stdinLines = normalizeLines(stdin).length;
-    this.echo = tokenize(stdin, options.ignoreCase);
-    this.maxPromptLines = this.stdinLines + 2;
   }
 
   /**
@@ -347,17 +397,76 @@ class FlexibleContext {
     );
   }
 
-  /** Numbers after a numeric answer (from token `from` on) are allowed? */
-  private cleanNumericTail(line: Line, from: number): boolean {
-    let sawWord = false;
-    for (const t of line.tokens.slice(from)) {
-      if (isWordToken(t)) sawWord = true;
-      if (!isNumberToken(t)) continue;
-      if (t.start > 0 && /[\p{L}_]/u.test(line.raw[t.start - 1])) continue;
-      if (sawWord && this.echo.some((e) => tokenEqual(e, t))) continue;
-      return false;
+  /**
+   * What `matches` needs to know about an output line, computed once per
+   * line so that checking every occurrence of the answer stays linear (a
+   * crafted output can repeat the answer thousands of times).
+   */
+  private lineInfo(line: Line): LineInfo {
+    const cached = this.infoCache.get(line.raw);
+    if (cached) return cached;
+    const L = line.tokens;
+    const n = L.length;
+    const nextWord = new Int32Array(n + 1).fill(n);
+    const nextNumber = new Int32Array(n + 1).fill(n);
+    const siblingNumberAfter = new Uint8Array(n + 1);
+    const otherNumbersAfter = new Uint8Array(n + 1);
+    for (let k = n - 1; k >= 0; k--) {
+      const t = L[k];
+      nextWord[k] = isWordToken(t) ? k : nextWord[k + 1];
+      nextNumber[k] = nextNumber[k + 1];
+      siblingNumberAfter[k] = siblingNumberAfter[k + 1];
+      otherNumbersAfter[k] = otherNumbersAfter[k + 1];
+      // Digits glued to a letter are part of a unit or name ("12 m2").
+      if (
+        !isNumberToken(t) ||
+        (t.start > 0 && /[\p{L}_]/u.test(line.raw[t.start - 1]))
+      )
+        continue;
+      nextNumber[k] = k;
+      if (this.echo.some((e) => tokenEqual(e, t))) continue;
+      if (this.siblingNumbers.has(tokenKey(t))) siblingNumberAfter[k] = 1;
+      else otherNumbersAfter[k] = Math.min(2, otherNumbersAfter[k] + 1);
     }
-    return true;
+    const lastInput = new Map<string, number>();
+    L.forEach((t, k) => {
+      const key = tokenKey(t);
+      if (this.inputKeys.has(key)) lastInput.set(key, k);
+    });
+    let wordyStart = Number.POSITIVE_INFINITY;
+    let wordyEnd = Number.NEGATIVE_INFINITY;
+    for (const h of this.foreignHits(line)) {
+      if (!h.wordy) continue;
+      wordyStart = Math.min(wordyStart, h.start);
+      wordyEnd = Math.max(wordyEnd, h.end);
+    }
+    const info: LineInfo = {
+      nextWord,
+      nextNumber,
+      siblingNumberAfter,
+      otherNumbersAfter,
+      lastInput,
+      wordyStart,
+      wordyEnd,
+    };
+    this.infoCache.set(line.raw, info);
+    return info;
+  }
+
+  /**
+   * Numbers after a numeric answer (from token `from` on) are allowed? Never
+   * right after it ("8 9", "8,5" for 8). After some words: digits glued to a
+   * letter (a unit or name: "12 m2"), the echoed input ("25 is het kwadraat
+   * van 5") and at most ONE other number that is not another test's answer
+   * ("De som is 51 (3 getallen)"); more would let a list of candidates
+   * ("x 7 x 8 x 9") pass.
+   */
+  private cleanNumericTail(info: LineInfo, from: number): boolean {
+    const word = info.nextWord[from];
+    if (info.nextNumber[from] < word) return false;
+    return (
+      info.siblingNumberAfter[word] === 0 && info.otherNumbersAfter[word] <= 1
+    );
   }
 
   /** Where other tests' expected lines occur in this output line. */
@@ -400,9 +509,22 @@ class FlexibleContext {
     const e = this.expected[i];
     const L = line.tokens;
     if (e.length > L.length) return false;
+    const select = this.select[i];
+    // The answer is one of the inputs: a prompt-like line ("9:", "olifant?")
+    // doesn't give it as THE answer (else printing every input as a "prompt"
+    // would pass).
+    if (select && !this.promptLike[i] && PROMPT_END.test(line.raw))
+      return false;
     const first = e[0];
     const last = e[e.length - 1];
     const negatedAnswer = this.negated[i];
+    const info = this.lineInfo(line);
+    // Last position of an input on this line that is not part of the answer.
+    let lastOtherInput = -1;
+    if (select) {
+      for (const [key, k] of info.lastInput)
+        if (!select.has(key)) lastOtherInput = Math.max(lastOtherInput, k);
+    }
     return occurrences(L, e).some((s) => {
       const end = s + e.length;
       const before = s > 0 ? L[s - 1] : null;
@@ -415,11 +537,14 @@ class FlexibleContext {
         !LABEL_SEPARATOR.test(line.raw.slice(before.end, L[s].start))
       )
         return false;
-      // Numeric end: no number after it ("8 9", "8,5" for 8), except digits
-      // glued to a letter (a unit or name: "12 m2") and the echoed input
-      // after some words ("25 is het kwadraat van 5").
-      if (isNumberToken(last) && !this.cleanNumericTail(line, end))
+      // Numeric end: no number right after it ("8 9", "8,5" for 8); after
+      // some words only units, echoed input and one other number (see
+      // cleanNumericTail).
+      if (isNumberToken(last) && !this.cleanNumericTail(info, end))
         return false;
+      // The answer is one of the inputs: other inputs after it mean the line
+      // lists the inputs instead of choosing one ("3 en 9 en 5" for 9).
+      if (lastOtherInput >= end) return false;
       // Word answers: no negation right before or after it.
       if (!negatedAnswer) {
         if (
@@ -431,9 +556,7 @@ class FlexibleContext {
           return false;
       }
       // No other test's (worded) answer next to it ("even oneven").
-      return !this.foreignHits(line).some(
-        (h) => h.wordy && (h.start < s || h.end > end),
-      );
+      return info.wordyStart >= s && info.wordyEnd <= end;
     });
   }
 
@@ -444,7 +567,7 @@ class FlexibleContext {
   skipCost(line: Line): number {
     const L = line.tokens;
     if (L.length === 0) return 0;
-    if (!/[:?]\s*$/u.test(line.raw) || !L.some(isWordToken))
+    if (!PROMPT_END.test(line.raw) || !L.some(isWordToken))
       return Number.POSITIVE_INFINITY;
     let cost = this.skipCache.get(line.raw);
     if (cost === undefined) {
@@ -632,8 +755,9 @@ function compareFlexible(
     raw,
     tokens: tokenize(raw, ignoreCase),
   }));
-  const { raw: eRaw, tokens: eTok } = expectedLineTokens(expected, ignoreCase);
-  const ctx = new FlexibleContext(eTok, options);
+  const expectedLines = expectedLineTokens(expected, ignoreCase);
+  const { raw: eRaw, tokens: eTok } = expectedLines;
+  const ctx = new FlexibleContext(expectedLines, options);
   const A = out.length;
   const E = eTok.length;
   const skip = out.map((l) => ctx.skipCost(l));

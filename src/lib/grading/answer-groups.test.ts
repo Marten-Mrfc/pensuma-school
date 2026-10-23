@@ -2,14 +2,20 @@ import { describe, expect, test } from "bun:test";
 import { groupAnswers, groupKey } from "./answer-groups";
 
 describe("groupKey: open", () => {
-  test("ignores spacing and sentence punctuation after words", () => {
+  test("ignores extra spaces, blank lines and a final full stop", () => {
     const a = groupKey("open", { text: "Een lus herhaalt code!" });
-    const b = groupKey("open", { text: "  Een lus   herhaalt\ncode " });
-    const c = groupKey("open", { text: "Een lus, herhaalt code." });
+    const b = groupKey("open", { text: "  Een lus   herhaalt code \n\n" });
+    const c = groupKey("open", { text: "\nEen lus herhaalt code." });
     expect(a).toBe("Een lus herhaalt code");
     expect(b).toBe(a);
     expect(c).toBe(a);
-    expect(groupKey("open", { text: "print(x)." })).toBe("print(x)");
+    // Only after a word: "print(x)." and "x = 3." keep their dot.
+    expect(groupKey("open", { text: "print(x)." })).toBe("print(x).");
+    expect(groupKey("open", { text: "x = 3." })).toBe("x = 3.");
+    // Code keeps its lines and relative indentation; a shared indent goes.
+    expect(
+      groupKey("open", { text: "    for i in x:\n\n        print(i)  " }),
+    ).toBe("for i in x:\n    print(i)");
   });
 
   test("different words give different keys", () => {
@@ -32,6 +38,15 @@ describe("groupKey: open", () => {
     ["2**3", "2*3"],
     ["True", "true"],
     ["3.5", "35"],
+    ["x = 3.", "x = 3"],
+    ["print(a, b)", "print(a b)"],
+    ["if x: print(x)", "if x print(x)"],
+    [
+      "for i in x:\n    print(i)\nprint(i)",
+      "for i in x:\n    print(i)\n    print(i)",
+    ],
+    ["x²", "x2"],
+    ["a; b", "a b"],
   ])("%p and %p get different keys", (a, b) => {
     expect(groupKey("open", { text: a })).not.toBe(
       groupKey("open", { text: b }),

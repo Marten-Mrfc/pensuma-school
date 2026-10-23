@@ -65,7 +65,12 @@ export const env = createEnv({
       .string()
       .min(24, "SETUP_TOKEN must be at least 24 characters.")
       .optional(),
-    /** Failed sign-ins from one IP within 10 minutes before it is paused. */
+    /**
+     * Failed sign-ins from one IP within 10 minutes after which student
+     * accounts signing in from that address lock after 5 wrong PINs
+     * instead of 8. The address itself is never blocked, and teachers are
+     * never limited by the network (see login-throttle.ts).
+     */
     LOGIN_IP_MAX_FAILURES: z.coerce
       .number()
       .int("LOGIN_IP_MAX_FAILURES must be a whole number.")

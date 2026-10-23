@@ -22,6 +22,7 @@ import {
   effectiveAssignmentStatus,
   resultsVisible,
 } from "@/server/services/assignment-status";
+import { stillWorking } from "@/server/services/assignment-targets";
 import {
   autoSubmitIfExpired,
   isAttemptExpired,
@@ -247,7 +248,8 @@ export const helpRouter = createTRPCRouter({
    * Model solutions (code) and model answers (open questions) of a handed-in
    * attempt, when the afname allows it:
    *  - after_attempts: every attempt used, or everything right;
-   *  - after_close: the afname is closed.
+   *  - after_close: the afname is closed and nobody (a classmate with
+   *    verlengde tijd, a reopened attempt) is still working on it.
    * Never while another attempt of the student is running.
    */
   solutions: studentProcedure
@@ -266,9 +268,12 @@ export const helpRouter = createTRPCRouter({
       });
 
       if (settings.showSolutions === "never") return none(null);
-      if (attempt.status !== "submitted" || !resultsVisible(a)) {
-        return none(null);
-      }
+      if (attempt.status !== "submitted") return none(null);
+      // Classmates with verlengde tijd may still be working after the
+      // close: the right answers wait until everyone has handed in.
+      const now = new Date();
+      const othersWorking = await stillWorking(db, a, now);
+      if (!resultsVisible(a, now, othersWorking)) return none(null);
       const mine = await db
         .select({ status: attempts.status })
         .from(attempts)
@@ -286,9 +291,14 @@ export const helpRouter = createTRPCRouter({
 
       let allowed = false;
       if (settings.showSolutions === "after_close") {
-        allowed = effectiveAssignmentStatus(a) === "closed";
+        const closed = effectiveAssignmentStatus(a, now) === "closed";
+        allowed = closed && !othersWorking;
         if (!allowed) {
-          return none("De modeloplossingen zie je zodra de toets gesloten is.");
+          return none(
+            closed
+              ? "De modeloplossingen zie je zodra iedereen klaar is met de toets."
+              : "De modeloplossingen zie je zodra de toets gesloten is.",
+          );
         }
       } else {
         const fullScore =

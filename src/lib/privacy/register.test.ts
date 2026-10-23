@@ -7,6 +7,7 @@ import {
   FACILITY_LABELS,
   formatSubjects,
   registerAsMarkdown,
+  SESSION_EXPIRY_TEXT,
 } from "./register";
 import { privacySettingsSchema } from "./settings";
 
@@ -140,6 +141,36 @@ describe("texts match what Pensuma does", () => {
       privacySettingsSchema.parse({}),
     );
     expect(text).toContain("30 dagen na de einddatum");
+  });
+
+  test("sessions: students are capped at 12 hours after signing in, teachers after last use", () => {
+    expect(SESSION_EXPIRY_TEXT).toBe(
+      "leerlingen: 12 uur na het inloggen (of eerder bij uitloggen); docenten: 12 uur na het laatste gebruik",
+    );
+    const text = byId("security").retention(privacySettingsSchema.parse({}));
+    expect(text).toContain(SESSION_EXPIRY_TEXT);
+    expect(text).not.toContain("Sessies zodra ze verlopen (12 uur na het");
+  });
+
+  test("the server's error log is in the register, without a table", () => {
+    const c = byId("server-log");
+    expect(c.label).toBe("Technische foutmeldingen (serverlogboek)");
+    expect(c.tables).toEqual([]);
+    expect(c.sharedTables ?? []).toEqual([]);
+    expect(c.subjects).toEqual(["leerlingen", "docenten"]);
+    expect(c.examples).toContain("tijdstip");
+    expect(c.examples).toContain("foutcode");
+    expect(c.examples).toContain("gebruikers-id");
+    expect(c.examples).toContain(
+      "Nooit wat iemand invoert, antwoorden, pincodes of wachtwoorden",
+    );
+    const retention = c.retention(privacySettingsSchema.parse({}));
+    expect(retention).toContain("logrotatie");
+    // What docker-compose.yml really configures (max-file 5, max-size 10m).
+    expect(retention).toContain("5 bestanden van 10 MB");
+    const md = registerAsMarkdown(privacySettingsSchema.parse({}));
+    expect(md).toContain("Technische foutmeldingen (serverlogboek)");
+    expect(md).toContain("geen databasetabel");
   });
 
   test("audit log: views are named precisely; scores yes, answer content never", () => {

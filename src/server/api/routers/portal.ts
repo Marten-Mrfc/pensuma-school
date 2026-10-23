@@ -17,6 +17,7 @@ import { z } from "zod";
 import { accommodationMinutes } from "@/lib/accommodations";
 import { hintPenaltyFraction } from "@/lib/grading/hint-penalty";
 import {
+  countFocusLosses,
   isEventAllowed,
   MONITORING_EVENT_TYPES,
   sanitizeEventDetails,
@@ -48,6 +49,7 @@ import {
   questions,
   tests,
 } from "@/server/db/schema";
+import { logServerError } from "@/server/privacy/error-log";
 import {
   ACCESS_CODE_FAILURE_DELAY_MS,
   ACCESS_CODE_LOCKED_MESSAGE,
@@ -105,13 +107,6 @@ const idSchema = z.uuid({ error: "Deze link klopt niet." });
 type AssignmentRow = typeof assignments.$inferSelect;
 type AttemptRow = typeof attempts.$inferSelect;
 type QuestionRow = typeof questions.$inferSelect;
-
-/** Losses of focus counted in `attempts.focusLossCount`. */
-const FOCUS_LOSS_EVENTS = new Set<string>([
-  "focus_lost",
-  "visibility_hidden",
-  "fullscreen_exit",
-]);
 
 /**
  * Flat event details from the browser: at most 10 keys, short strings,
@@ -589,7 +584,9 @@ export const portalRouter = createTRPCRouter({
               subjectLabel: ctx.user.username ?? null,
               details: { assignmentId: a.id },
             }).catch((error: unknown) => {
-              console.error("[portal] access code audit failed", error);
+              logServerError("portal.access_code_audit_failed", error, {
+                assignmentId: a.id,
+              });
             });
           }
           // Small delay makes guessing codes unattractive.
@@ -845,7 +842,12 @@ export const portalRouter = createTRPCRouter({
         };
       });
       if (values.length) await db.insert(attemptEvents).values(values);
-      const losses = values.filter((v) => FOCUS_LOSS_EVENTS.has(v.type)).length;
+      // With "vensterwissels niet registreren" a fullscreen exit is still
+      // logged (when the toets requires fullscreen) but never counted.
+      const losses = countFocusLosses(
+        values.map((v) => v.type),
+        settings,
+      );
       await db
         .update(attempts)
         .set({

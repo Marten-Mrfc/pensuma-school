@@ -30,8 +30,11 @@ export const AUDIT_ACTIONS = {
     label: "Account tijdelijk geblokkeerd na mislukte inlogpogingen",
     category: "auth",
   },
+  // The network itself is never blocked: while it has many failures,
+  // student accounts signing in from it lock sooner (login-throttle.ts).
   "auth.network_locked": {
-    label: "Inloggen vanaf een netwerk tijdelijk geblokkeerd",
+    label:
+      "Veel mislukte inlogpogingen vanaf één netwerk (strengere blokkade per leerling)",
     category: "auth",
   },
   "auth.login_unlocked": { label: "Inlogblokkade opgeheven", category: "auth" },
@@ -102,6 +105,9 @@ export const AUDIT_ACTIONS = {
     category: "change",
   },
   "attempt.reset": { label: "Poging gewist", category: "change" },
+  "attempt.time_extended": { label: "Extra tijd gegeven", category: "change" },
+  "attempt.reopened": { label: "Poging heropend", category: "change" },
+  "question.deleted": { label: "Vraag verwijderd", category: "change" },
   "trpc.mutation": { label: "Wijziging", category: "change" },
 
   // privacy

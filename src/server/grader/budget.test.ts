@@ -101,6 +101,81 @@ describe("JobBudget + runPhase", () => {
     expect(elapsed).toBeLessThanOrEqual(30_000);
   });
 
+  test("one timeout doesn't cost a question its later tests when time allows", async () => {
+    // 9 questions with a 10 s limit (share 13.3 s): after one timeout the
+    // question is over its share, but the job has used only 11 s of 120 s.
+    const { ran, skipped } = await simulate(120_000, [
+      { timeLimitMs: 10_000, tests: [null, 5, 5, 5, 5, 5] },
+      ...Array.from({ length: 8 }, () => ({
+        timeLimitMs: 10_000,
+        tests: fast(5),
+      })),
+    ]);
+    expect(ran).toEqual([6, ...Array(8).fill(5)]);
+    expect(skipped).toEqual(Array(9).fill(0));
+  });
+
+  test("visible tests that had to wait run before the hidden phase", async () => {
+    // Like gradeCodeBatch: the visible tests of every question, then the
+    // hidden ones. Question 0 times out once; the others each still have a
+    // hidden test that could take up to its time limit.
+    let clock = 0;
+    const questions = [
+      { visible: [null, 5, 5, 5, 5] as Duration[], hidden: [] as Duration[] },
+      ...Array.from({ length: 8 }, () => ({
+        visible: [5] as Duration[],
+        hidden: [5] as Duration[],
+      })),
+    ];
+    const budget = new JobBudget(
+      120_000,
+      questions.map(() => 10_000),
+      () => clock,
+      questions.map((q) => q.visible.length + q.hidden.length),
+    );
+    const order: string[] = [];
+    const execute = (phase: string) => async (i: number, d: Duration) => {
+      order.push(`${phase}${i}`);
+      clock += d === null ? 10_000 + RESPAWN_MARGIN_MS : d;
+      return d === null;
+    };
+    const skippedTests: number[] = [];
+    await runPhase(
+      budget,
+      questions.map((q) => q.visible),
+      questions.map((q) => q.hidden.length === 0),
+      execute("v"),
+      (i) => skippedTests.push(i),
+    );
+    await runPhase(
+      budget,
+      questions.map((q) => q.hidden),
+      questions.map(() => true),
+      execute("h"),
+      (i) => skippedTests.push(i),
+    );
+    expect(skippedTests).toEqual([]);
+    expect(order.filter((o) => o === "v0")).toHaveLength(5);
+    // Every visible test (the waiting ones included) ran before any hidden one.
+    expect(order.findLastIndex((o) => o.startsWith("v"))).toBeLessThan(
+      order.findIndex((o) => o.startsWith("h")),
+    );
+  });
+
+  test("a waiting test is given up when the others may still need the time", async () => {
+    // 3 questions, 30 s job, 10 s limit (share 10 s): question 0 loops; the
+    // others are fast but each still has 2 tests that could time out.
+    const { ran, skipped, elapsed } = await simulate(30_000, [
+      { timeLimitMs: 9_000, tests: loops(3) },
+      { timeLimitMs: 9_000, tests: fast(2) },
+      { timeLimitMs: 9_000, tests: fast(2) },
+    ]);
+    expect(ran[1]).toBe(2);
+    expect(ran[2]).toBe(2);
+    expect(ran[0] + skipped[0]).toBe(3);
+    expect(elapsed).toBeLessThanOrEqual(30_000 + 10_000);
+  });
+
   test("nothing starts after the job deadline", () => {
     let clock = 0;
     const budget = new JobBudget(10_000, [1_000, 1_000], () => clock);

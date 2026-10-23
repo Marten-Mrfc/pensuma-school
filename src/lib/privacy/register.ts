@@ -53,6 +53,14 @@ export const FACILITY_LABELS = {
   ignoreFocusEvents: "vensterwissels niet registreren",
 } as const;
 
+/**
+ * When a session ends (src/server/auth.ts): a student's session is capped
+ * at 12 hours after signing in and is never extended; a teacher's session
+ * is extended while it is used.
+ */
+export const SESSION_EXPIRY_TEXT =
+  "leerlingen: 12 uur na het inloggen (of eerder bij uitloggen); docenten: 12 uur na het laatste gebruik";
+
 /** Auto-delete of attempts and accounts: on, not yet confirmed, or off. */
 const autoDeleteOn = (s: PrivacySettings) =>
   s.retention.autoDeleteAttempts && s.retention.confirmedAt != null;
@@ -160,7 +168,7 @@ export const DATA_CATEGORIES: readonly DataCategory[] = [
     purpose: "Ingelogd blijven en het systeem beveiligen tegen misbruik",
     legalBasis: SECURITY,
     retention: () =>
-      "Sessies zodra ze verlopen (12 uur na het laatste gebruik); tellers na 24 uur; de laatste keer inloggen zolang het account bestaat",
+      `Sessies zodra ze verlopen (${SESSION_EXPIRY_TEXT}); tellers na 24 uur; de laatste keer inloggen zolang het account bestaat`,
     recipients: "Alleen het systeem; de beheerder bij een beveiligingsincident",
     tables: [
       "session",
@@ -169,6 +177,20 @@ export const DATA_CATEGORIES: readonly DataCategory[] = [
       "login_throttle",
       "user_activity",
     ],
+  },
+  {
+    id: "server-log",
+    label: "Technische foutmeldingen (serverlogboek)",
+    examples:
+      "Als er iets misgaat: het tijdstip, de functie waarin het misging en een foutcode. Bij een storing ook de gebruikers-id (een willekeurige code, geen naam of leerlingnummer) en de foutcode die de gebruiker te zien krijgt. Nooit wat iemand invoert, antwoorden, pincodes of wachtwoorden",
+    subjects: ["leerlingen", "docenten"],
+    purpose: "Storingen opsporen en verhelpen en het systeem beveiligen",
+    legalBasis: SECURITY,
+    retention: () =>
+      "Tot de logrotatie van de server ze overschrijft: met de meegeleverde docker-compose.yml hoogstens 5 bestanden van 10 MB per container. Bij een andere installatie stelt de beheerder de logrotatie in",
+    recipients: "Alleen de beheerder van Pensuma, voor technisch onderhoud",
+    // Not a database table: lines on the server's standard output.
+    tables: [],
   },
   {
     id: "audit-log",
@@ -293,10 +315,11 @@ export function registerAsMarkdown(
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const c of DATA_CATEGORIES) {
-    const tables = [
-      ...c.tables,
-      ...(c.sharedTables ?? []).map((t) => `${t} (gedeeld)`),
-    ].join(", ");
+    const tables =
+      [
+        ...c.tables,
+        ...(c.sharedTables ?? []).map((t) => `${t} (gedeeld)`),
+      ].join(", ") || "geen databasetabel";
     lines.push(
       `| ${[
         c.label,

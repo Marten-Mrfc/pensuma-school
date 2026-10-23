@@ -37,6 +37,7 @@ import {
   toPublicPrivacyInfo,
 } from "@/lib/privacy/settings";
 import { assignmentSettingsSchema } from "@/lib/questions/schema";
+import { assertNoActiveHolds } from "@/server/api/routers/assignment";
 import {
   adminProcedure,
   createTRPCRouter,
@@ -80,6 +81,7 @@ import {
   toDate,
 } from "@/server/privacy/student-export";
 import { resultsVisible } from "@/server/services/assignment-status";
+import { stillWorkingByAssignment } from "@/server/services/assignment-targets";
 import { actorFromCtx, auditFromCtx } from "@/server/services/audit";
 
 /**
@@ -677,6 +679,7 @@ export const privacyRouter = createTRPCRouter({
       const [attempt] = await ctx.db
         .select({
           id: attempts.id,
+          assignmentId: attempts.assignmentId,
           userId: attempts.userId,
           username: user.username,
         })
@@ -691,6 +694,16 @@ export const privacyRouter = createTRPCRouter({
         });
       }
       return ctx.db.transaction(async (tx) => {
+        // A bewaarblokkade (bezwaar, examendossier, AVG art. 18) on the
+        // afname or the student keeps the log as it is.
+        await assertNoActiveHolds(
+          tx,
+          { assignmentIds: [attempt.assignmentId], userIds: [attempt.userId] },
+          {
+            afname: "deze afname",
+            consequence: "Je kunt het logboek daarom niet wissen.",
+          },
+        );
         const deleted = await tx
           .delete(attemptEvents)
           .where(eq(attemptEvents.attemptId, attempt.id))
@@ -1117,6 +1130,7 @@ export const privacyRouter = createTRPCRouter({
         ctx.db
           .select({
             id: attempts.id,
+            assignmentId: attempts.assignmentId,
             status: attempts.status,
             submittedAt: attempts.submittedAt,
             score: attempts.score,
@@ -1149,6 +1163,18 @@ export const privacyRouter = createTRPCRouter({
       ]);
     const now = new Date();
     const submitted = attemptRows.filter((a) => a.status === "submitted");
+    // Results that wait for the close stay hidden while a classmate with
+    // verlengde tijd is still working (as on the portal).
+    const working = await stillWorkingByAssignment(
+      ctx.db,
+      submitted.map((a) => ({
+        id: a.assignmentId,
+        status: a.assignmentStatus,
+        opensAt: a.opensAt,
+        closesAt: a.closesAt,
+      })),
+      now,
+    );
     const visible = submitted.filter((a) => {
       try {
         return resultsVisible(
@@ -1160,6 +1186,7 @@ export const privacyRouter = createTRPCRouter({
             resultsReleased: a.resultsReleased,
           },
           now,
+          working.get(a.assignmentId) ?? false,
         );
       } catch {
         return false;

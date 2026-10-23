@@ -370,10 +370,11 @@ describe("deleting a question", () => {
     expect(shown.score).toBe(0.5);
     expect(shown.maxScore).toBe(2);
 
-    const rows = await auditRows("trpc.mutation");
+    // Its own action ("Vraag verwijderd"), not the generic "Wijziging".
+    expect(await auditRows("trpc.mutation")).toHaveLength(0);
+    const rows = await auditRows("question.deleted");
     const summary = rows.find((r) => r.subjectUserId == null);
     expect(summary?.details).toMatchObject({
-      path: "question.delete",
       questionId: w.mc.id,
       answersCount: 2,
       attemptsAffected: 2,
@@ -413,10 +414,11 @@ describe("per-student changes are audited with the student", () => {
     const t = callerFor(w.teacher);
     await t.assignment.extendTime({ attemptId: running.id, minutes: 5 });
     await t.assignment.reopenAttempt({ attemptId: done.id, minutes: 10 });
-    const rows = await auditRows("trpc.mutation");
-    const extend = rows.find(
-      (r) => (r.details as { path?: string }).path === "assignment.extendTime",
-    );
+    // Their own actions ("Extra tijd gegeven", "Poging heropend"), not the
+    // generic "Wijziging".
+    expect(await auditRows("trpc.mutation")).toHaveLength(0);
+    const [extend, ...moreExtends] = await auditRows("attempt.time_extended");
+    expect(moreExtends).toHaveLength(0);
     expect(extend).toMatchObject({
       subjectType: "attempt",
       subjectId: running.id,
@@ -424,10 +426,8 @@ describe("per-student changes are audited with the student", () => {
       subjectLabel: w.s1.username,
     });
     expect(extend?.details).toMatchObject({ minutes: 5 });
-    const reopen = rows.find(
-      (r) =>
-        (r.details as { path?: string }).path === "assignment.reopenAttempt",
-    );
+    const [reopen, ...moreReopens] = await auditRows("attempt.reopened");
+    expect(moreReopens).toHaveLength(0);
     expect(reopen).toMatchObject({
       subjectId: done.id,
       subjectUserId: w.s2.id,

@@ -75,7 +75,8 @@ export function DataInventoryTable({
                     </span>
                     {detailed ? (
                       <span className="mt-1 block font-mono text-[0.7rem] font-normal break-words text-muted-foreground">
-                        {[...c.tables, ...(c.sharedTables ?? [])].join(", ")}
+                        {[...c.tables, ...(c.sharedTables ?? [])].join(", ") ||
+                          "geen databasetabel"}
                       </span>
                     ) : null}
                   </th>

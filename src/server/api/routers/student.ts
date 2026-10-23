@@ -34,6 +34,7 @@ import {
   user,
 } from "@/server/db/schema";
 import { eraseStudentById } from "@/server/privacy/erasure";
+import { databaseErrorOf, logServerError } from "@/server/privacy/error-log";
 import {
   assertNotRestricted,
   hasActiveRestriction,
@@ -152,7 +153,13 @@ const ACCOUNT_CONCURRENCY = 4;
 /**
  * Create a student account and never leave a half-created user behind: if
  * any step after inserting the user fails, the user row is removed again.
- * Callers must have checked up front that the number/email are free.
+ * Callers must have checked up front that the number/email are free; a
+ * number taken meanwhile (two teachers at once) is a CONFLICT.
+ *
+ * A failure is an INTERNAL_SERVER_ERROR without the leerlingnummer in its
+ * message, with the original error as cause: the tRPC error log then keeps
+ * only the database error code and constraint (never Drizzle's message with
+ * the query parameters), and the teacher sees the same error code.
  */
 async function createStudentSafely(
   db: DB,
@@ -179,13 +186,22 @@ async function createStudentSafely(
     ) {
       await db.delete(user).where(eq(user.id, partial.id));
     }
-    console.error(`[student] creating ${input.studentNumber} failed`, error);
+    if (databaseErrorOf(error)?.code === UNIQUE_VIOLATION) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: `Leerlingnummer ${input.studentNumber} is al in gebruik.`,
+      });
+    }
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: `Het account voor leerlingnummer ${input.studentNumber} kon niet worden aangemaakt.`,
+      message: "Het account kon niet worden aangemaakt. Probeer het opnieuw.",
+      cause: error,
     });
   }
 }
+
+/** Postgres SQLSTATE for a unique constraint violation. */
+const UNIQUE_VIOLATION = "23505";
 
 /** Users that already use these student numbers (as username or placeholder email). */
 async function findByNumbers(db: DB, numbers: string[]) {
@@ -531,6 +547,14 @@ export const studentRouter = createTRPCRouter({
           .values({ classId: input.classId, userId: created.id })
           .onConflictDoNothing();
       }
+      await auditFromCtx(ctx, {
+        action: "student.created",
+        subjectType: "student",
+        subjectId: created.id,
+        subjectUserId: created.id,
+        subjectLabel: input.studentNumber,
+        details: input.classId ? { classId: input.classId } : null,
+      });
       return {
         user: {
           id: created.id,
@@ -637,22 +661,31 @@ export const studentRouter = createTRPCRouter({
             pin: res.pin,
           });
         } catch (error) {
+          // The row (with its leerlingnummer) goes back to the teacher; the
+          // log line holds an error code and the database error code only.
+          const internal =
+            !(error instanceof TRPCError) ||
+            error.code === "INTERNAL_SERVER_ERROR";
+          const errorId = internal
+            ? logServerError("student.import_create_failed", error)
+            : null;
           errors.push({
             row: r.row,
             studentNumber: r.studentNumber,
             message:
-              error instanceof TRPCError
+              error instanceof TRPCError && !internal
                 ? error.message
-                : "Account aanmaken mislukt.",
+                : `Account aanmaken mislukt (foutcode: ${errorId}). Probeer het opnieuw.`,
           });
         }
       });
 
       // 4. Rename existing students when asked, except while their
-      // processing is restricted (AVG art. 18).
+      // processing is restricted (AVG art. 18): their name and klasindeling
+      // stay as they are.
       const renamed = new Set<string>();
       const restricted =
-        input.onExisting === "update_name"
+        input.onExisting === "update_name" || input.classId
           ? await restrictedUserIds(
               ctx.db,
               toLink.map((r) => r.id),
@@ -674,7 +707,7 @@ export const studentRouter = createTRPCRouter({
       let addedToClass = new Set<string>();
       const memberIds = [
         ...created.map((c) => c.id),
-        ...toLink.map((r) => r.id),
+        ...toLink.filter((r) => !restricted.has(r.id)).map((r) => r.id),
       ];
       if (input.classId && memberIds.length > 0) {
         const classId = input.classId;
@@ -685,6 +718,49 @@ export const studentRouter = createTRPCRouter({
           .returning({ userId: classMembers.userId });
         addedToClass = new Set(inserted.map((i) => i.userId));
       }
+
+      // 6. Audit: one summary row, plus one row per new account and per
+      // renamed student, so each shows up under that student in the audit
+      // log and in their own inzage export.
+      const classDetails = input.classId ? { classId: input.classId } : {};
+      await auditManyFromCtx(ctx, [
+        {
+          action: "student.imported",
+          subjectType: input.classId ? "class" : "student",
+          subjectId: input.classId ?? null,
+          details: {
+            ...classDetails,
+            rowsCount: input.rows.length,
+            createdCount: created.length,
+            existingCount: toLink.length,
+            renamedCount: renamed.size,
+            addedToClassCount: addedToClass.size,
+            errorsCount: errors.length,
+          },
+        },
+        ...created.map(
+          (c): AuditEntry => ({
+            action: "student.created",
+            subjectType: "student",
+            subjectId: c.id,
+            subjectUserId: c.id,
+            subjectLabel: c.studentNumber,
+            details: { ...classDetails, via: "import" },
+          }),
+        ),
+        ...toLink
+          .filter((r) => renamed.has(r.id))
+          .map(
+            (r): AuditEntry => ({
+              action: "student.updated",
+              subjectType: "student",
+              subjectId: r.id,
+              subjectUserId: r.id,
+              subjectLabel: r.studentNumber,
+              details: { fields: ["name"], via: "import" },
+            }),
+          ),
+      ]);
 
       const order = new Map(
         input.rows.map((r, i) => [normalizeCell(r.studentNumber), i]),
@@ -704,7 +780,10 @@ export const studentRouter = createTRPCRouter({
             name: renamed.has(r.id) ? r.name : r.previousName,
             importedName: r.name,
             nameUpdated: renamed.has(r.id),
-            /** Not renamed: processing restricted (AVG art. 18). */
+            /**
+             * Processing restricted (AVG art. 18): not renamed and not
+             * added to the class.
+             */
             restricted: restricted.has(r.id),
             addedToClass: addedToClass.has(r.id),
           }))

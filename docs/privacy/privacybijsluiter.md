@@ -47,6 +47,7 @@ Deze indeling komt overeen met het verwerkingsregister in Pensuma zelf (Privacy 
 | Antwoorden en resultaten | Leerlingen | Ingeleverde code en antwoorden, testresultaten, scores, cijfers, feedback, start- en inlevertijd |
 | Logboek tijdens toetsen | Leerlingen | Altijd: code uitvoeren en testen (vraag, duur, soort fout, aantal geslaagde tests; nooit de code zelf). Alleen als de docent het aanzet: venster/tabblad verlaten, volledig scherm verlaten, plakpogingen (zonder inhoud). Kopiëren wordt niet bijgehouden |
 | Inlog- en beveiligingsgegevens | Leerlingen, docenten | Sessies met IP-adres en browser, tellers van mislukte inlogpogingen en verzoeken, laatste keer inloggen |
+| Technische foutmeldingen (serverlogboek) | Leerlingen, docenten | Tijdstip, functie en foutcode; bij een storing ook de gebruikers-id (een willekeurige code) en de foutcode die de gebruiker ziet; nooit invoer, antwoorden, pincodes of wachtwoorden |
 | Logboek docenthandelingen | Docenten, leerlingen | Wie wanneer een leerling, een poging of pincodes bekeek, code vergeleek, en leerlinggegevens wijzigde, exporteerde of verwijderde, met ingekort IP-adres; nooit de inhoud van antwoorden, wel de oude en nieuwe score bij een scorewijziging; opschoonrapporten |
 | Privacy-instellingen en bewaarblokkades | Leerlingen, docenten | Contactgegevens, bewaartermijnen, bewaarblokkades met reden |
 | Faciliteiten bij toetsen | Leerlingen | Alleen een percentage verlengde tijd en twee schakelaars (plakken toegestaan, vensterwissels niet registreren); nooit een reden of diagnose |
@@ -85,7 +86,7 @@ automatisch, elke 6 uur.
 
 | Gegevens | Standaard | Instelbaar | Automatisch |
 | --- | --- | --- | --- |
-| Sessies, verificatiecodes | bij verlopen (12 uur na laatste gebruik) | nee | altijd |
+| Sessies, verificatiecodes | bij verlopen (leerlingen: 12 uur na het inloggen, of eerder bij uitloggen; docenten: 12 uur na het laatste gebruik) | nee | altijd |
 | Tellers voor afremmen en mislukte inlogpogingen | 24 uur | nee | altijd |
 | Logboek tijdens toetsen | 90 dagen na de poging | 7–730 dagen | altijd |
 | Pogingen en antwoorden (ook nooit ingeleverde) | 24 maanden na sluiten afname (of na de laatste activiteit als de afname niet sluit) | 6–120 maanden | na vaststelling door de school, als automatisch verwijderen aanstaat |
@@ -93,6 +94,7 @@ automatisch, elke 6 uur.
 | Logboek docenthandelingen | 24 maanden | 6–84 maanden | altijd |
 | Verlopen bewaarblokkades (met reden) | 30 dagen na de einddatum | nee | altijd |
 | Back-ups | [[30]] dagen | bij de beheerder | buiten de applicatie |
+| Technische foutmeldingen (serverlogboek) | tot de logrotatie ze overschrijft (meegeleverde `docker-compose.yml`: hoogstens 5 × 10 MB per container) | bij de beheerder | buiten de applicatie |
 
 Werk van schoolexamens (PTA) wordt minstens 6 maanden na het vaststellen van de uitslag bewaard
 (Eindexamenbesluit VO, art. 55). Het officiële cijfer staat in de leerlingadministratie (bijvoorbeeld

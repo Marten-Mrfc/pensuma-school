@@ -69,6 +69,13 @@ export interface ExportAttemptRow {
     closesAt: Date | null;
     settings: unknown;
     resultsReleased: boolean;
+    /**
+     * Somebody (a classmate with verlengde tijd, a reopened attempt) is
+     * still working on this afname: results that wait for the close stay
+     * hidden from the student until everyone has handed in. Computed by
+     * the loader (stillWorkingByAssignment); omitted = nobody.
+     */
+    othersWorking?: boolean;
   };
   testTitle: string;
   answers: ExportAnswerRow[];
@@ -250,7 +257,7 @@ function visibleToStudent(
   now: Date,
 ): boolean {
   try {
-    return resultsVisible(assignment, now);
+    return resultsVisible(assignment, now, assignment.othersWorking ?? false);
   } catch {
     return false;
   }

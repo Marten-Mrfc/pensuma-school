@@ -99,3 +99,71 @@ describe("labels", () => {
     expect([...all].sort()).toEqual(Object.keys(AUDIT_ACTIONS).sort());
   });
 });
+
+describe("specific actions instead of the generic 'Wijziging'", () => {
+  test("extra time, reopening and deleting a question have their own label", () => {
+    expect(auditActionLabel("attempt.time_extended")).toBe(
+      "Extra tijd gegeven",
+    );
+    expect(auditActionLabel("attempt.reopened")).toBe("Poging heropend");
+    expect(auditActionLabel("question.deleted")).toBe("Vraag verwijderd");
+    for (const action of [
+      "attempt.time_extended",
+      "attempt.reopened",
+      "question.deleted",
+    ]) {
+      expect(auditActionCategory(action)).toBe("change");
+    }
+  });
+
+  test("the network is never blocked: the label says what really happens", () => {
+    const label = auditActionLabel("auth.network_locked");
+    expect(label).toBe(
+      "Veel mislukte inlogpogingen vanaf één netwerk (strengere blokkade per leerling)",
+    );
+    expect(label).not.toContain("geblokkeerd");
+  });
+
+  test("their details read as Dutch, with a Dutch date and time", () => {
+    expect(
+      formatAuditDetails({
+        attemptId: "x",
+        minutes: 5,
+        totalExtraMinutes: 15,
+        deadlineAt: "2026-10-22T12:30:00.000Z",
+      }),
+    ).toBe(
+      "minuten: 5 · extra tijd in totaal (minuten): 15 · eindtijd: 22-10-2026 14:30",
+    );
+    expect(
+      formatAuditDetails({
+        questionId: "q",
+        answersCount: 3,
+        attemptsAffected: 2,
+        assignmentsAffected: 1,
+        studentsCount: 2,
+      }),
+    ).toBe("antwoorden: 3 · pogingen: 2 · afnames: 1 · leerlingen: 2");
+  });
+
+  test("student import and AVG art. 18 details", () => {
+    expect(formatAuditDetails({ fields: ["name"], via: "import" })).toBe(
+      "velden: name · via: leerlingen importeren",
+    );
+    expect(
+      formatAuditDetails({
+        rowsCount: 4,
+        createdCount: 2,
+        existingCount: 1,
+        renamedCount: 1,
+        addedToClassCount: 3,
+        errorsCount: 1,
+      }),
+    ).toBe(
+      "regels: 4 · aangemaakt: 2 · bestonden al: 1 · naam gewijzigd: 1 · aan de klas toegevoegd: 3 · niet gelukt: 1",
+    );
+    expect(formatAuditDetails({ rows: 25, restrictedRows: 1 })).toBe(
+      "regels: 25 · zonder resultaten (beperking AVG art. 18): 1",
+    );
+  });
+});

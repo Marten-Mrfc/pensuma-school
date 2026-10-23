@@ -2,6 +2,7 @@
  * Display helpers for audit log rows (viewer and CSV export).
  * Pure module.
  */
+import { formatDateTimeNl } from "@/lib/export/csv";
 import {
   AUDIT_ACTIONS,
   type AuditAction,
@@ -37,13 +38,32 @@ const DETAIL_LABELS: Record<string, string> = {
   from: "van",
   to: "tot en met",
   minutes: "minuten",
+  totalExtraMinutes: "extra tijd in totaal (minuten)",
+  deadlineAt: "eindtijd",
   windowMinutes: "periode (minuten)",
   threshold: "drempel",
   manualScore: "score",
   includeFocus: "met logboek",
   retentionConfirmed: "vastgesteld",
   restricted: "beperkt",
+  bulk: "meerdere tegelijk",
+  skippedRestricted: "overgeslagen (beperking AVG art. 18)",
+  restrictedRows: "zonder resultaten (beperking AVG art. 18)",
   passwordChangeRequired: "tijdelijk wachtwoord",
+  // Deleting a question, an afname, a klas or a toets.
+  answersCount: "antwoorden",
+  attemptsAffected: "pogingen",
+  assignmentsAffected: "afnames",
+  assignmentsCount: "afnames",
+  studentsCount: "leerlingen",
+  deletedAttempts: "pogingen verwijderd",
+  // Importing students.
+  rowsCount: "regels",
+  createdCount: "aangemaakt",
+  existingCount: "bestonden al",
+  renamedCount: "naam gewijzigd",
+  addedToClassCount: "aan de klas toegevoegd",
+  errorsCount: "niet gelukt",
   // Facilities: rows written before values were left out of the log.
   extraTimePercent: "extra tijd (%)",
   allowPaste: "plakken toegestaan",
@@ -86,6 +106,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     retention: "automatische opschoning",
     school_year: "schooljaar afsluiten",
     similarity: "code vergelijken",
+    import: "leerlingen importeren",
   },
   trigger: {
     manual: "handmatig",
@@ -136,8 +157,19 @@ const SETTING_LABELS: Record<string, string> = {
 /** Keys that only repeat the subject or are internal. */
 const HIDDEN = /^(id|ids|[a-z][A-Za-z]*Id|[a-z][A-Za-z]*Ids)$/;
 
+/** A full ISO timestamp (not a bare date such as a period's "2026-10-01"). */
+const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 function formatValue(key: string, value: unknown): string | null {
   if (value === null || value === undefined) return null;
+  // "deadlineAt" and friends: Dutch date and time instead of ISO.
+  if (
+    typeof value === "string" &&
+    key.endsWith("At") &&
+    ISO_DATE_TIME.test(value)
+  ) {
+    return formatDateTimeNl(value) || value;
+  }
   if (typeof value === "boolean") return value ? "ja" : "nee";
   if (typeof value === "number") return value.toLocaleString("nl-NL");
   if (Array.isArray(value)) {
