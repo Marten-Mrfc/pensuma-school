@@ -95,6 +95,11 @@ async function expectFocusReturn(page: Page, opener: Locator) {
   await page.keyboard.press("Enter");
   const dialog = page.locator('[role="dialog"], [role="alertdialog"]').last();
   await expect(dialog).toBeVisible();
+  // Wait until the dialog has taken focus (Radix moves it on mount): on a
+  // busy machine an earlier Escape can arrive before the dialog listens.
+  await expect
+    .poll(() => dialog.evaluate((el) => el.contains(document.activeElement)))
+    .toBe(true);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(opener).toBeFocused();

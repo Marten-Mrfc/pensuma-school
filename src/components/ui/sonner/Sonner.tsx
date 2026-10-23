@@ -49,6 +49,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
+          // Inline on purpose: Radix sets pointer-events: none on <body> while a
+          // dialog is open; the toaster must stay hoverable/closable (WCAG
+          // 2.2.1). The equivalent globals.css rule is dropped by the
+          // production CSS optimiser, so it can't be relied on.
+          pointerEvents: 'auto',
           '--normal-bg': 'var(--popover)',
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'var(--border)',
