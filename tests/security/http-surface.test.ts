@@ -8,7 +8,6 @@
  */
 import { describe, expect, test } from "bun:test";
 import { STUDENT_EMAIL_DOMAIN } from "@/lib/auth-shared";
-import { pendingTest } from "../support/pending";
 
 const BASE = (process.env.SECURITY_BASE_URL ?? "http://localhost:3100").replace(
   /\/$/,
@@ -95,7 +94,7 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     expect(res.status).toBe(200);
   });
 
-  pendingTest("P1", "every unused better-auth path is blocked", async () => {
+  test("every unused better-auth path is blocked", async () => {
     const open: string[] = [];
     for (const path of DISABLED_AUTH_PATHS) {
       for (const method of ["GET", "POST"] as const) {
@@ -111,27 +110,23 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     expect(open).toEqual([]);
   });
 
-  pendingTest(
-    "P1",
-    "students cannot sign in through the e-mail flow",
-    async () => {
-      const res = await fetch(`${BASE}/api/auth/sign-in/email`, {
-        method: "POST",
-        headers: sameOrigin,
-        body: JSON.stringify({
-          email: `${STUDENT_NUMBER}@${STUDENT_EMAIL_DOMAIN}`,
-          password: STUDENT_PIN,
-        }),
-        redirect: "manual",
-      });
-      expect(res.status).toBe(401);
-      expect(res.headers.getSetCookie()).toEqual([]);
-      // The username flow still works (and clears the throttle).
-      expect((await signInStudent()).status).toBe(200);
-    },
-  );
+  test("students cannot sign in through the e-mail flow", async () => {
+    const res = await fetch(`${BASE}/api/auth/sign-in/email`, {
+      method: "POST",
+      headers: sameOrigin,
+      body: JSON.stringify({
+        email: `${STUDENT_NUMBER}@${STUDENT_EMAIL_DOMAIN}`,
+        password: STUDENT_PIN,
+      }),
+      redirect: "manual",
+    });
+    expect(res.status).toBe(401);
+    expect(res.headers.getSetCookie()).toEqual([]);
+    // The username flow still works (and clears the throttle).
+    expect((await signInStudent()).status).toBe(200);
+  });
 
-  pendingTest("P1", "sign-in and get-session expose no token", async () => {
+  test("sign-in and get-session expose no token", async () => {
     const signIn = await signInStudent();
     expect(signIn.status).toBe(200);
     expect(JSON.stringify(await signIn.json())).not.toContain('"token"');
@@ -150,7 +145,7 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     expect(body.session?.userAgent).toBeUndefined();
   });
 
-  pendingTest("P1", "security headers are set on pages", async () => {
+  test("security headers are set on pages", async () => {
     for (const path of ["/inloggen", "/"]) {
       const res = await fetch(`${BASE}${path}`, { redirect: "manual" });
       const h = res.headers;
@@ -165,7 +160,7 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     }
   });
 
-  pendingTest("P1", "a tRPC batch of 21 calls is refused", async () => {
+  test("a tRPC batch of 21 calls is refused", async () => {
     const paths = Array.from({ length: 21 }, () => "setup.status").join(",");
     const input = encodeURIComponent(
       JSON.stringify(
@@ -176,7 +171,7 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     expect(res.status).toBe(400);
   });
 
-  pendingTest("P1", "a 7 MB tRPC body is refused with 413", async () => {
+  test("a 7 MB tRPC body is refused with 413", async () => {
     const big = JSON.stringify({ json: { blob: "x".repeat(7 * 1024 * 1024) } });
     const res = await fetch(`${BASE}/api/trpc/setup.createFirstAdmin`, {
       method: "POST",
@@ -186,7 +181,7 @@ describe.skipIf(!reachable)(`HTTP surface of ${BASE}`, () => {
     expect(res.status).toBe(413);
   });
 
-  pendingTest("P1", "a cross-site mutation is refused with 403", async () => {
+  test("a cross-site mutation is refused with 403", async () => {
     const res = await fetch(`${BASE}/api/trpc/setup.createFirstAdmin`, {
       method: "POST",
       headers: {

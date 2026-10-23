@@ -3,7 +3,11 @@
  * and mobile projects. A route that answers 404 is marked fixme.
  */
 import { expect, type Page, type Response, test } from "@playwright/test";
-import { assertPageBasics, expectAccessible } from "../helpers/a11y";
+import {
+  assertPageBasics,
+  expectAccessible,
+  waitForSettled,
+} from "../helpers/a11y";
 import {
   provisionStudent,
   removeStudent,
@@ -113,10 +117,15 @@ test.describe("teacher pages", () => {
 
   test("user menu", async ({ page }) => {
     await open(page, "/docent");
-    await page
+    await waitForSettled(page);
+    const trigger = page
       .getByRole("button", { name: /Accountmenu openen/ })
-      .first()
-      .click();
+      .first();
+    // Phones: the account menu lives in the menu sheet.
+    if (!(await trigger.isVisible())) {
+      await page.getByRole("button", { name: "Menu openen" }).click();
+    }
+    await trigger.click();
     await expect(page.getByRole("menu")).toBeVisible();
     await expectAccessible(page);
   });

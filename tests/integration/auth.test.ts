@@ -16,7 +16,6 @@ import {
   createTeacherAccount,
   nextStudentNumber,
 } from "../support/factories";
-import { pendingTest } from "../support/pending";
 
 beforeEach(resetDatabase);
 
@@ -111,21 +110,14 @@ describe("sign-in", () => {
     expect(rows).toHaveLength(0);
   });
 
-  pendingTest(
-    "P1",
-    "a student cannot use the e-mail flow with the placeholder address",
-    async () => {
-      const s = await createStudentLogin();
-      const out = await signInEmail(
-        `${s.number}@${STUDENT_EMAIL_DOMAIN}`,
-        s.pin,
-      );
-      expect(out.status).toBe(401);
-      expect(out.setCookie).toEqual([]);
-    },
-  );
+  test("a student cannot use the e-mail flow with the placeholder address", async () => {
+    const s = await createStudentLogin();
+    const out = await signInEmail(`${s.number}@${STUDENT_EMAIL_DOMAIN}`, s.pin);
+    expect(out.status).toBe(401);
+    expect(out.setCookie).toEqual([]);
+  });
 
-  pendingTest("P1", "a sign-in records the last sign-in time", async () => {
+  test("a sign-in records the last sign-in time", async () => {
     const s = await createStudentLogin();
     expect((await signInStudent(s.number, s.pin)).status).toBe(200);
     const [row] = await db
@@ -202,34 +194,26 @@ describe("first-run setup", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  pendingTest(
-    "P1",
-    "the password needs at least 12 characters (teacher policy)",
-    async () => {
-      await expect(
-        callerFor(null).setup.createFirstAdmin({
-          ...admin,
-          password: "elf-tekens1",
-        }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    },
-  );
+  test("the password needs at least 12 characters (teacher policy)", async () => {
+    await expect(
+      callerFor(null).setup.createFirstAdmin({
+        ...admin,
+        password: "elf-tekens1",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 
-  pendingTest(
-    "P1",
-    "two parallel setups create exactly one teacher",
-    async () => {
-      const anon = callerFor(null);
-      const results = await Promise.allSettled([
-        anon.setup.createFirstAdmin(admin),
-        anon.setup.createFirstAdmin({
-          ...admin,
-          email: "parallel@test.pensuma.local",
-        }),
-      ]);
-      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-      const admins = await db.select().from(user).where(eq(user.role, "admin"));
-      expect(admins).toHaveLength(1);
-    },
-  );
+  test("two parallel setups create exactly one teacher", async () => {
+    const anon = callerFor(null);
+    const results = await Promise.allSettled([
+      anon.setup.createFirstAdmin(admin),
+      anon.setup.createFirstAdmin({
+        ...admin,
+        email: "parallel@test.pensuma.local",
+      }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const admins = await db.select().from(user).where(eq(user.role, "admin"));
+    expect(admins).toHaveLength(1);
+  });
 });

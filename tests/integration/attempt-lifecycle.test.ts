@@ -25,7 +25,6 @@ import {
   q,
 } from "../support/factories";
 import { FAIL_MARKER, gradeCalls } from "../support/fake-grader";
-import { pendingTest } from "../support/pending";
 import { waitForGrading } from "../support/wait";
 
 beforeEach(resetDatabase);
@@ -97,31 +96,24 @@ describe("startAttempt", () => {
     expect(rows).toHaveLength(1);
   });
 
-  // Race found by this suite: when the second request's resume check runs
-  // before the first commits but its attempt query runs after, it hits the
-  // 30-second cooldown ("Je bent net nog begonnen…") instead of resuming.
-  // Fix: createOrResumeAttempt should resume an in-progress attempt found in
-  // `previous` before applying the attempt limit and the cooldown.
-  pendingTest(
-    "P4",
-    "many concurrent starts always resume instead of failing",
-    async () => {
-      const w = await createBasicWorld();
-      const failures: string[] = [];
-      for (let i = 0; i < 25; i++) {
-        const student = await insertStudent();
-        await addToClass(w.klas.id, student.id);
-        const results = await Promise.allSettled(
-          [1, 2, 3, 4].map(() => start(w, student)),
-        );
-        for (const r of results) {
-          if (r.status === "rejected") failures.push(String(r.reason));
-        }
+  // Regression: a request whose resume check ran before the other one
+  // committed used to hit the 30-second cooldown ("Je bent net nog
+  // begonnen…") instead of resuming.
+  test("many concurrent starts always resume instead of failing", async () => {
+    const w = await createBasicWorld();
+    const failures: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      const student = await insertStudent();
+      await addToClass(w.klas.id, student.id);
+      const results = await Promise.allSettled(
+        [1, 2, 3, 4].map(() => start(w, student)),
+      );
+      for (const r of results) {
+        if (r.status === "rejected") failures.push(String(r.reason));
       }
-      expect(failures).toEqual([]);
-    },
-    60_000,
-  );
+    }
+    expect(failures).toEqual([]);
+  }, 60_000);
 
   test("a second start resumes the attempt in progress", async () => {
     const w = await createBasicWorld();

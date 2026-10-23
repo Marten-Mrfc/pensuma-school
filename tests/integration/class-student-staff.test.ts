@@ -31,7 +31,6 @@ import {
   nextStudentNumber,
   q,
 } from "../support/factories";
-import { pendingTest } from "../support/pending";
 
 let teacher: TestUser;
 
@@ -204,22 +203,18 @@ describe("students", () => {
     expect((await signIn(s.number, s.pin)).status).toBe(200);
   });
 
-  pendingTest(
-    "P1",
-    "setActive(false) revokes an existing session cookie at once",
-    async () => {
-      const s = await createStudentLogin();
-      const { status, cookie } = await signIn(s.number, s.pin);
-      expect(status).toBe(200);
-      await expect(
-        callerForCookie(cookie).portal.dashboard(),
-      ).resolves.toBeDefined();
-      await callerFor(teacher).student.setActive({ id: s.id, active: false });
-      await expect(
-        callerForCookie(cookie).portal.dashboard(),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    },
-  );
+  test("setActive(false) revokes an existing session cookie at once", async () => {
+    const s = await createStudentLogin();
+    const { status, cookie } = await signIn(s.number, s.pin);
+    expect(status).toBe(200);
+    await expect(
+      callerForCookie(cookie).portal.dashboard(),
+    ).resolves.toBeDefined();
+    await callerFor(teacher).student.setActive({ id: s.id, active: false });
+    await expect(
+      callerForCookie(cookie).portal.dashboard(),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
 
   test("student.delete removes every personal row", async () => {
     const s = await createStudentLogin();
@@ -267,25 +262,21 @@ describe("students", () => {
     expect(await countRows("account")).toBe(0);
   });
 
-  pendingTest(
-    "P6",
-    "student.delete writes a student.deleted audit row",
-    async () => {
-      const s = await createStudentLogin();
-      await callerFor(teacher).student.delete({ id: s.id });
-      const rows = await db
-        .select()
-        .from(auditLog)
-        .where(
-          and(
-            eq(auditLog.action, "student.deleted"),
-            eq(auditLog.subjectUserId, s.id),
-          ),
-        );
-      expect(rows).toHaveLength(1);
-      expect(JSON.stringify(rows[0].details ?? {})).not.toContain(s.name);
-    },
-  );
+  test("student.delete writes a student.deleted audit row", async () => {
+    const s = await createStudentLogin();
+    await callerFor(teacher).student.delete({ id: s.id });
+    const rows = await db
+      .select()
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.action, "student.deleted"),
+          eq(auditLog.subjectUserId, s.id),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows[0].details ?? {})).not.toContain(s.name);
+  });
 });
 
 describe("teachers (staff)", () => {

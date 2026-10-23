@@ -29,10 +29,7 @@ const TEST_TITLE = `E2E-toets ${stamp}`;
 const AFNAME_TITLE = `E2E-afname ${stamp}`;
 const ACCESS_CODE = `PY${stamp}`;
 const FEEDBACK = "Goed uitgelegd! Noem de volgende keer ook een voorbeeld.";
-const student = {
-  ...E2E_STUDENTS.exam,
-  number: `${E2E_STUDENTS.exam.number}${stamp.length}`,
-};
+const student = { ...E2E_STUDENTS.exam };
 
 let api: TrpcApi;
 

@@ -2,41 +2,14 @@
  * The first teacher account for `bun run db:seed` and the E2E seed.
  * Importable (no side effects); scripts/seed/index.ts is the CLI.
  */
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { eq } from "drizzle-orm";
+import { validateTeacherPassword } from "@/lib/security/password-policy";
 import { db } from "@/server/db";
 import { user } from "@/server/db/schema";
 import { createAdminAccount } from "@/server/services/accounts";
 
 /** Development default (never accepted in production). */
 export const DEV_ADMIN_PASSWORD = "welkom-docent";
-const FALLBACK_MIN_LENGTH = 12;
-
-type PolicyResult = { ok: true } | { ok: false; message: string };
-type PolicyFn = (
-  password: string,
-  ctx?: { email?: string; name?: string },
-) => PolicyResult;
-
-/** P1's teacher password policy, when it is present in this checkout. */
-async function loadPasswordPolicy(): Promise<PolicyFn | null> {
-  const file = path.join(
-    process.cwd(),
-    "src",
-    "lib",
-    "security",
-    "password-policy.ts",
-  );
-  if (!existsSync(file)) return null;
-  const mod = (await import(pathToFileURL(file).href)) as {
-    validateTeacherPassword?: PolicyFn;
-  };
-  return typeof mod.validateTeacherPassword === "function"
-    ? mod.validateTeacherPassword
-    : null;
-}
 
 /**
  * Throws (Dutch message) when the seed password is not acceptable. In
@@ -60,17 +33,11 @@ export async function checkSeedPassword(
       "Het demowachtwoord mag niet in productie. Zet een eigen SEED_ADMIN_PASSWORD.",
     );
   }
-  const policy = await loadPasswordPolicy();
-  if (policy) {
-    const result = policy(password, { email: ctx.email, name: ctx.name });
-    if (!result.ok) throw new Error(`SEED_ADMIN_PASSWORD: ${result.message}`);
-    return;
-  }
-  if (password.length < FALLBACK_MIN_LENGTH) {
-    throw new Error(
-      `Zet SEED_ADMIN_PASSWORD (minstens ${FALLBACK_MIN_LENGTH} tekens) om een docentaccount aan te maken.`,
-    );
-  }
+  const result = validateTeacherPassword(password, {
+    email: ctx.email,
+    name: ctx.name,
+  });
+  if (!result.ok) throw new Error(`SEED_ADMIN_PASSWORD: ${result.message}`);
 }
 
 export type SeedAdminOptions = {

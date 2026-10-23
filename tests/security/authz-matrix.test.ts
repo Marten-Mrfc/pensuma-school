@@ -23,9 +23,6 @@ import {
 
 const PATHS = Object.keys(appRouter._def.procedures).sort();
 
-/** Exact policy entries for procedures another package is still building. */
-const PENDING_PROCEDURES = new Set(["privacy.myData", "privacy.exportMyData"]);
-
 type Outcome = { code: string | null; message?: string };
 
 async function call(caller: Caller, path: string): Promise<Outcome> {
@@ -89,10 +86,7 @@ describe("access policy", () => {
   });
 
   test("exact entries point at existing procedures", () => {
-    const stale = staleExactEntries(PATHS).filter(
-      (p) => !PENDING_PROCEDURES.has(p),
-    );
-    expect(stale).toEqual([]);
+    expect(staleExactEntries(PATHS)).toEqual([]);
   });
 });
 

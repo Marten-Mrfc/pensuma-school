@@ -29,11 +29,11 @@ let student: { number: string; name: string; pin: string };
 
 test.beforeAll(async () => {
   api = await teacherApi();
-  // One fresh student per project, so desktop and mobile don't share attempts.
-  student = {
-    ...E2E_STUDENTS.practice,
-    number: `${E2E_STUDENTS.practice.number}${currentProject() === "mobile" ? "2" : "1"}`,
-  };
+  // Its own student per project, so desktop and mobile don't share attempts.
+  student =
+    currentProject() === "mobile"
+      ? { ...E2E_STUDENTS.practice, number: "17103" }
+      : { ...E2E_STUDENTS.practice };
   await provisionStudent(api, student);
 });
 
