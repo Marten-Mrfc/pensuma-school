@@ -63,14 +63,13 @@ export function QuestionHeader({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-xs font-semibold tracking-wide text-primary uppercase">
-          <span aria-hidden="true">
+        <span className="text-sm text-muted-foreground">
+          {/* The exam header shows "Vraag x van y" too on small screens. */}
+          <span aria-hidden="true" className="max-sm:hidden">
             Vraag {number} van {total} ·{" "}
           </span>
-          {QUESTION_TYPE_LABELS[question.type]}
-        </span>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-          {formatPoints(question.points)}
+          {QUESTION_TYPE_LABELS[question.type]} ·{" "}
+          <span className="tabular-nums">{formatPoints(question.points)}</span>
         </span>
         <Button
           type="button"

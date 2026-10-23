@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, Loader2, TriangleAlert } from "lucide-react";
+import { Loader2, TriangleAlert } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,7 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   /** Default "Annuleren". */
   cancelLabel?: string;
-  /** Red confirm button and warning icon. */
+  /** Red confirm button and a warning icon (the only dialogs with an icon). */
   destructive?: boolean;
   /**
    * Runs on confirm. While the promise is pending the buttons are disabled.
@@ -82,8 +82,6 @@ export function ConfirmDialog({
     }
   }
 
-  const Icon = destructive ? TriangleAlert : CircleAlert;
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
@@ -99,17 +97,17 @@ export function ConfirmDialog({
         returnFocusFallbackRef={returnFocusRef}
       >
         <div className="flex gap-4">
-          <span
+          {destructive ? (
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-destructive/10 text-destructive">
+              <TriangleAlert className="size-5" aria-hidden="true" />
+            </span>
+          ) : null}
+          <div
             className={cn(
-              "grid size-10 shrink-0 place-items-center rounded-full",
-              destructive
-                ? "bg-destructive/10 text-destructive"
-                : "bg-primary/10 text-primary",
+              "flex min-w-0 flex-col gap-1.5",
+              destructive && "pt-1",
             )}
           >
-            <Icon className="size-5" aria-hidden="true" />
-          </span>
-          <div className="flex min-w-0 flex-col gap-1.5 pt-1">
             <DialogTitle className="text-base leading-snug font-semibold">
               {title}
             </DialogTitle>

@@ -100,7 +100,7 @@ export function RunConsole({
   onSubmitInput,
   onClear,
   status,
-  placeholder = "Klik op Uitvoeren om je programma te starten.",
+  placeholder = "Druk op Uitvoeren om je programma te starten.",
   title = "Console",
   maxHeight = "20rem",
   minHeight = "8rem",

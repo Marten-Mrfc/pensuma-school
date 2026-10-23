@@ -153,7 +153,7 @@ export function StudentPicker({
                     </span>
                   </span>
                   {s.extraTimePercent > 0 ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-info/10 px-1.5 py-0.5 text-[11px] font-medium text-info-ink">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-info/10 px-1.5 py-0.5 text-[11px] font-medium text-info-ink">
                       <Clock className="size-3" aria-hidden="true" />+
                       {s.extraTimePercent}%
                       <span className="sr-only"> verlengde tijd</span>

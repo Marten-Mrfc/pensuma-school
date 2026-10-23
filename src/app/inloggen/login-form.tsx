@@ -10,7 +10,6 @@ import {
   Loader2,
   LogOut,
   Presentation,
-  Sparkles,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
@@ -319,9 +318,7 @@ function StudentLoginForm({
       >
         {pending ? (
           <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
-        ) : (
-          <ArrowRight aria-hidden="true" />
-        )}
+        ) : null}
         {pending ? "Bezig met inloggen…" : "Inloggen"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
@@ -479,9 +476,7 @@ function TeacherLoginForm({
       >
         {pending ? (
           <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
-        ) : (
-          <ArrowRight aria-hidden="true" />
-        )}
+        ) : null}
         {pending ? "Bezig met inloggen…" : "Inloggen"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
@@ -502,11 +497,8 @@ function SetupBanner() {
   return (
     <Link
       href={ROUTES.setup}
-      className="group mb-6 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/[0.07] p-3.5 text-sm outline-none transition-colors hover:bg-primary/[0.11] focus-visible:ring-2 focus-visible:ring-ring"
+      className="mb-6 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/[0.06] px-4 py-3 text-sm outline-none transition-colors hover:bg-primary/[0.11] focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-        <Sparkles className="size-4" aria-hidden="true" />
-      </span>
       <span className="flex flex-col">
         <span className="font-semibold text-foreground">
           Pensuma is nog niet ingesteld
@@ -516,7 +508,7 @@ function SetupBanner() {
         </span>
       </span>
       <ArrowRight
-        className="ml-auto size-4 text-primary transition-transform group-hover:translate-x-0.5"
+        className="ml-auto size-4 shrink-0 text-primary"
         aria-hidden="true"
       />
     </Link>

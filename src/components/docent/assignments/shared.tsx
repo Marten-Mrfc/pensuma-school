@@ -1,34 +1,8 @@
 "use client";
 
-import { Dumbbell, FileCheck2, RotateCcw, UserRoundCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AssignmentMode } from "./defaults";
 
-/** "Toets" / "Oefenen" pill. */
-export function ModeBadge({
-  mode,
-  className,
-}: {
-  mode: AssignmentMode;
-  className?: string;
-}) {
-  const exam = mode === "exam";
-  const Icon = exam ? FileCheck2 : Dumbbell;
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset",
-        exam
-          ? "bg-primary/10 text-primary ring-primary/20"
-          : "bg-info/10 text-info-ink ring-info/25",
-        className,
-      )}
-    >
-      <Icon className="size-3.5" aria-hidden="true" />
-      {exam ? "Toets" : "Oefenen"}
-    </span>
-  );
-}
+export { ModeBadge } from "@/components/app/mode-badge";
 
 export type ProgressCounts = {
   students: number;
@@ -131,7 +105,7 @@ export function InfoItem({
   );
 }
 
-/** "Herkansing van {titel}" and "Alleen voor {n} leerlingen" badges. */
+/** "Herkansing van {titel}" and "Alleen voor {n} leerlingen" tags. */
 export function TargetingBadges({
   retakeOf,
   targetedStudentCount,
@@ -147,22 +121,20 @@ export function TargetingBadges({
       {retakeOf ? (
         <span
           className={cn(
-            "inline-flex h-6 max-w-64 min-w-0 items-center gap-1 rounded-full bg-secondary px-2.5 text-xs font-medium text-secondary-foreground ring-1 ring-border ring-inset",
+            "inline-flex h-6 max-w-64 min-w-0 items-center rounded-sm bg-secondary px-2 text-xs font-medium text-secondary-foreground",
             className,
           )}
         >
-          <RotateCcw className="size-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">Herkansing van {retakeOf.title}</span>
         </span>
       ) : null}
       {targetedStudentCount != null ? (
         <span
           className={cn(
-            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-info/10 px-2.5 text-xs font-medium whitespace-nowrap text-info-ink ring-1 ring-info/25 ring-inset",
+            "inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-secondary px-2 text-xs font-medium whitespace-nowrap text-secondary-foreground",
             className,
           )}
         >
-          <UserRoundCheck className="size-3.5" aria-hidden="true" />
           Alleen voor {targetedStudentCount}{" "}
           {targetedStudentCount === 1 ? "leerling" : "leerlingen"}
         </span>

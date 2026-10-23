@@ -1,13 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  CircleCheckBig,
-  Loader2,
-  LockKeyhole,
-  TriangleAlert,
-} from "lucide-react";
+import { Loader2, LockKeyhole, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
@@ -84,7 +78,7 @@ export function SetupForm() {
           window.location.assign(`${ROUTES.login}?rol=docent`);
           return;
         }
-        toast.success("Welkom bij Pensuma!");
+        toast.success("Je account is aangemaakt.");
         window.location.assign(ROUTES.adminHome);
       },
       onError: (error) => {
@@ -113,7 +107,7 @@ export function SetupForm() {
   if (status.isPending) {
     return (
       <div
-        className="flex flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm sm:p-8"
+        className="flex flex-col gap-6 rounded-xl border bg-card p-6 sm:p-8"
         aria-busy="true"
       >
         <span className="sr-only">Laden…</span>
@@ -141,10 +135,7 @@ export function SetupForm() {
 
   if (!status.data.needsSetup && !create.isSuccess) {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card px-6 py-10 text-center shadow-sm sm:px-10">
-        <span className="grid size-12 place-items-center rounded-2xl bg-success/12 text-success-ink ring-1 ring-success/25">
-          <CircleCheckBig className="size-6" aria-hidden="true" />
-        </span>
+      <div className="flex flex-col items-start gap-4 rounded-xl border bg-card p-6 text-left sm:p-8">
         <div className="flex flex-col gap-1.5">
           <h1 className="font-display-wide text-2xl font-bold">
             Pensuma is al ingesteld
@@ -155,10 +146,7 @@ export function SetupForm() {
           </p>
         </div>
         <Button asChild size="lg" className="mt-2">
-          <Link href={`${ROUTES.login}?rol=docent`}>
-            Naar inloggen
-            <ArrowRight aria-hidden="true" />
-          </Link>
+          <Link href={`${ROUTES.login}?rol=docent`}>Naar inloggen</Link>
         </Button>
       </div>
     );
@@ -197,17 +185,14 @@ export function SetupForm() {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="border-b bg-muted/30 px-6 py-6 sm:px-8">
-        <p className="mb-2 text-xs font-semibold tracking-[0.14em] text-primary uppercase">
-          Eerste keer
-        </p>
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="border-b px-6 py-6 sm:px-8">
         <h1 className="font-display-wide text-[1.7rem] leading-tight font-bold">
-          Welkom bij Pensuma
+          Eerste docentaccount aanmaken
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Maak het eerste docentaccount aan. Daarmee beheer je straks klassen,
-          leerlingen, toetsen en andere docenten.
+          Met dit account beheer je straks klassen, leerlingen, toetsen en
+          andere docenten.
         </p>
       </div>
       <form
@@ -349,8 +334,7 @@ export function SetupForm() {
             ? "Je wordt ingelogd…"
             : create.isPending
               ? "Account aanmaken…"
-              : "Account aanmaken en beginnen"}
-          {!busy ? <ArrowRight aria-hidden="true" /> : null}
+              : "Account aanmaken"}
         </Button>
       </form>
     </div>

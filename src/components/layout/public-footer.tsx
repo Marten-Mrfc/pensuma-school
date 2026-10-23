@@ -3,8 +3,6 @@ import { LogoMark } from "@/components/app/logo";
 import { routes } from "@/lib/routes";
 
 const LINKS = [
-  { href: routes.login, label: "Leerlingen" },
-  { href: `${routes.login}?rol=docent`, label: "Docenten" },
   { href: routes.privacy, label: "Privacyverklaring" },
   { href: routes.accessibility, label: "Toegankelijkheid" },
 ];

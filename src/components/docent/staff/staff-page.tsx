@@ -6,7 +6,6 @@ import {
   MoreHorizontal,
   Trash2,
   UserPlus,
-  UserRound,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -101,7 +100,7 @@ function TeacherRow({ teacher: t }: { teacher: Teacher }) {
     <li className="flex items-center gap-4 px-4 py-3.5 sm:px-5">
       <span
         aria-hidden="true"
-        className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary ring-1 ring-primary/15"
+        className="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
       >
         {initials(t.name)}
       </span>
@@ -109,12 +108,12 @@ function TeacherRow({ teacher: t }: { teacher: Teacher }) {
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate font-medium">{t.name}</span>
           {t.isMe ? (
-            <span className="inline-flex h-5 items-center rounded-full bg-primary/10 px-2 text-[0.7rem] font-semibold text-primary">
+            <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-secondary px-2 text-xs font-medium whitespace-nowrap text-secondary-foreground">
               Jij
             </span>
           ) : null}
           {t.passwordChangeRequired ? (
-            <span className="inline-flex h-5 items-center rounded-full bg-warning/15 px-2 text-[0.7rem] font-semibold text-warning-ink ring-1 ring-warning/30">
+            <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-warning/15 px-2 text-xs font-medium whitespace-nowrap text-warning-ink">
               Tijdelijk wachtwoord
             </span>
           ) : null}
@@ -131,10 +130,7 @@ function TeacherRow({ teacher: t }: { teacher: Teacher }) {
       </div>
       {t.isMe ? (
         <Button variant="ghost" size="sm" asChild>
-          <Link href={routes.docent.account}>
-            <UserRound aria-hidden="true" />
-            Mijn account
-          </Link>
+          <Link href={routes.docent.account}>Mijn account</Link>
         </Button>
       ) : (
         <DropdownMenu modal={false}>

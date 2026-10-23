@@ -1,6 +1,6 @@
 "use client";
 
-import { ListChecks, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useId } from "react";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { Button } from "@/components/ui/button";
@@ -49,13 +49,7 @@ export function RubricItemsEditor({
 
   return (
     <fieldset className="flex min-w-0 flex-col gap-3">
-      <legend className="mb-1 flex items-center gap-1.5 text-sm font-medium">
-        <ListChecks
-          className="size-4 text-muted-foreground"
-          aria-hidden="true"
-        />
-        Beoordelingscriteria
-      </legend>
+      <legend className="mb-1 text-sm font-medium">Beoordelingscriteria</legend>
       <p className="-mt-1 text-xs text-muted-foreground">
         Optioneel. Bij het nakijken vink je de criteria aan en wordt de score
         automatisch berekend.

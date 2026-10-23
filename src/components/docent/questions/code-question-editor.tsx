@@ -1,19 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import {
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-  Code2,
-  FlaskConical,
-  Loader2,
-  Monitor,
-  RefreshCw,
-  Server,
-  ShieldCheck,
-  Timer,
-} from "lucide-react";
+import { Loader2, Monitor, RefreshCw, Server } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -183,11 +171,7 @@ export function CodeQuestionEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      <EditorSection
-        title="Code"
-        description={CODE_QUESTION_VISIBILITY_NOTE}
-        icon={<Code2 />}
-      >
+      <EditorSection title="Code" description={CODE_QUESTION_VISIBILITY_NOTE}>
         <div className="flex flex-col gap-2">
           <FieldLabel id={`${id}-starter-label`}>Startcode</FieldLabel>
           <CodeEditor
@@ -233,7 +217,6 @@ export function CodeQuestionEditor({
         description={
           'Hiermee wordt de code van de leerling automatisch nagekeken. De tekst in input("…") telt nooit mee.'
         }
-        icon={<FlaskConical />}
       >
         <TestCaseEditor
           tests={data.tests}
@@ -244,15 +227,9 @@ export function CodeQuestionEditor({
           results={resultsById}
         />
         <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Timer
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <label htmlFor={`${id}-time`} className="text-sm font-medium">
-              Tijdslimiet per test
-            </label>
-          </div>
+          <label htmlFor={`${id}-time`} className="text-sm font-medium">
+            Tijdslimiet per test
+          </label>
           <div className="flex items-center gap-3">
             <NumberInput
               id={`${id}-time`}
@@ -275,8 +252,7 @@ export function CodeQuestionEditor({
 
       <EditorSection
         title="Vraag controleren"
-        description="Voert de modeloplossing uit tegen álle tests (ook de verborgen) en de code-eisen. Zo weet je zeker dat de tests kloppen."
-        icon={<ShieldCheck />}
+        description="Voert de modeloplossing uit tegen álle tests (ook de verborgen) en de code-eisen."
         actions={<CheckStateBadge state={state} check={solutionCheck} />}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -322,7 +298,7 @@ export function CodeQuestionEditor({
             <p className="text-xs text-muted-foreground">
               Resultaat van de laatste controle (
               {lastRun.source === "server" ? "server" : "in je browser"})
-              {fresh ? "" : " — let op: de vraag is daarna gewijzigd"}
+              {fresh ? "" : ". De vraag is daarna gewijzigd."}
             </p>
             {/* Inside an EditorSection (h2): the summary heading is h3. */}
             <TestResultsList
@@ -337,7 +313,6 @@ export function CodeQuestionEditor({
       <EditorSection
         title="Code-eisen"
         description="Optioneel: controleer of de leerling bepaalde onderdelen wel of juist niet gebruikt."
-        icon={<ShieldCheck />}
       >
         <ChecksEditor
           checks={data.checks}
@@ -364,18 +339,11 @@ export function CheckStateBadge({
   className?: string;
 }) {
   const base =
-    "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ring-1 ring-inset whitespace-nowrap";
+    "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs font-medium whitespace-nowrap";
   switch (state) {
     case "passed":
       return (
-        <span
-          className={cn(
-            base,
-            "bg-success/10 text-success-ink ring-success/25",
-            className,
-          )}
-        >
-          <CircleCheck className="size-3.5" aria-hidden="true" />
+        <span className={cn(base, "bg-success/12 text-success-ink", className)}>
           Modeloplossing slaagt voor alle tests
         </span>
       );
@@ -384,51 +352,29 @@ export function CheckStateBadge({
         <span
           className={cn(
             base,
-            "bg-destructive/10 text-destructive-ink ring-destructive/25",
+            "bg-destructive/10 text-destructive-ink",
             className,
           )}
         >
-          <CircleX className="size-3.5" aria-hidden="true" />
           Slaagt voor {check?.passedTests ?? 0} van {check?.totalTests ?? 0}{" "}
           tests
         </span>
       );
     case "stale":
       return (
-        <span
-          className={cn(
-            base,
-            "bg-warning/12 text-warning-ink ring-warning/30",
-            className,
-          )}
-        >
-          <RefreshCw className="size-3.5" aria-hidden="true" />
+        <span className={cn(base, "bg-warning/15 text-warning-ink", className)}>
           Gewijzigd sinds de laatste controle
         </span>
       );
     case "unchecked":
       return (
-        <span
-          className={cn(
-            base,
-            "bg-warning/12 text-warning-ink ring-warning/30",
-            className,
-          )}
-        >
-          <CircleDashed className="size-3.5" aria-hidden="true" />
+        <span className={cn(base, "bg-warning/15 text-warning-ink", className)}>
           Nog niet gecontroleerd
         </span>
       );
     default:
       return (
-        <span
-          className={cn(
-            base,
-            "bg-muted/60 text-muted-foreground ring-border",
-            className,
-          )}
-        >
-          <CircleDashed className="size-3.5" aria-hidden="true" />
+        <span className={cn(base, "bg-muted text-muted-foreground", className)}>
           Niets om te controleren
         </span>
       );

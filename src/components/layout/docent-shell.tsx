@@ -42,9 +42,11 @@ function DocentNavGroups({ pathname }: { pathname: string | null }) {
     <>
       {DOCENT_NAV.map((group) => (
         <SidebarGroup key={group.label} className="py-1">
-          <SidebarGroupLabel className="text-[0.68rem] font-semibold tracking-[0.08em] text-sidebar-foreground/70 uppercase">
-            {group.label}
-          </SidebarGroupLabel>
+          {group.items.length > 1 ? (
+            <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70">
+              {group.label}
+            </SidebarGroupLabel>
+          ) : null}
           <SidebarGroupContent>
             <SidebarMenu>
               {group.items.map((item) => {
@@ -176,9 +178,7 @@ export function DocentShell({ userMenu, children }: DocentShellProps) {
               <span className="font-display-wide text-[1.15rem] font-bold">
                 Pensuma
               </span>
-              <span className="mt-1 text-[0.68rem] font-medium tracking-[0.12em] text-muted-foreground uppercase">
-                Docent
-              </span>
+              <span className="mt-1 text-xs text-muted-foreground">Docent</span>
             </span>
           </Link>
           <MobileCloseButton />
@@ -194,7 +194,7 @@ export function DocentShell({ userMenu, children }: DocentShellProps) {
         <SidebarRail />
       </Sidebar>
       <SidebarInset className="min-h-svh md:min-h-[calc(100svh-1rem)] md:border">
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 rounded-t-[inherit] border-b bg-background/85 px-3 backdrop-blur-md sm:px-5">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 rounded-t-[inherit] border-b bg-background px-3 sm:px-5">
           <ShellTrigger />
           <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
           <Link

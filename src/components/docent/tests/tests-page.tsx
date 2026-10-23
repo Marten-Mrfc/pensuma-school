@@ -4,19 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArchiveRestore,
-  CalendarPlus,
-  ClipboardList,
   Copy,
   Download,
   Ellipsis,
   ListChecks,
   MessageSquareText,
-  Plus,
   Search,
-  Sparkles,
   SquareCode,
   Trash2,
-  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -121,7 +116,6 @@ export function TestsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Toetsen"
-        description="Bouw toetsen met programmeer-, meerkeuze- en open vragen. Publiceer een toets en plan daarna een afname voor een klas."
         actions={
           <>
             <ExampleTestsDialog />
@@ -200,34 +194,18 @@ export function TestsPage() {
           />
         ) : (
           <EmptyBlock
-            icon={ClipboardList}
-            title="Nog geen toetsen"
-            description="Maak je eerste toets, of begin met een kant-en-klare voorbeeldtoets en pas die aan. Je voegt vragen toe vanuit sjablonen of uit de vragenbank."
+            title="Je hebt nog geen toetsen"
+            description="Maak een lege toets, of begin met een voorbeeldtoets en pas die aan. Vragen voeg je toe vanuit sjablonen of uit de vragenbank. Publiceer de toets daarna en plan een afname voor een klas."
             action={
               <>
                 <ExampleTestsDialog
-                  trigger={
-                    <Button>
-                      <Sparkles aria-hidden="true" />
-                      Begin met een voorbeeldtoets
-                    </Button>
-                  }
+                  trigger={<Button>Begin met een voorbeeldtoets</Button>}
                 />
                 <NewTestDialog
-                  trigger={
-                    <Button variant="outline">
-                      <Plus aria-hidden="true" />
-                      Nieuwe toets
-                    </Button>
-                  }
+                  trigger={<Button variant="outline">Nieuwe toets</Button>}
                 />
                 <ImportTestDialog
-                  trigger={
-                    <Button variant="outline">
-                      <Upload aria-hidden="true" />
-                      Importeren
-                    </Button>
-                  }
+                  trigger={<Button variant="outline">Importeren</Button>}
                 />
               </>
             }
@@ -322,13 +300,13 @@ function TestCard({ test }: { test: TestRow }) {
   const hasAttempts = test.attemptCount > 0;
 
   return (
-    <li className="group relative flex flex-col rounded-xl border bg-card text-card-foreground shadow-xs transition-[box-shadow,border-color] focus-within:ring-2 focus-within:ring-ring hover:border-primary/30 hover:shadow-md">
+    <li className="relative flex flex-col rounded-xl border bg-card text-card-foreground transition-colors focus-within:ring-2 focus-within:ring-ring hover:border-primary/30">
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <StatusBadge kind="test" status={test.status} />
             {test.topic ? (
-              <span className="truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              <span className="h-6 min-w-0 truncate rounded-sm bg-muted px-2 text-xs leading-6 font-medium text-muted-foreground">
                 {test.topic}
               </span>
             ) : null}
@@ -467,7 +445,6 @@ function TestCard({ test }: { test: TestRow }) {
             className="relative z-10 shrink-0"
           >
             <Link href={routes.docent.newAssignment({ testId: test.id })}>
-              <CalendarPlus aria-hidden="true" />
               Afname plannen
             </Link>
           </Button>
@@ -476,7 +453,6 @@ function TestCard({ test }: { test: TestRow }) {
             <TooltipTrigger asChild>
               <span className="relative z-10 shrink-0">
                 <Button size="xs" variant="outline" disabled>
-                  <CalendarPlus aria-hidden="true" />
                   Afname plannen
                 </Button>
               </span>

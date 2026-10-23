@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react";
+import { Check, CircleCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* Static, hand-highlighted snippet: no editor bundle needed on public pages. */
@@ -57,18 +57,11 @@ export function GradingDemo({ variant = "card", className }: GradingDemoProps) {
       className={cn("flex flex-col gap-3", className)}
       aria-label="Voorbeeld: een opdracht met input() wordt goed gerekend"
     >
-      <div className="overflow-hidden rounded-xl border bg-[var(--code-bg)] text-[var(--code-fg)] shadow-xl shadow-black/[0.06] ring-1 ring-black/[0.02] dark:shadow-black/40">
+      <div className="overflow-hidden rounded-xl border bg-[var(--code-bg)] text-[var(--code-fg)]">
         <div className="flex h-10 items-center gap-2 border-b bg-muted/50 px-3.5">
-          <span className="flex gap-1.5" aria-hidden="true">
-            <span className="size-2.5 rounded-full bg-[oklch(0.7_0.15_25)]/80" />
-            <span className="size-2.5 rounded-full bg-[oklch(0.82_0.14_85)]/80" />
-            <span className="size-2.5 rounded-full bg-[oklch(0.72_0.14_145)]/80" />
-          </span>
-          <span className="ml-2 font-mono text-xs text-muted-foreground">
+          <span className="text-xs font-medium text-foreground">Jouw code</span>
+          <span className="font-mono text-xs text-muted-foreground">
             begroeting.py
-          </span>
-          <span className="ml-auto rounded-full border bg-background/70 px-2 py-0.5 text-[0.65rem] font-medium tracking-wide text-muted-foreground uppercase">
-            Python
           </span>
         </div>
         <Snippet />
@@ -83,8 +76,8 @@ export function GradingDemo({ variant = "card", className }: GradingDemoProps) {
                 Sam
               </code>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2 py-0.5 text-xs font-semibold text-success-ink ring-1 ring-success/25 ring-inset">
-              <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-success-ink">
+              <CircleCheck className="size-4" aria-hidden="true" />
               Goed
             </span>
           </div>
@@ -94,11 +87,7 @@ export function GradingDemo({ variant = "card", className }: GradingDemoProps) {
             <dt className="font-sans text-muted-foreground">Uitvoer</dt>
             <dd>Hallo Sam</dd>
           </dl>
-          <p className="mt-2.5 flex items-start gap-1.5 text-xs text-muted-foreground">
-            <span
-              className="mt-1 size-1.5 shrink-0 rounded-full bg-primary"
-              aria-hidden="true"
-            />
+          <p className="mt-2.5 text-xs text-muted-foreground">
             De vraag “Wat is je naam?” is geen uitvoer en telt dus niet mee.
           </p>
         </div>

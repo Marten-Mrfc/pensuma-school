@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 import type { MonitoringSettings } from "@/lib/privacy/event-details";
@@ -54,18 +53,7 @@ export function MonitoringNotice({
         className,
       )}
     >
-      <h3
-        id={titleId}
-        className="flex items-center gap-2 font-display text-sm font-semibold"
-      >
-        {logFocusEvents || requireFullscreen ? (
-          <Eye className="size-4 shrink-0 text-primary" aria-hidden="true" />
-        ) : (
-          <EyeOff
-            className="size-4 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
-        )}
+      <h3 id={titleId} className="font-display text-sm font-semibold">
         Dit wordt bijgehouden tijdens deze toets
       </h3>
       {!logFocusEvents && !requireFullscreen ? (

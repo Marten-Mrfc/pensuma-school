@@ -133,12 +133,12 @@ export function StudentsPage() {
       hideBelow: "md",
       cell: (s) =>
         s.classes.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
             {s.classes.map((c) => (
               <Link
                 key={c.id}
                 href={routes.docent.class(c.id)}
-                className="inline-flex h-6 items-center rounded-full bg-secondary px-2 text-xs font-medium text-secondary-foreground ring-1 ring-border ring-inset transition-colors hover:bg-accent data-[archived=true]:text-muted-foreground"
+                className="rounded-sm text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring data-[archived=true]:text-muted-foreground"
                 data-archived={c.archived}
               >
                 {c.name}

@@ -11,18 +11,18 @@ export function CookieTable() {
         <ScrollRegion label={caption}>
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <caption className="sr-only">{caption}</caption>
-            <thead className="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
+            <thead className="bg-muted/50 text-xs text-muted-foreground">
               <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Naam
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Soort
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Doel
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Bewaartermijn
                 </th>
               </tr>

@@ -73,14 +73,14 @@ export function QuestionNavigator({
                 }${isFlagged ? ", gemarkeerd" : ""}`}
                 title={q.title}
                 className={cn(
-                  "relative grid aspect-square w-full min-w-9 place-items-center rounded-lg border text-sm font-semibold tabular-nums transition-[background-color,border-color,box-shadow,transform] outline-none hover:-translate-y-px focus-visible:ring-[3px] focus-visible:ring-ring motion-reduce:hover:translate-y-0",
+                  "relative grid aspect-square w-full min-w-9 place-items-center rounded-lg border text-sm font-semibold tabular-nums transition-[background-color,border-color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
                   isAnswered
                     ? "border-primary/30 bg-primary/12 text-primary hover:bg-primary/18"
                     : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
                   isFlagged &&
                     "border-warning/60 bg-warning/12 text-warning-ink",
                   isCurrent &&
-                    "border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-ring ring-offset-2 ring-offset-background hover:bg-primary",
+                    "border-primary bg-primary text-primary-foreground ring-2 ring-ring ring-offset-2 ring-offset-background hover:bg-primary",
                 )}
               >
                 {index + 1}

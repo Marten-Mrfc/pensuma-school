@@ -134,7 +134,7 @@ function SwitchRow({
 function Preview() {
   return (
     <figure className="flex flex-col gap-2 rounded-lg border bg-card p-3.5">
-      <figcaption className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+      <figcaption className="text-sm font-medium text-muted-foreground">
         Voorbeeld
       </figcaption>
       <p className="text-sm leading-relaxed text-foreground">

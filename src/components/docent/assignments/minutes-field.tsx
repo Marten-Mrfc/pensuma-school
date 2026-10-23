@@ -70,7 +70,7 @@ export function MinutesField({
             aria-pressed={minutes === m}
             onClick={() => onChange(String(m))}
             className={cn(
-              "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
+              "h-7 rounded-md border px-2.5 text-xs font-medium tabular-nums outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
               minutes === m && "border-primary bg-primary/10 text-primary",
             )}
           >

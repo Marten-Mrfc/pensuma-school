@@ -49,9 +49,6 @@ export function FullscreenOverlay({
         }}
         className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
       >
-        <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
-          <Maximize className="size-7" aria-hidden="true" />
-        </span>
         <DialogTitle className="font-display text-2xl leading-tight font-bold tracking-tight">
           Ga terug naar volledig scherm om verder te gaan
         </DialogTitle>

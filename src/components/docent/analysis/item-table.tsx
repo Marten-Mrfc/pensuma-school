@@ -27,11 +27,15 @@ import { NeutralizeDialog, useNeutralizeMutation } from "./neutralize-dialog";
 type Analysis = RouterOutputs["analysis"]["assignment"];
 type Item = Analysis["items"][number];
 
+/** One recipe for every tag in the table. */
+const TAG =
+  "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs font-medium whitespace-nowrap";
+
 const FLAG_CLASSES: Record<Item["flags"][number]["tone"], string> = {
-  info: "bg-info/10 text-info-ink ring-info/25",
-  warning: "bg-warning/12 text-warning-ink ring-warning/30",
-  destructive: "bg-destructive/10 text-destructive-ink ring-destructive/25",
-  success: "bg-success/10 text-success-ink ring-success/25",
+  info: "bg-info/12 text-info-ink",
+  warning: "bg-warning/15 text-warning-ink",
+  destructive: "bg-destructive/10 text-destructive-ink",
+  success: "bg-success/12 text-success-ink",
 };
 
 export function ItemTable({
@@ -111,8 +115,9 @@ export function ItemTable({
                   <span className="flex flex-wrap items-center gap-2">
                     {item.title}
                     {item.neutralized ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] font-medium text-warning-ink">
-                        <Ban className="size-3" aria-hidden="true" />
+                      <span
+                        className={cn(TAG, "bg-warning/15 text-warning-ink")}
+                      >
                         Vervallen
                         <span className="sr-only">
                           {item.neutralized === "drop"
@@ -146,17 +151,16 @@ export function ItemTable({
                 <td className="px-3 py-3">
                   <span className="flex flex-wrap gap-1">
                     {item.pendingReview > 0 ? (
-                      <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 ring-border ring-inset">
+                      <span
+                        className={cn(TAG, "bg-muted text-muted-foreground")}
+                      >
                         Nog {item.pendingReview} na te kijken
                       </span>
                     ) : null}
                     {item.flags.map((f) => (
                       <span
                         key={f.key}
-                        className={cn(
-                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-                          FLAG_CLASSES[f.tone],
-                        )}
+                        className={cn(TAG, FLAG_CLASSES[f.tone])}
                       >
                         {f.label}
                       </span>

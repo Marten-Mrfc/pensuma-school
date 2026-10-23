@@ -1,22 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  CalendarClock,
-  ClipboardPaste,
-  Clock3,
-  Code2,
-  FileQuestion,
-  KeyRound,
-  Lightbulb,
-  Loader2,
-  PlayCircle,
-  RotateCcw,
-  Save,
-  Sparkles,
-  Trophy,
-} from "lucide-react";
+import { Loader2, PlayCircle, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -38,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { useDocumentTitle } from "@/lib/a11y/use-document-title";
 import { claimLocalData, removeAttemptBackups } from "@/lib/local-data";
 import { routes } from "@/lib/routes";
-import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { AccessCodeInput } from "./access-code-input";
 import {
@@ -46,75 +30,41 @@ import {
   formatMoment,
   formatNumber,
   formatTimeLeft,
-  pluralize,
 } from "./format";
 import { ModeBadge } from "./mode-badge";
 import { MonitoringNotice } from "./monitoring/monitoring-notice";
 
 type AssignmentInfo = RouterOutputs["portal"]["getAssignment"];
 
-function FactTile({
-  icon: Icon,
+/** One fact on the start screen: label, value and an optional note. */
+function Fact({
   label,
   value,
   hint,
 }: {
-  icon: typeof Clock3;
   label: string;
   value: ReactNode;
   hint?: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border bg-card p-3.5 shadow-xs sm:p-4">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary max-sm:hidden">
-        <Icon className="size-[18px]" aria-hidden="true" />
-      </span>
-      <div className="flex min-w-0 flex-col">
-        <span className="text-xs font-medium text-muted-foreground">
-          {label}
-        </span>
-        <span className="font-display text-lg leading-tight font-semibold">
-          {value}
-        </span>
-        {hint ? (
-          <span className="mt-0.5 text-xs text-muted-foreground">{hint}</span>
-        ) : null}
-      </div>
+    <div className="flex min-w-0 flex-col">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-semibold tabular-nums">{value}</dd>
+      {hint ? <dd className="text-xs text-muted-foreground">{hint}</dd> : null}
     </div>
   );
 }
 
-function Rule({
-  icon: Icon,
-  tone = "default",
-  children,
-}: {
-  icon: typeof Clock3;
-  tone?: "default" | "warning";
-  children: ReactNode;
-}) {
-  return (
-    <li className="flex items-start gap-3">
-      <span
-        className={cn(
-          "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg",
-          tone === "warning"
-            ? "bg-warning/15 text-warning-ink"
-            : "bg-muted text-muted-foreground",
-        )}
-      >
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
-      <span className="text-sm leading-6">{children}</span>
-    </li>
-  );
-}
+/** Keeps a count on the same line as its question type. */
+const NBSP = "\u00a0";
 
+/** "9 programmeren · 2 meerkeuze · 1 open" */
 function typeBreakdown(types: AssignmentInfo["questionTypes"]) {
   const parts: string[] = [];
-  if (types.code) parts.push(`${types.code} programmeren`);
-  if (types.multiple_choice) parts.push(`${types.multiple_choice} meerkeuze`);
-  if (types.open) parts.push(`${types.open} open`);
+  if (types.code) parts.push(`${types.code}${NBSP}programmeren`);
+  if (types.multiple_choice)
+    parts.push(`${types.multiple_choice}${NBSP}meerkeuze`);
+  if (types.open) parts.push(`${types.open}${NBSP}open`);
   return parts.join(" · ");
 }
 
@@ -213,11 +163,11 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
           : "Alle pogingen gebruikt";
       text =
         info.maxAttempts === 1
-          ? "Goed gedaan! Je kunt deze toets maar één keer maken."
+          ? "Je kunt deze toets maar één keer maken."
           : `Je hebt al je ${info.maxAttempts} pogingen gebruikt.`;
     }
     return (
-      <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
+      <div className="flex flex-col gap-4 rounded-xl border bg-card p-5 sm:p-6">
         <div className="flex flex-col gap-1">
           <h2 className="font-display text-lg font-semibold">{title}</h2>
           <p className="text-sm text-muted-foreground">{text}</p>
@@ -225,7 +175,6 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
         {info.lastSubmittedAttemptId ? (
           <Button asChild variant="outline" className="w-full">
             <Link href={routes.leerling.result(info.lastSubmittedAttemptId)}>
-              <Trophy aria-hidden="true" />
               Bekijk je resultaat
             </Link>
           </Button>
@@ -237,15 +186,11 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-col gap-5 rounded-2xl border bg-card p-5 shadow-sm ring-1 ring-primary/10 sm:p-6"
+      className="flex flex-col gap-5 rounded-xl border bg-card p-5 sm:p-6"
     >
       <div className="flex flex-col gap-1">
         <h2 className="font-display text-lg font-semibold">
-          {resuming
-            ? "Ga verder waar je was"
-            : exam
-              ? "Klaar om te beginnen?"
-              : "Zin om te oefenen?"}
+          {resuming ? "Ga verder waar je was" : "Voor je begint"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {resuming
@@ -262,14 +207,7 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
 
       {needsCode ? (
         <div className="flex flex-col gap-2">
-          <label
-            htmlFor={codeId}
-            className="flex items-center gap-2 text-sm font-medium"
-          >
-            <KeyRound
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
+          <label htmlFor={codeId} className="text-sm font-medium">
             Toegangscode
           </label>
           <AccessCodeInput
@@ -317,9 +255,6 @@ function StartPanel({ info }: { info: AssignmentInfo }) {
           : info.attemptsUsed > 0
             ? "Opnieuw proberen"
             : "Start toets"}
-        {!busy && !resuming && info.attemptsUsed === 0 ? (
-          <ArrowRight aria-hidden="true" />
-        ) : null}
       </Button>
       {info.settings.requireFullscreen ? (
         <p className="-mt-2 text-center text-xs text-muted-foreground">
@@ -341,29 +276,30 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
   const s = info.settings;
   const exam = info.mode === "exam";
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
-      <h2 className="flex items-center gap-2 font-display text-base font-semibold">
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 sm:p-6">
+      <h2 className="font-display text-base font-semibold">
         {exam ? "Goed om te weten" : "Zo werkt het"}
       </h2>
-      <ul className="flex flex-col gap-3">
+      <ul className="flex list-disc flex-col gap-2 pl-5 text-sm leading-6 marker:text-muted-foreground">
         {s.blockPaste ? (
-          <Rule icon={ClipboardPaste} tone="warning">
-            Plakken in de code-editor is uitgeschakeld. Typ je code zelf.
-            Pogingen om te plakken worden geregistreerd, maar niet wát je plakt.
-          </Rule>
+          <li className="font-medium text-warning-ink">
+            <span>Let op: </span>plakken in de code-editor is uitgeschakeld. Typ
+            je code zelf. Pogingen om te plakken worden geregistreerd, maar niet
+            wát je plakt.
+          </li>
         ) : null}
         {info.timeLimitMinutes ? (
-          <Rule icon={Clock3}>
+          <li>
             De tijd loopt door, ook als je het venster sluit. Is de tijd om, dan
             wordt je werk automatisch ingeleverd.
-          </Rule>
+          </li>
         ) : null}
-        <Rule icon={Save}>
+        <li>
           Je antwoorden worden automatisch opgeslagen. Je kunt tussendoor gerust
           van vraag wisselen.
-        </Rule>
+        </li>
         {info.questionTypes.code ? (
-          <Rule icon={Code2}>
+          <li>
             {s.allowCodeRun && s.allowSelfTest
               ? "Je kunt je code uitvoeren en testen met de voorbeeldtests. Bij het nakijken gebruiken we ook nog verborgen tests."
               : s.allowCodeRun
@@ -371,23 +307,24 @@ function RulesCard({ info }: { info: AssignmentInfo }) {
                 : s.allowSelfTest
                   ? "Je kunt je code testen met de voorbeeldtests. Uitvoeren is uitgeschakeld."
                   : "Uitvoeren en testen zijn bij deze toets uitgeschakeld."}
-          </Rule>
+          </li>
         ) : null}
         {info.hasHints ? (
-          <Rule icon={Lightbulb}>
+          <li>
             Bij sommige vragen kun je een hint bekijken. Een hint kan punten
             kosten.
-          </Rule>
+          </li>
         ) : null}
         {!exam ? (
-          <Rule icon={Sparkles}>
-            Dit is een oefening: fouten maken mag! Na het inleveren zie je
+          <li>
+            Dit is een oefening: fouten maken mag. Na het inleveren zie je
             meteen wat goed ging
             {info.maxAttempts > 1 ? " en kun je het opnieuw proberen." : "."}
-          </Rule>
+          </li>
         ) : null}
       </ul>
       <MonitoringNotice
+        className="rounded-none border-0 border-t bg-transparent px-0 pt-4 pb-0"
         settings={{
           logFocusEvents: s.logFocusEvents,
           requireFullscreen: s.requireFullscreen,
@@ -431,6 +368,13 @@ function StartScreenContent({ id }: { id: string }) {
     );
   }
   const info = query.data;
+  // Only set when verlengde tijd makes the limit longer.
+  const personalMinutes =
+    info.timeLimitMinutes &&
+    info.extraTimePercent > 0 &&
+    (info.personalTimeMinutes ?? 0) > info.timeLimitMinutes
+      ? info.personalTimeMinutes
+      : null;
 
   return (
     <>
@@ -448,50 +392,41 @@ function StartScreenContent({ id }: { id: string }) {
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 lg:col-start-1 lg:grid-cols-2 2xl:grid-cols-4">
-          <FactTile
-            icon={FileQuestion}
+        <dl className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-3 rounded-xl border bg-card p-4 sm:grid-cols-4 lg:col-start-1 lg:grid-cols-2 2xl:grid-cols-4">
+          <Fact
             label="Vragen"
             value={info.questionCount}
             hint={typeBreakdown(info.questionTypes)}
           />
-          <FactTile
-            icon={Trophy}
-            label="Punten"
-            value={formatNumber(info.totalPoints)}
-          />
-          <FactTile
-            icon={Clock3}
+          <Fact label="Punten" value={formatNumber(info.totalPoints)} />
+          <Fact
             label="Tijdslimiet"
             value={
               info.timeLimitMinutes
-                ? info.extraTimePercent > 0 &&
-                  (info.personalTimeMinutes ?? 0) > info.timeLimitMinutes
-                  ? `${info.personalTimeMinutes} min (incl. verlengde tijd)`
-                  : `${info.timeLimitMinutes} min`
+                ? `${personalMinutes ?? info.timeLimitMinutes} min`
                 : "Geen"
             }
+            hint={personalMinutes ? "incl. verlengde tijd" : undefined}
           />
-          <FactTile
-            icon={CalendarClock}
+          <Fact
             label="Sluit"
             value={
-              info.closesAt ? formatMoment(info.closesAt) : "Geen deadline"
+              info.closesAt ? formatMoment(info.closesAt) : "Geen sluitingstijd"
             }
             hint={
               info.maxAttempts > 1
-                ? `${pluralize(info.maxAttempts, "poging", "pogingen")}, ${info.attemptsUsed} gebruikt`
+                ? `${info.attemptsUsed} van ${info.maxAttempts} pogingen gebruikt`
                 : undefined
             }
           />
-        </div>
+        </dl>
 
         <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-1">
           <StartPanel info={info} />
         </aside>
 
         {info.description.trim() ? (
-          <section className="min-w-0 rounded-2xl border bg-card p-5 shadow-xs sm:p-6 lg:col-start-1">
+          <section className="min-w-0 rounded-xl border bg-card p-5 sm:p-6 lg:col-start-1">
             <Markdown>{info.description}</Markdown>
           </section>
         ) : null}

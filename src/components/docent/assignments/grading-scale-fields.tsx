@@ -1,6 +1,5 @@
 "use client";
 
-import { Calculator } from "lucide-react";
 import { useId } from "react";
 import { NumberField } from "@/components/ui/number-field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -53,8 +52,7 @@ export function GradingScaleFields({
 
   return (
     <fieldset className="flex flex-col gap-3" disabled={disabled}>
-      <legend className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        <Calculator className="size-3.5" aria-hidden="true" />
+      <legend className="mb-1 text-sm font-semibold text-foreground">
         Cijferberekening
       </legend>
       <RadioGroup

@@ -1,6 +1,6 @@
 "use client";
 
-import { Lightbulb, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useId } from "react";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
@@ -61,11 +61,10 @@ export function HintsEditor({
     <EditorSection
       title="Hints"
       description="Leerlingen zien hints alleen als je ze bij de afname toestaat. Hints worden in volgorde vrijgegeven."
-      icon={<Lightbulb />}
     >
       <IssueList issues={issues.filter((i) => i.target?.field === "hints")} />
       {hints.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-5 text-center text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Nog geen hints. Een hint helpt een leerling op weg zonder het antwoord
           weg te geven, bijvoorbeeld: “Gebruik een for-lus met range()”.
         </p>
@@ -87,14 +86,8 @@ export function HintsEditor({
                 <div className="flex items-center justify-between gap-2">
                   <label
                     htmlFor={`${id}-${hint.id}-text`}
-                    className="flex items-center gap-2 text-sm font-semibold"
+                    className="text-sm font-semibold"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="grid size-6 place-items-center rounded-full bg-warning/15 text-xs text-warning-ink tabular-nums"
-                    >
-                      {n}
-                    </span>
                     Hint {n}
                   </label>
                   <div className="flex items-center gap-1">

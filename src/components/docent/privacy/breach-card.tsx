@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Download, LogOut, Siren } from "lucide-react";
+import { Download, LogOut } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { useAnnounce } from "@/components/a11y/live-announcer";
@@ -37,18 +37,15 @@ export function BreachCard({ dpoEmail }: { dpoEmail: string | null }) {
   return (
     <section
       aria-labelledby={`${passwordId}-titel`}
-      className="flex flex-col gap-4 rounded-xl border border-destructive/25 bg-destructive/[0.035] p-4 sm:flex-row sm:items-start sm:gap-5 sm:p-6"
+      className="flex flex-col gap-4 rounded-xl border border-destructive/25 bg-destructive/[0.035] p-4 sm:p-6"
     >
-      <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-destructive/10 text-destructive-ink">
-        <Siren className="size-5" aria-hidden="true" />
-      </span>
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="flex flex-col gap-1">
           <h2
             id={`${passwordId}-titel`}
             className="font-display text-lg font-semibold tracking-tight text-foreground"
           >
-            Datalek of vermoeden van een datalek?
+            Datalek of vermoeden van een datalek
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-pretty text-muted-foreground">
             Meld het direct bij de FG van je school

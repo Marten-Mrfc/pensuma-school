@@ -68,7 +68,7 @@ export function ShortcutsDialog({
         <div className="flex flex-col gap-5">
           {shortcutsByScope().map((group) => (
             <section key={group.scope} className="flex flex-col gap-2">
-              <h3 className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+              <h3 className="text-sm font-medium text-muted-foreground">
                 {group.scope}
               </h3>
               <dl className="divide-y rounded-lg border">

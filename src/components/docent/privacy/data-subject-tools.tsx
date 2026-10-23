@@ -1,14 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Download,
-  Loader2,
-  Lock,
-  LockOpen,
-  Trash2,
-  UserRound,
-} from "lucide-react";
+import { Download, Loader2, Lock, LockOpen, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useId, useState } from "react";
 import { toast } from "sonner";
@@ -129,16 +122,12 @@ function StudentActions({
     <div className="flex flex-col gap-4 rounded-xl border bg-muted/20 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-            <UserRound className="size-5" aria-hidden="true" />
-          </span>
           <div className="min-w-0">
             <p className="truncate font-semibold">{p.name}</p>
             <p className="text-sm text-muted-foreground tabular-nums">
               Leerlingnummer {p.studentNumber}
               {restriction ? (
-                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning-ink">
-                  <Lock className="size-3" aria-hidden="true" />
+                <span className="ml-2 inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-warning/15 px-2 text-xs font-medium whitespace-nowrap text-warning-ink">
                   Verwerking beperkt
                 </span>
               ) : null}

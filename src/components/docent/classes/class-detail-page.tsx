@@ -4,10 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArchiveRestore,
-  CalendarClock,
-  CalendarPlus,
   KeyRound,
-  LogIn,
   MoreHorizontal,
   Pencil,
   Printer,
@@ -21,7 +18,6 @@ import { use, useId, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { PageHeader } from "@/components/app/page-header";
-import { StatCard } from "@/components/app/stat-card";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,12 +103,24 @@ export function ClassDetailPage({
     if (!open) setDialog(null);
   };
 
+  const open = klas.openAssignmentCount;
   const description = [
     klas.schoolYear ? `Schooljaar ${klas.schoolYear}` : null,
+    open > 0 ? plural(open, "open afname", "open afnames") : null,
     klas.description,
   ]
     .filter(Boolean)
     .join(" · ");
+  const inactive = members.length - active;
+  const memberSummary = [
+    members.length.toLocaleString("nl-NL"),
+    inactive > 0
+      ? `${inactive.toLocaleString("nl-NL")} gedeactiveerd`
+      : members.length === 1
+        ? "actief"
+        : "allemaal actief",
+    `${loggedIn.toLocaleString("nl-NL")} ooit ingelogd`,
+  ].join(" · ");
 
   return (
     <>
@@ -123,8 +131,7 @@ export function ClassDetailPage({
         description={description || undefined}
         badge={
           klas.archived ? (
-            <span className="inline-flex h-6 items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium text-muted-foreground ring-1 ring-border ring-inset">
-              <Archive className="size-3" aria-hidden="true" />
+            <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-muted px-2 text-xs font-medium whitespace-nowrap text-muted-foreground">
               Gearchiveerd
             </span>
           ) : null
@@ -147,7 +154,6 @@ export function ClassDetailPage({
             </Button>
             <Button variant="outline" asChild>
               <Link href={routes.docent.newAssignment({ classId: klas.id })}>
-                <CalendarPlus aria-hidden="true" />
                 Afname plannen
               </Link>
             </Button>
@@ -187,50 +193,24 @@ export function ClassDetailPage({
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        <StatCard
-          label="Leerlingen"
-          value={members.length}
-          icon={UsersRound}
-          tone="primary"
-          hint={
-            members.length - active > 0
-              ? `${members.length - active} gedeactiveerd`
-              : "Allemaal actief"
-          }
-        />
-        <StatCard
-          label="Open afnames"
-          value={klas.openAssignmentCount}
-          icon={CalendarClock}
-          tone={klas.openAssignmentCount > 0 ? "success" : "default"}
-          hint={`${plural(klas.assignmentCount, "afname", "afnames")} in totaal`}
-        />
-        <StatCard
-          label="Ingelogd"
-          value={loggedIn}
-          icon={LogIn}
-          tone="info"
-          className="hidden sm:flex"
-          hint={
-            members.length > 0
-              ? `van de ${plural(members.length, "leerling", "leerlingen")} (recent)`
-              : "Nog geen leerlingen"
-          }
-        />
-      </div>
-
       <section
         aria-labelledby={`${uid}-students-heading`}
         className="flex flex-col gap-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2
-            id={`${uid}-students-heading`}
-            className="font-display text-lg font-bold tracking-tight"
-          >
-            Leerlingen
-          </h2>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2
+              id={`${uid}-students-heading`}
+              className="font-display text-lg font-bold tracking-tight"
+            >
+              Leerlingen
+            </h2>
+            {members.length > 0 ? (
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {memberSummary}
+              </span>
+            ) : null}
+          </div>
           {members.length > 0 ? (
             <Button
               variant="ghost"

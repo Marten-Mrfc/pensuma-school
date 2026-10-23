@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical, Settings2 } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { useId, useState } from "react";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
 import { IssueDot, IssueIcon } from "@/components/docent/questions/issue-list";
@@ -105,9 +105,6 @@ export function QuestionList({
             "border-primary/50 bg-primary/[0.06] ring-1 ring-primary/25",
         )}
       >
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-          <Settings2 className="size-4" aria-hidden="true" />
-        </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-sm font-medium">Toetsinstellingen</span>
           <span className="truncate text-xs text-muted-foreground">

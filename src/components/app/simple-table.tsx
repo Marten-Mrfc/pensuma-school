@@ -170,7 +170,7 @@ export function SimpleTable<T>({
                         : undefined
                     }
                     className={cn(
-                      "h-10 px-4 text-xs font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase",
+                      "h-10 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground",
                       ALIGN[col.align ?? "left"],
                       col.hideBelow && HIDE[col.hideBelow],
                       col.headerClassName,
@@ -181,7 +181,7 @@ export function SimpleTable<T>({
                         type="button"
                         onClick={() => toggleSort(col)}
                         className={cn(
-                          "-mx-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 uppercase outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                          "-mx-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                           active && "text-foreground",
                         )}
                       >

@@ -12,7 +12,6 @@ import {
   type CodeConstruct,
 } from "@/lib/questions/schema";
 import { newCheck } from "@/lib/questions/templates";
-import { cn } from "@/lib/utils";
 import { FieldLabel, NumberInput } from "./fields";
 
 const CONSTRUCT_OPTIONS = (
@@ -211,14 +210,7 @@ function CheckRow({
   const requires = check.kind === "requires";
 
   return (
-    <li
-      className={cn(
-        "flex flex-col gap-3 rounded-lg border bg-background/60 p-3",
-        requires
-          ? "border-l-[3px] border-l-success/70"
-          : "border-l-[3px] border-l-destructive/70",
-      )}
-    >
+    <li className="flex flex-col gap-3 rounded-lg border bg-background/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-medium">
           {requires ? (

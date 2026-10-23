@@ -50,9 +50,9 @@ export function ChoiceQuestion({
           <label
             key={option.id}
             className={cn(
-              "group relative flex cursor-pointer items-start gap-4 rounded-xl border-2 bg-card p-4 shadow-xs transition-[border-color,background-color,box-shadow] select-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring sm:p-5",
+              "group relative flex cursor-pointer items-start gap-4 rounded-xl border-2 bg-card p-4 transition-[border-color,background-color,box-shadow] select-none has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring sm:p-5",
               isChosen
-                ? "border-primary bg-primary/[0.06] shadow-sm"
+                ? "border-primary bg-primary/[0.06]"
                 : "border-border hover:border-primary/40 hover:bg-accent/40",
               disabled && "cursor-not-allowed opacity-70",
             )}

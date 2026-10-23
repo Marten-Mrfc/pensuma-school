@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Tag, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 import { useAnnounce } from "@/components/a11y/live-announcer";
 import {
@@ -61,11 +61,7 @@ export function TopicTagsField({
 
   return (
     <div className="flex flex-col gap-2">
-      <label
-        htmlFor={`${id}-input`}
-        className="flex items-center gap-1.5 text-sm font-medium"
-      >
-        <Tag className="size-3.5 text-muted-foreground" aria-hidden="true" />
+      <label htmlFor={`${id}-input`} className="text-sm font-medium">
         Onderwerpen
       </label>
       <div
@@ -79,14 +75,14 @@ export function TopicTagsField({
             {value.map((tag) => (
               <li
                 key={tag}
-                className="inline-flex h-7 items-center gap-0.5 rounded-full bg-secondary pr-0.5 pl-2.5 text-xs font-medium text-secondary-foreground"
+                className="inline-flex h-7 items-center gap-0.5 rounded-sm bg-secondary pr-0.5 pl-2.5 text-xs font-medium text-secondary-foreground"
               >
                 {tag}
                 <button
                   type="button"
                   onClick={() => remove(tag)}
                   aria-label={`Onderwerp ${tag} verwijderen`}
-                  className="grid size-6 place-items-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  className="grid size-6 place-items-center rounded-sm text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <X className="size-3.5" aria-hidden="true" />
                 </button>
@@ -149,7 +145,7 @@ export function TopicTagsField({
                 <button
                   type="button"
                   onClick={() => add(tag)}
-                  className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs text-muted-foreground transition-colors outline-none hover:border-solid hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex h-7 items-center gap-1 rounded-sm border border-dashed px-2.5 text-xs text-muted-foreground transition-colors outline-none hover:border-solid hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Plus className="size-3" aria-hidden="true" />
                   {tag}

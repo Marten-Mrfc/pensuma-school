@@ -6,8 +6,6 @@ import {
   ListChecks,
   Loader2,
   MessageSquareText,
-  Plus,
-  Sparkles,
   SquareCode,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -63,19 +61,11 @@ export function ExampleTestsDialog({ trigger }: { trigger?: ReactNode }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ?? (
-          <Button variant="outline">
-            <Sparkles aria-hidden="true" />
-            Voorbeeldtoetsen
-          </Button>
-        )}
+        {trigger ?? <Button variant="outline">Voorbeeldtoetsen</Button>}
       </DialogTrigger>
       <DialogContent className="flex max-h-[min(46rem,calc(100dvh-2rem))] flex-col gap-4 sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" aria-hidden="true" />
-            Voorbeeldtoetsen
-          </DialogTitle>
+          <DialogTitle>Voorbeeldtoetsen</DialogTitle>
           <DialogDescription>
             Kant-en-klare toetsen met modeloplossingen, verborgen tests en
             onderwerpen. Je krijgt een eigen kopie als concept die je daarna
@@ -136,9 +126,6 @@ function ExampleCard({
   return (
     <li className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs">
       <div className="flex flex-col gap-1.5">
-        <span className="w-fit rounded-full bg-primary/10 px-2 py-0.5 text-[0.7rem] font-semibold text-primary">
-          {example.level}
-        </span>
         <h3 id={`${id}-title`} className="leading-snug font-semibold">
           {example.title}
         </h3>
@@ -147,6 +134,10 @@ function ExampleCard({
         </p>
       </div>
       <dl className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex gap-1">
+          <dt className="sr-only">Niveau</dt>
+          <dd className="font-medium text-foreground">{example.level}</dd>
+        </div>
         <div className="flex gap-1">
           <dt className="sr-only">Vragen</dt>
           <dd>
@@ -174,7 +165,7 @@ function ExampleCard({
           {example.tags.map((tag) => (
             <li
               key={tag}
-              className="rounded-full bg-secondary px-2 py-0.5 text-[0.7rem] font-medium text-secondary-foreground"
+              className="inline-flex h-6 items-center rounded-sm bg-secondary px-2 text-xs font-medium whitespace-nowrap text-secondary-foreground"
             >
               {tag}
             </li>
@@ -210,6 +201,7 @@ function ExampleCard({
         </ol>
       </div>
       <Button
+        variant="outline"
         className="mt-auto"
         onClick={onImport}
         disabled={disabled}
@@ -217,9 +209,7 @@ function ExampleCard({
       >
         {pending ? (
           <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
-        ) : (
-          <Plus aria-hidden="true" />
-        )}
+        ) : null}
         Toevoegen als concept
       </Button>
     </li>

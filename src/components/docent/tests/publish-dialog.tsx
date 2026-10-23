@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  ArrowRight,
-  CircleAlert,
-  Loader2,
-  Rocket,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowRight, CircleAlert, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,33 +36,17 @@ export function PublishDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[min(44rem,calc(100dvh-2rem))] flex-col gap-0 p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-6 pt-6 pb-4 text-left">
-          <div className="flex items-start gap-3">
-            <span
-              className={cn(
-                "grid size-10 shrink-0 place-items-center rounded-full",
-                blocked
-                  ? "bg-destructive/10 text-destructive"
-                  : "bg-warning/15 text-warning-ink",
-              )}
-            >
-              {blocked ? (
-                <CircleAlert className="size-5" aria-hidden="true" />
-              ) : (
-                <TriangleAlert className="size-5" aria-hidden="true" />
-              )}
-            </span>
-            <div className="flex flex-col gap-1.5 pt-0.5">
-              <DialogTitle className="text-base leading-snug">
-                {blocked
-                  ? "De toets kan nog niet gepubliceerd worden"
-                  : "Wil je de toets toch publiceren?"}
-              </DialogTitle>
-              <DialogDescription>
-                {blocked
-                  ? `Los eerst ${problems.length === 1 ? "dit probleem" : `deze ${problems.length} problemen`} op. Klik op een melding om naar de vraag te gaan.`
-                  : "Er zijn geen fouten, maar wel een paar aandachtspunten. Controleer ze voordat leerlingen de toets maken."}
-              </DialogDescription>
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <DialogTitle className="text-base leading-snug">
+              {blocked
+                ? "De toets kan nog niet gepubliceerd worden"
+                : "Wil je de toets toch publiceren?"}
+            </DialogTitle>
+            <DialogDescription>
+              {blocked
+                ? `Los eerst ${problems.length === 1 ? "dit probleem" : `deze ${problems.length} problemen`} op. Kies een melding om naar de vraag te gaan.`
+                : "Er zijn geen fouten, maar wel een paar aandachtspunten. Controleer ze voordat leerlingen de toets maken."}
+            </DialogDescription>
           </div>
         </DialogHeader>
 
@@ -102,9 +80,7 @@ export function PublishDialog({
                   className="motion-safe:animate-spin"
                   aria-hidden="true"
                 />
-              ) : (
-                <Rocket aria-hidden="true" />
-              )}
+              ) : null}
               Toch publiceren
             </Button>
           ) : null}
@@ -128,8 +104,11 @@ function ProblemGroup({
   const Icon = severity === "error" ? CircleAlert : TriangleAlert;
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        {title} ({items.length})
+      <h3 className="text-sm font-medium text-foreground">
+        {title}{" "}
+        <span className="ml-1 font-normal text-muted-foreground tabular-nums">
+          {items.length}
+        </span>
       </h3>
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => (

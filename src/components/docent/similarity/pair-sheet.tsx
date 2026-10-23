@@ -123,7 +123,7 @@ function PairContent({ pair }: { pair: PairRef }) {
             {features.map((f) => (
               <li
                 key={f}
-                className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
+                className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-secondary px-2 text-xs font-medium whitespace-nowrap text-secondary-foreground"
               >
                 {f}
               </li>

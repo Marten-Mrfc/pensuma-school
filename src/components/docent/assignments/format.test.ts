@@ -8,7 +8,6 @@ import {
   formatRemaining,
   formatWindow,
   fromDateTimeLocal,
-  greeting,
   pluralize,
   toDateTimeLocal,
 } from "./format";
@@ -91,13 +90,6 @@ describe("dates", () => {
 });
 
 describe("text helpers", () => {
-  test("greeting by time of day", () => {
-    expect(greeting(new Date(2026, 9, 22, 3))).toBe("Goedenacht");
-    expect(greeting(new Date(2026, 9, 22, 9))).toBe("Goedemorgen");
-    expect(greeting(new Date(2026, 9, 22, 14))).toBe("Goedemiddag");
-    expect(greeting(new Date(2026, 9, 22, 20))).toBe("Goedenavond");
-  });
-
   test("pluralize", () => {
     expect(pluralize(1, "leerling", "leerlingen")).toBe("1 leerling");
     expect(pluralize(3, "leerling", "leerlingen")).toBe("3 leerlingen");

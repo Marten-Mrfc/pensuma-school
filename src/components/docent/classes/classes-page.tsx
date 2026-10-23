@@ -107,7 +107,7 @@ export function ClassesPage() {
             >
               <h2
                 id={`${uid}-archived-heading`}
-                className="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+                className="text-sm font-medium text-muted-foreground"
               >
                 Gearchiveerd
               </h2>

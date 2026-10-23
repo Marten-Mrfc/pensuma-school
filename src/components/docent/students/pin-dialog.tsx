@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import Link from "next/link";
 import { CopyButton } from "@/components/app/copy-button";
 import { Button } from "@/components/ui/button";
@@ -56,9 +56,6 @@ export function PinDialog({
         </DialogHeader>
         {student ? (
           <div className="flex flex-col items-center gap-4 rounded-xl border bg-muted/40 px-4 py-6 text-center">
-            <span className="grid size-11 place-items-center rounded-full bg-primary/10 text-primary">
-              <KeyRound className="size-5" aria-hidden="true" />
-            </span>
             <div className="flex flex-col gap-0.5">
               <span className="font-semibold text-foreground">
                 {student.name}

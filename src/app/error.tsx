@@ -34,7 +34,7 @@ export default function RootError({
       <Logo />
       <div className="flex max-w-md flex-col gap-2">
         <h1 className="font-display-wide text-3xl font-bold tracking-tight">
-          Oeps, er ging iets mis
+          Er ging iets mis
         </h1>
         <p className="text-muted-foreground">
           Er is een onverwachte fout opgetreden. Probeer het opnieuw. Blijft het

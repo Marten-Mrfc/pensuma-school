@@ -47,12 +47,12 @@ const STATUS_MAP: Record<
 };
 
 const TONE_CLASS: Record<Tone, string> = {
-  neutral: "bg-secondary text-secondary-foreground ring-border",
-  muted: "bg-muted/60 text-muted-foreground ring-border/70",
-  success: "bg-success/10 text-success-ink ring-success/25",
-  warning: "bg-warning/12 text-warning-ink ring-warning/30",
-  info: "bg-info/10 text-info-ink ring-info/25",
-  destructive: "bg-destructive/10 text-destructive-ink ring-destructive/25",
+  neutral: "bg-secondary text-secondary-foreground",
+  muted: "bg-muted text-muted-foreground",
+  success: "bg-success/12 text-success-ink",
+  warning: "bg-warning/15 text-warning-ink",
+  info: "bg-info/12 text-info-ink",
+  destructive: "bg-destructive/10 text-destructive-ink",
 };
 
 const DOT_CLASS: Record<Tone, string> = {
@@ -75,7 +75,10 @@ export interface StatusBadgeProps {
   className?: string;
 }
 
-/** Coloured pill with a Dutch label for test / assignment / attempt / answer / grading statuses. */
+/**
+ * Small tag with a Dutch label for test / assignment / attempt / answer /
+ * grading statuses. Only live states (open, bezig, wordt nagekeken) get a dot.
+ */
 export function StatusBadge({ kind, status, className }: StatusBadgeProps) {
   const entry = STATUS_MAP[kind]?.[status] ?? {
     label: status,
@@ -86,13 +89,13 @@ export function StatusBadge({ kind, status, className }: StatusBadgeProps) {
     <span
       data-status={status}
       className={cn(
-        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset",
+        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs font-medium whitespace-nowrap",
         TONE_CLASS[entry.tone],
         className,
       )}
     >
-      <span className="relative flex size-1.5" aria-hidden="true">
-        {entry.pulse ? (
+      {entry.pulse ? (
+        <span className="relative flex size-1.5" aria-hidden="true">
           <span
             className={cn(
               // Stops after 3 pulses (WCAG 2.2.2: no endless motion).
@@ -100,14 +103,14 @@ export function StatusBadge({ kind, status, className }: StatusBadgeProps) {
               DOT_CLASS[entry.tone],
             )}
           />
-        ) : null}
-        <span
-          className={cn(
-            "relative inline-flex size-1.5 rounded-full",
-            DOT_CLASS[entry.tone],
-          )}
-        />
-      </span>
+          <span
+            className={cn(
+              "relative inline-flex size-1.5 rounded-full",
+              DOT_CLASS[entry.tone],
+            )}
+          />
+        </span>
+      ) : null}
       {entry.label}
     </span>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { FileText } from "lucide-react";
 import { type ReactNode, type Ref, useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
 import { Input } from "@/components/ui/input";
@@ -100,7 +99,7 @@ export function QuestionEditor({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="z-10 flex lg:sticky lg:top-[4.25rem] flex-col gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-xs backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="z-10 flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 lg:sticky lg:top-[4.25rem]">
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={cn(
@@ -147,7 +146,7 @@ export function QuestionEditor({
         </section>
       ) : null}
 
-      <EditorSection title="Vraag" icon={<FileText />}>
+      <EditorSection title="Vraag">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
           <div className="flex flex-col gap-2">
             <FieldLabel htmlFor={`${id}-title`}>Titel</FieldLabel>

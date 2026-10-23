@@ -10,11 +10,7 @@ export const metadata: Metadata = {
 
 export default function SetupPage() {
   return (
-    <div className="relative flex min-h-dvh flex-col">
-      <div
-        aria-hidden="true"
-        className="bg-graph-paper absolute inset-0 -z-10 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]"
-      />
+    <div className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between px-5 pt-5 sm:px-8">
         <Logo size="sm" />
         <ThemeToggle />

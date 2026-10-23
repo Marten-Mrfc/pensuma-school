@@ -171,7 +171,7 @@ export function CodeTipsButton({
             <CodeTipList tips={tips} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Geen tips: ziet er goed uit!
+              Geen tips voor deze code.
             </p>
           )}
         </div>

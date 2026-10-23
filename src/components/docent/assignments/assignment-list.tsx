@@ -3,16 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
-  CalendarClock,
   CalendarPlus,
   ChevronRight,
-  Clock,
-  KeyRound,
   MoreHorizontal,
   NotebookPen,
   Radio,
   UserRoundCheck,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -97,13 +93,9 @@ export function AssignmentList() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Afnames"
-        description="Een afname is een toets voor één klas (of een paar leerlingen), met een eigen tijdvak, toegangscode en instellingen."
         actions={
           <Button asChild>
-            <Link href={routes.docent.newAssignment()}>
-              <CalendarPlus aria-hidden="true" />
-              Afname plannen
-            </Link>
+            <Link href={routes.docent.newAssignment()}>Afname plannen</Link>
           </Button>
         }
       />
@@ -135,13 +127,6 @@ export function AssignmentList() {
             <ErrorState error={query.error} onRetry={() => query.refetch()} />
           ) : visible.length === 0 ? (
             <EmptyBlock
-              icon={
-                tab === "open"
-                  ? Radio
-                  : tab === "planned"
-                    ? CalendarClock
-                    : NotebookPen
-              }
               title={EMPTY[tab].title}
               description={EMPTY[tab].description}
               action={
@@ -150,7 +135,6 @@ export function AssignmentList() {
                   variant={tab === "closed" ? "outline" : "default"}
                 >
                   <Link href={routes.docent.newAssignment()}>
-                    <CalendarPlus aria-hidden="true" />
                     Afname plannen
                   </Link>
                 </Button>
@@ -175,7 +159,7 @@ function AssignmentRow({ row }: { row: Row }) {
   const showProgress =
     row.effectiveStatus !== "planned" || row.counts.started > 0;
   return (
-    <li className="group relative flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:border-primary/40 sm:p-5 lg:flex-row lg:items-center">
+    <li className="relative flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs transition-colors hover:border-primary/40 sm:p-5 lg:flex-row lg:items-center">
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge kind="assignment" status={row.effectiveStatus} />
@@ -185,9 +169,8 @@ function AssignmentRow({ row }: { row: Row }) {
             targetedStudentCount={row.targetedStudentCount}
           />
           {row.hasAccessCode ? (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <KeyRound className="size-3.5" aria-hidden="true" />
-              Code
+            <span className="text-xs text-muted-foreground">
+              Met toegangscode
             </span>
           ) : null}
         </div>
@@ -198,20 +181,15 @@ function AssignmentRow({ row }: { row: Row }) {
           {row.title}
         </Link>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="size-4" aria-hidden="true" />
-            {row.className}
-          </span>
+          <span className="font-medium text-foreground">{row.className}</span>
           {row.customTitle && row.customTitle !== row.testTitle ? (
             <span className="truncate">{row.testTitle}</span>
           ) : null}
-          <span className="inline-flex items-center gap-1.5">
-            <CalendarClock className="size-4" aria-hidden="true" />
-            {formatWindow(row.opensAt, row.closesAt)}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="size-4" aria-hidden="true" />
-            {formatMinutes(row.timeLimitMinutes)}
+          <span>{formatWindow(row.opensAt, row.closesAt)}</span>
+          <span>
+            {row.timeLimitMinutes == null
+              ? "Geen tijdslimiet"
+              : `${formatMinutes(row.timeLimitMinutes)} per leerling`}
           </span>
         </div>
       </div>
@@ -274,7 +252,7 @@ function AssignmentRow({ row }: { row: Row }) {
             </DropdownMenuContent>
           </DropdownMenu>
           <ChevronRight
-            className="hidden size-5 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block"
+            className="hidden size-5 text-muted-foreground sm:block"
             aria-hidden="true"
           />
         </div>

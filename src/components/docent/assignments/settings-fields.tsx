@@ -1,18 +1,6 @@
 "use client";
 
-import {
-  ClipboardX,
-  Expand,
-  Eye,
-  FlaskConical,
-  Lightbulb,
-  type LucideIcon,
-  MonitorSmartphone,
-  Play,
-  Repeat,
-  Shuffle,
-  Sparkles,
-} from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -52,7 +40,6 @@ type SwitchDef = {
   key: BooleanKey;
   label: string;
   help: string;
-  icon: LucideIcon;
   group: "work" | "help" | "exam";
 };
 
@@ -61,56 +48,48 @@ const SWITCHES: SwitchDef[] = [
     key: "shuffleQuestions",
     label: "Vragen husselen",
     help: "Iedere leerling krijgt de vragen in een andere volgorde. Lastiger om af te kijken.",
-    icon: Shuffle,
     group: "work",
   },
   {
     key: "allowCodeRun",
     label: "Code uitvoeren toestaan",
     help: "Leerlingen mogen hun programma in de browser uitvoeren met de knop ‘Uitvoeren’.",
-    icon: Play,
     group: "work",
   },
   {
     key: "allowSelfTest",
     label: "Zelf testen toestaan",
     help: "Leerlingen mogen de zichtbare testgevallen zelf draaien voordat ze inleveren.",
-    icon: FlaskConical,
     group: "work",
   },
   {
     key: "allowHints",
     label: "Hints toestaan",
     help: "Leerlingen kunnen de hints bij programmeervragen bekijken. Een hint kan punten kosten; dat stel je per hint in.",
-    icon: Lightbulb,
     group: "help",
   },
   {
     key: "codeTips",
     label: "Tips over veelgemaakte fouten",
     help: "Leerlingen zien een seintje bij bijvoorbeeld print in plaats van return, of een verkeerd gespelde functienaam. Er wordt nooit iets voorgezegd.",
-    icon: Sparkles,
     group: "help",
   },
   {
     key: "requireFullscreen",
     label: "Volledig scherm verplichten",
     help: "De toets vraagt om volledig scherm en registreert elke keer dat de leerling dit verlaat.",
-    icon: Expand,
     group: "exam",
   },
   {
     key: "logFocusEvents",
     label: "Vensterwissels registreren",
     help: "Wisselt een leerling van tabblad of venster, dan zie je dat live in het overzicht.",
-    icon: MonitorSmartphone,
     group: "exam",
   },
   {
     key: "blockPaste",
     label: "Plakken blokkeren",
     help: "Plakken in de code-editor werkt niet. Pogingen om te plakken worden wel geregistreerd.",
-    icon: ClipboardX,
     group: "exam",
   },
 ];
@@ -159,11 +138,7 @@ export function AssignmentSettingsFields({
     <div className="flex flex-col gap-6">
       <div className={cn("grid gap-4", !compact && "md:grid-cols-2")}>
         <div className="flex flex-col gap-2">
-          <label
-            htmlFor={`${id}-results`}
-            className="flex items-center gap-2 text-sm font-medium"
-          >
-            <Eye className="size-4 text-muted-foreground" aria-hidden="true" />
+          <label htmlFor={`${id}-results`} className="text-sm font-medium">
             Resultaten tonen
           </label>
           <NativeSelect
@@ -187,14 +162,7 @@ export function AssignmentSettingsFields({
           </p>
         </div>
         <div className="flex flex-col gap-2">
-          <label
-            htmlFor={`${id}-attempts`}
-            className="flex items-center gap-2 text-sm font-medium"
-          >
-            <Repeat
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
+          <label htmlFor={`${id}-attempts`} className="text-sm font-medium">
             Max. pogingen
           </label>
           <Input
@@ -235,7 +203,7 @@ export function AssignmentSettingsFields({
 
       {(["work", "help", "exam"] as const).map((group) => (
         <fieldset key={group} className="flex flex-col gap-2">
-          <legend className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <legend className="mb-1 text-sm font-semibold text-foreground">
             {GROUP_LABELS[group]}
           </legend>
           {group === "help" && exam ? (
@@ -243,7 +211,7 @@ export function AssignmentSettingsFields({
               {EXAM_HELP_OFF}
             </Notice>
           ) : (
-            <div className={cn("grid gap-2", !compact && "md:grid-cols-2")}>
+            <div className="divide-y overflow-hidden rounded-lg border">
               {SWITCHES.filter((s) => s.group === group).map((s) => (
                 <SettingSwitch
                   key={s.key}
@@ -255,7 +223,7 @@ export function AssignmentSettingsFields({
                 />
               ))}
               {group === "help" ? (
-                <div className="flex flex-col gap-2 rounded-lg border bg-background/50 p-3">
+                <div className="flex flex-col gap-2 p-3">
                   <label
                     htmlFor={`${id}-solutions`}
                     className="text-sm font-medium"
@@ -316,26 +284,14 @@ function SettingSwitch({
   disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
-  const Icon = def.icon;
   return (
     <label
       htmlFor={id}
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border bg-background/50 p-3 transition-colors hover:bg-accent/40",
-        checked && "border-primary/30 bg-primary/[0.04]",
+        "flex cursor-pointer items-start gap-3 p-3 transition-colors hover:bg-muted/30",
         disabled && "cursor-not-allowed opacity-60",
       )}
     >
-      <span
-        className={cn(
-          "mt-0.5 grid size-8 shrink-0 place-items-center rounded-md",
-          checked
-            ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground",
-        )}
-      >
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-sm font-medium">{def.label}</span>
         <span

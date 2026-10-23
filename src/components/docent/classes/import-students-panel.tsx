@@ -292,7 +292,7 @@ export function ImportStudentsPanel({
             </label>
             <div className="flex items-center gap-1.5">
               {fileName ? (
-                <span className="inline-flex max-w-48 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                <span className="inline-flex max-w-48 items-center gap-1 rounded-sm bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   <span className="truncate">{fileName}</span>
                   <button
                     type="button"
@@ -382,27 +382,17 @@ export function ImportStudentsPanel({
             className="flex flex-col gap-3"
           >
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <SummaryChip
-                tone="success"
-                icon={UserPlus}
-                label={`${counts.new} nieuw`}
-              />
-              <SummaryChip
-                tone="info"
-                icon={UsersRound}
-                label={existingLabel(counts.existing)}
-              />
+              <SummaryChip tone="success" label={`${counts.new} nieuw`} />
+              <SummaryChip tone="info" label={existingLabel(counts.existing)} />
               {counts.member > 0 ? (
                 <SummaryChip
                   tone="muted"
-                  icon={CircleCheck}
                   label={`${counts.member} al in klas`}
                 />
               ) : null}
               {counts.error > 0 ? (
                 <SummaryChip
                   tone="destructive"
-                  icon={CircleAlert}
                   label={`${counts.error} met fout`}
                 />
               ) : null}
@@ -423,7 +413,7 @@ export function ImportStudentsPanel({
             <div className="overflow-hidden rounded-lg border">
               <div className="max-h-[42vh] overflow-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
+                  <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="text-left text-xs text-muted-foreground">
                       <th scope="col" className="w-12 px-3 py-2 font-medium">
                         Regel
@@ -549,29 +539,26 @@ export function ImportAlert({ problem }: { problem: ImportProblem }) {
 }
 
 const CHIP_TONE = {
-  success: "bg-success/10 text-success-ink ring-success/25",
-  info: "bg-info/10 text-info-ink ring-info/25",
-  muted: "bg-muted text-muted-foreground ring-border",
-  destructive: "bg-destructive/10 text-destructive-ink ring-destructive/25",
+  success: "bg-success/12 text-success-ink",
+  info: "bg-info/12 text-info-ink",
+  muted: "bg-muted text-muted-foreground",
+  destructive: "bg-destructive/10 text-destructive-ink",
 } as const;
 
 function SummaryChip({
   tone,
-  icon: Icon,
   label,
 }: {
   tone: keyof typeof CHIP_TONE;
-  icon: typeof UserPlus;
   label: string;
 }) {
   return (
     <span
       className={cn(
-        "inline-flex h-6 items-center gap-1 rounded-full px-2.5 font-medium ring-1 ring-inset",
+        "inline-flex h-6 w-fit shrink-0 items-center rounded-sm px-2 text-xs font-medium whitespace-nowrap",
         CHIP_TONE[tone],
       )}
     >
-      <Icon className="size-3" aria-hidden="true" />
       {label}
     </span>
   );
@@ -611,7 +598,7 @@ function PreviewTableRow({ row }: { row: PreviewRow }) {
           <span className="flex flex-col gap-0.5">
             <span className="inline-flex items-center gap-1 font-medium text-info-ink">
               <UsersRound className="size-3.5" aria-hidden="true" />
-              Bestaat al – wordt aan klas toegevoegd
+              Bestaat al, wordt aan de klas toegevoegd
             </span>
             {status.nameDiffers ? (
               <span className="text-muted-foreground">

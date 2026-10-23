@@ -1,6 +1,5 @@
 "use client";
 
-import { Bug, FlaskConical, ListChecks } from "lucide-react";
 import type { RouterOutputs } from "@/trpc/react";
 import { students } from "./format";
 
@@ -18,13 +17,13 @@ export function CommonErrors({ questions }: { questions: CodeErrors }) {
   );
   if (!withFindings.length) {
     return (
-      <p className="rounded-xl border border-dashed bg-card/50 px-4 py-6 text-center text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Geen veelgemaakte fouten bij de programmeervragen.
       </p>
     );
   }
   return (
-    <ul className="grid gap-4 lg:grid-cols-2">
+    <ul className="grid items-start gap-4 lg:grid-cols-2">
       {withFindings.map((q) => {
         const tests = q.summary.tests
           .filter((t) => t.failed > 0)
@@ -44,8 +43,7 @@ export function CommonErrors({ questions }: { questions: CodeErrors }) {
             </h3>
             {q.summary.errorTypes.length ? (
               <div className="flex flex-col gap-1.5">
-                <h4 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  <Bug className="size-3.5" aria-hidden="true" />
+                <h4 className="text-sm font-medium text-foreground">
                   Foutmeldingen
                 </h4>
                 <ul className="flex flex-col gap-1.5 text-sm">
@@ -67,10 +65,7 @@ export function CommonErrors({ questions }: { questions: CodeErrors }) {
             ) : null}
             {tests.length ? (
               <div className="flex flex-col gap-1.5">
-                <h4 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  <FlaskConical className="size-3.5" aria-hidden="true" />
-                  Tests
-                </h4>
+                <h4 className="text-sm font-medium text-foreground">Tests</h4>
                 <ul className="flex flex-col gap-1 text-sm">
                   {tests.map((t) => (
                     <li key={t.testId}>
@@ -86,10 +81,7 @@ export function CommonErrors({ questions }: { questions: CodeErrors }) {
             ) : null}
             {checks.length ? (
               <div className="flex flex-col gap-1.5">
-                <h4 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  <ListChecks className="size-3.5" aria-hidden="true" />
-                  Eisen
-                </h4>
+                <h4 className="text-sm font-medium text-foreground">Eisen</h4>
                 <ul className="flex flex-col gap-1 text-sm">
                   {checks.map((c) => (
                     <li key={c.checkId}>

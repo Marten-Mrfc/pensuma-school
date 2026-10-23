@@ -15,7 +15,7 @@ describe("row links in Afgerond and Resultaten keep a visible focus indicator (A
   test("the first and last rows round their own corners", async () => {
     const twDir = path.dirname(require.resolve("tailwindcss/package.json"));
     const compiler = await compile(
-      '@import "tailwindcss/utilities"; @theme { --radius-2xl: 1rem; --color-ring: red; }',
+      '@import "tailwindcss/utilities"; @theme { --radius-xl: 0.3rem; --color-ring: red; }',
       {
         loadStylesheet: async (id, base) => {
           const file = path.join(

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleAlert, CloudOff, Loader2, RotateCcw } from "lucide-react";
+import { Check, CircleAlert, CloudOff, Loader2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -20,7 +20,7 @@ export function SaveIndicator({
   className?: string;
 }) {
   const base =
-    "inline-flex h-7 max-w-full items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap";
+    "inline-flex h-7 max-w-full items-center gap-1.5 rounded-sm px-2.5 text-xs font-medium whitespace-nowrap";
 
   let content: React.ReactNode;
   switch (state.status) {
@@ -45,12 +45,11 @@ export function SaveIndicator({
               onClick={onRetry}
               className={cn(
                 base,
-                "bg-destructive/10 text-destructive-ink ring-1 ring-destructive/25 ring-inset outline-none hover:bg-destructive/15 focus-visible:ring-2",
+                "bg-destructive/10 text-destructive-ink outline-none hover:bg-destructive/15 focus-visible:ring-2 focus-visible:ring-ring",
               )}
             >
               <CloudOff className="size-3.5" aria-hidden="true" />
               Fout bij opslaan
-              <RotateCcw className="size-3" aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
@@ -69,7 +68,7 @@ export function SaveIndicator({
               onClick={onRetry}
               className={cn(
                 base,
-                "bg-warning/12 text-warning-ink ring-1 ring-warning/30 ring-inset outline-none focus-visible:ring-2",
+                "bg-warning/15 text-warning-ink outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
             >
               <CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />

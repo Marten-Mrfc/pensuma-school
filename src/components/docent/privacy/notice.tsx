@@ -10,20 +10,20 @@ import { cn } from "@/lib/utils";
 const TONES = {
   info: {
     box: "border-info/25 bg-info/[0.06]",
-    icon: "bg-info/12 text-info-ink",
+    iconText: "text-info-ink",
     Icon: Info,
   },
   warning: {
     box: "border-warning/35 bg-warning/[0.08]",
-    icon: "bg-warning/18 text-warning-ink",
+    iconText: "text-warning-ink",
     Icon: TriangleAlert,
   },
   destructive: {
     box: "border-destructive/25 bg-destructive/[0.05]",
-    icon: "bg-destructive/10 text-destructive-ink",
+    iconText: "text-destructive-ink",
     Icon: CircleAlert,
   },
-} satisfies Record<string, { box: string; icon: string; Icon: LucideIcon }>;
+} satisfies Record<string, { box: string; iconText: string; Icon: LucideIcon }>;
 
 export interface NoticeProps {
   tone?: keyof typeof TONES;
@@ -50,20 +50,16 @@ export function Notice({
     <div
       role="note"
       className={cn(
-        "flex gap-3.5 rounded-xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
+        "flex gap-3 rounded-xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
         t.box,
         className,
       )}
     >
-      <span
-        className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-lg",
-          t.icon,
-        )}
-      >
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-1">
+      <Icon
+        className={cn("mt-0.5 size-4 shrink-0", t.iconText)}
+        aria-hidden="true"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {title ? (
           <p className="font-semibold text-foreground">{title}</p>
         ) : null}

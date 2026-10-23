@@ -1,12 +1,4 @@
-import {
-  Ban,
-  ChevronDown,
-  CircleCheck,
-  Eye,
-  EyeOff,
-  type LucideIcon,
-  ShieldCheck,
-} from "lucide-react";
+import { Ban, ChevronDown, Eye, EyeOff, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, Suspense } from "react";
 import { routes } from "@/lib/routes";
@@ -139,10 +131,6 @@ export function PrivacyStatement() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-8 sm:py-14">
       <header className="flex max-w-3xl flex-col gap-3 lg:ml-[19.5rem]">
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-          <ShieldCheck className="size-3.5 text-primary" aria-hidden="true" />
-          Privacy
-        </span>
         <h1 className="font-display text-3xl font-bold tracking-tight text-balance text-foreground sm:text-4xl">
           Privacyverklaring
         </h1>
@@ -187,8 +175,8 @@ export function PrivacyStatement() {
 
         <article className="flex min-w-0 max-w-3xl flex-1 flex-col gap-12">
           <Section id="kort">
-            <div className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 sm:p-6">
-              <ul className="flex flex-col gap-3 text-foreground">
+            <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-5 sm:p-6">
+              <ul className="ml-5 flex list-disc flex-col gap-3 text-foreground marker:text-primary">
                 {[
                   "Pensuma is het programma waarin je Python-toetsen maakt voor informatica.",
                   "We bewaren alleen wat nodig is: je naam, je leerlingnummer, je klas, je antwoorden en je resultaten.",
@@ -196,25 +184,13 @@ export function PrivacyStatement() {
                   "Je docent kijkt je toets na en beslist over je cijfer. De computer helpt alleen bij het nakijken.",
                   "Geen reclame, geen trackers, en we geven je gegevens niet aan andere bedrijven.",
                 ].map((text) => (
-                  <li key={text} className="flex gap-3">
-                    <CircleCheck
-                      className="mt-0.5 size-5 shrink-0 text-primary"
-                      aria-hidden="true"
-                    />
-                    <span>{text}</span>
-                  </li>
+                  <li key={text}>{text}</li>
                 ))}
-                <li className="flex gap-3">
-                  <CircleCheck
-                    className="mt-0.5 size-5 shrink-0 text-primary"
-                    aria-hidden="true"
-                  />
-                  <span>
-                    Je mag altijd vragen welke gegevens we over je hebben.{" "}
-                    <Inline>
-                      <AskSentence />
-                    </Inline>
-                  </span>
+                <li>
+                  Je mag altijd vragen welke gegevens we over je hebben.{" "}
+                  <Inline>
+                    <AskSentence />
+                  </Inline>
                 </li>
               </ul>
             </div>

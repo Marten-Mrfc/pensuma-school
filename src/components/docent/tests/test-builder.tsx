@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArchiveRestore,
-  CalendarPlus,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -16,7 +15,6 @@ import {
   FolderInput,
   ListOrdered,
   Loader2,
-  Rocket,
   Trash2,
   TriangleAlert,
   Undo2,
@@ -779,7 +777,6 @@ function Builder({ test }: { test: BuilderTest }) {
             {status === "published" ? (
               <Button asChild variant="outline" size="sm">
                 <Link href={routes.docent.newAssignment({ testId: test.id })}>
-                  <CalendarPlus aria-hidden="true" />
                   Afname plannen
                 </Link>
               </Button>
@@ -788,7 +785,6 @@ function Builder({ test }: { test: BuilderTest }) {
                 <TooltipTrigger asChild>
                   <span>
                     <Button variant="outline" size="sm" disabled>
-                      <CalendarPlus aria-hidden="true" />
                       Afname plannen
                     </Button>
                   </span>
@@ -807,12 +803,10 @@ function Builder({ test }: { test: BuilderTest }) {
                     className="motion-safe:animate-spin"
                     aria-hidden="true"
                   />
-                ) : (
-                  <Rocket aria-hidden="true" />
-                )}
+                ) : null}
                 Publiceren
                 {validation.errors.length > 0 ? (
-                  <span className="ml-0.5 rounded-full bg-primary-foreground/20 px-1.5 text-[0.68rem] tabular-nums">
+                  <span className="ml-0.5 rounded-sm bg-primary-foreground/20 px-1.5 text-[0.68rem] tabular-nums">
                     {validation.errors.length}
                   </span>
                 ) : null}
@@ -927,7 +921,7 @@ function Builder({ test }: { test: BuilderTest }) {
               </span>
             </span>
             {validation.errors.length > 0 ? (
-              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-ink tabular-nums">
+              <span className="rounded-sm bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-ink tabular-nums">
                 {validation.errors.length}
               </span>
             ) : null}

@@ -6,12 +6,10 @@ import {
   Clock,
   Eye,
   Loader2,
-  MonitorX,
   MoreHorizontal,
   RotateCcw,
   Search,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
@@ -170,7 +168,7 @@ export function MonitorTable({
               aria-pressed={filter === f.value}
               onClick={() => setFilter(f.value)}
               className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
                 filter === f.value &&
                   "border-primary bg-primary/10 text-primary hover:bg-primary/15",
               )}
@@ -187,7 +185,7 @@ export function MonitorTable({
             </button>
           ))}
           {data.summary.withAccommodation > 0 ? (
-            <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-info/10 px-3 text-sm font-medium whitespace-nowrap text-info-ink">
+            <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-info/12 px-3 text-sm font-medium whitespace-nowrap text-info-ink">
               <Clock className="size-3.5" aria-hidden="true" />
               {data.summary.withAccommodation} met verlengde tijd
             </span>
@@ -333,15 +331,9 @@ export function MonitorTable({
             ))}
           </ul>
           {logFocusEvents ? (
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <MonitorX
-                className="mt-0.5 size-3.5 shrink-0"
-                aria-hidden="true"
-              />
-              <span>
-                Vensterwissels: het aantal keer dat een leerling het
-                toetsvenster verliet. {FOCUS_LOSS_HELP}
-              </span>
+            <p className="text-xs text-muted-foreground">
+              Vensterwissels: het aantal keer dat een leerling het toetsvenster
+              verliet. {FOCUS_LOSS_HELP}
             </p>
           ) : null}
         </>
@@ -435,42 +427,33 @@ function StatusPill({
 }) {
   const a = row.attempt;
   let label = "Niet begonnen";
-  let cls = "bg-muted/60 text-muted-foreground ring-border/70";
-  let dot = "bg-muted-foreground/40";
-  let pulse = false;
+  let cls = "bg-muted text-muted-foreground";
+  // Only a student who is working right now gets the (live) dot.
+  let working = false;
   if (a?.status === "in_progress") {
     const inactive =
       a.lastSeenAt &&
       serverNow - new Date(a.lastSeenAt).getTime() > INACTIVE_MS;
     label = inactive ? "Bezig · inactief" : "Bezig";
-    cls = "bg-warning/12 text-warning-ink ring-warning/30";
-    dot = "bg-warning";
-    pulse = !inactive;
+    cls = "bg-warning/15 text-warning-ink";
+    working = !inactive;
   } else if (a?.status === "submitted") {
     label = a.autoSubmitted ? "Ingeleverd (auto)" : "Ingeleverd";
-    cls = "bg-success/10 text-success-ink ring-success/25";
-    dot = "bg-success";
+    cls = "bg-success/12 text-success-ink";
   }
   return (
     <span
       className={cn(
-        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset",
+        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs font-medium whitespace-nowrap",
         cls,
       )}
     >
-      <span className="relative flex size-1.5" aria-hidden="true">
-        {pulse ? (
-          <span
-            className={cn(
-              "absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping",
-              dot,
-            )}
-          />
-        ) : null}
-        <span
-          className={cn("relative inline-flex size-1.5 rounded-full", dot)}
-        />
-      </span>
+      {working ? (
+        <span className="relative flex size-1.5" aria-hidden="true">
+          <span className="absolute inline-flex size-full rounded-full bg-warning opacity-60 motion-safe:animate-ping motion-safe:[animation-iteration-count:3]" />
+          <span className="relative inline-flex size-1.5 rounded-full bg-warning" />
+        </span>
+      ) : null}
       {label}
     </span>
   );
@@ -576,14 +559,13 @@ function FocusCell({ row }: { row: StudentRow }) {
   return (
     <span
       className={cn(
-        "inline-flex h-6 w-fit items-center gap-1 rounded-full px-2 text-xs font-semibold tabular-nums ring-1 ring-inset",
+        "inline-flex h-6 w-fit shrink-0 items-center rounded-sm px-2 text-xs font-semibold tabular-nums",
         n >= 3
-          ? "bg-destructive/10 text-destructive-ink ring-destructive/25"
-          : "bg-warning/12 text-warning-ink ring-warning/30",
+          ? "bg-destructive/10 text-destructive-ink"
+          : "bg-warning/15 text-warning-ink",
       )}
       title={`${n} keer venster verlaten. ${FOCUS_LOSS_HELP}`}
     >
-      <MonitorX className="size-3.5" aria-hidden="true" />
       {n}
       <span className="sr-only"> keer venster verlaten</span>
     </span>
@@ -708,18 +690,8 @@ function RowActions({
   );
 
   const a = row.attempt;
-  if (!a) {
-    return (
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        disabled
-        aria-label="Geen acties: nog niet begonnen"
-      >
-        <UserRound className="opacity-40" aria-hidden="true" />
-      </Button>
-    );
-  }
+  // Nothing to do for a student who hasn't started.
+  if (!a) return null;
   const canExtend = a.status === "in_progress" && a.deadlineAt != null;
 
   return (

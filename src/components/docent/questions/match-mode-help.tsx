@@ -65,7 +65,7 @@ export function MatchModeHelpContent({
                   {OUTPUT_MATCH_MODE_LABELS[mode]}
                 </span>
                 {mode === current ? (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
+                  <span className="rounded-sm bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
                     gekozen
                   </span>
                 ) : null}

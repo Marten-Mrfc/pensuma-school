@@ -8,8 +8,6 @@ import {
   ClipboardCheck,
   Eye,
   EyeOff,
-  PartyPopper,
-  UserRound,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,8 +19,10 @@ import { HighlightedCode } from "@/components/app/highlighted-code";
 import { Markdown } from "@/components/app/markdown";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
+import { StatusBadge } from "@/components/app/status-badge";
 import { AssignmentNav } from "@/components/docent/assignments/assignment-nav";
 import { formatNumber } from "@/components/docent/assignments/format";
+import { ModeBadge } from "@/components/docent/assignments/shared";
 import { plural } from "@/components/docent/students/format";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -110,8 +110,14 @@ export function GradingView({
       <PageHeader
         backHref={routes.docent.assignments}
         backLabel="Afnames"
-        title={`Nakijken · ${a.title}`}
-        description={`${a.class.name} · beoordeel de open vragen per vraag, leerling voor leerling.`}
+        title={a.title}
+        badge={
+          <>
+            <StatusBadge kind="assignment" status={a.effectiveStatus} />
+            <ModeBadge mode={a.mode} />
+          </>
+        }
+        description={`${a.class.name} · ${a.test.title}`}
       />
       <AssignmentNav
         assignmentId={a.id}
@@ -413,22 +419,19 @@ export function QuestionGrader({
           }
         />
       ) : !current ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border bg-card px-6 py-12 text-center shadow-xs">
-          <span className="grid size-12 place-items-center rounded-2xl bg-success/12 text-success-ink">
-            <PartyPopper className="size-6" aria-hidden="true" />
-          </span>
+        <div className="flex flex-col items-start gap-3 rounded-xl border bg-card p-5 text-left shadow-xs">
           <h2
             ref={doneRef}
             tabIndex={-1}
-            className="rounded-sm px-1 text-lg font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+            className="-mx-1 rounded-sm px-1 text-lg font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
           >
-            Klaar met deze vraag!
+            Klaar met deze vraag
           </h2>
-          <p className="max-w-sm text-sm text-muted-foreground">
+          <p className="max-w-prose text-sm text-muted-foreground">
             Je hebt {reviewedCount} van de {order.length} antwoorden beoordeeld.
-            Kies hierboven een andere vraag of bekijk de resultaten.
+            Kies een andere vraag of bekijk de resultaten.
           </p>
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => goTo(0, "if-lost")}>
               Terug naar het begin
             </Button>
@@ -444,9 +447,6 @@ export function QuestionGrader({
           <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs">
             <header className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-full bg-primary/10 text-primary">
-                  <UserRound className="size-4" aria-hidden="true" />
-                </span>
                 <div className="flex flex-col">
                   <h2
                     ref={studentRef}
@@ -532,7 +532,7 @@ export function QuestionGrader({
                 href={routes.docent.attempt(assignmentId, current.attemptId)}
                 className="w-fit text-xs font-medium text-primary hover:underline"
               >
-                Hele poging van {current.student.name} bekijken →
+                Hele poging van {current.student.name} bekijken
               </Link>
             ) : null}
           </article>
@@ -571,7 +571,7 @@ export function QuestionGrader({
               </div>
               {question.modelAnswer ? (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold tracking-wide text-success-ink uppercase">
+                  <span className="text-sm font-medium text-foreground">
                     Modelantwoord
                   </span>
                   <div className="rounded-lg border border-success/25 bg-success/[0.05] px-3 py-2.5 text-sm">
@@ -581,7 +581,7 @@ export function QuestionGrader({
               ) : null}
               {question.rubric ? (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  <span className="text-sm font-medium text-muted-foreground">
                     Toelichting voor het nakijken
                   </span>
                   <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
@@ -591,7 +591,7 @@ export function QuestionGrader({
               ) : null}
               {question.solution ? (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold tracking-wide text-success-ink uppercase">
+                  <span className="text-sm font-medium text-foreground">
                     Modeloplossing
                   </span>
                   <HighlightedCode

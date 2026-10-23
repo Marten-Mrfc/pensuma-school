@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Check,
-  Eye,
-  ListChecks,
-  Plus,
-  Settings2,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useAnnounce } from "@/components/a11y/live-announcer";
 import { ReorderButtons } from "@/components/a11y/reorder-buttons";
@@ -131,7 +123,6 @@ export function MultipleChoiceEditor({
             ? "Markeer alle goede antwoorden. Markdown mag, bijvoorbeeld `code`."
             : "Markeer het goede antwoord. Markdown mag, bijvoorbeeld `code`."
         }
-        icon={<ListChecks />}
         actions={
           <span className="text-xs text-muted-foreground tabular-nums">
             {correctCount} van {options.length} goed
@@ -172,7 +163,7 @@ export function MultipleChoiceEditor({
         </div>
       </EditorSection>
 
-      <EditorSection title="Instellingen" icon={<Settings2 />}>
+      <EditorSection title="Instellingen">
         <div className="grid gap-3 sm:grid-cols-2">
           <SwitchField
             label="Meerdere antwoorden toegestaan"
@@ -248,7 +239,6 @@ export function MultipleChoiceEditor({
       <EditorSection
         title="Zo ziet de leerling het"
         description="Live voorbeeld. Je kunt het uitproberen; er wordt niets opgeslagen."
-        icon={<Eye />}
         actions={
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Switch
@@ -344,7 +334,7 @@ function OptionRow({
               aria-label={`Optie ${letter} is ${correct ? "goed" : "fout"}. Klik om te wisselen.`}
               onClick={onToggle}
               className={cn(
-                "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "inline-flex h-7 items-center gap-1 rounded-md border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 correct
                   ? "border-success/40 bg-success/15 text-success-ink"
                   : "text-muted-foreground hover:border-foreground/30 hover:text-foreground",

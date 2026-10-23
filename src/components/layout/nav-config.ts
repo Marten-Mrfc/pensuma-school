@@ -1,6 +1,6 @@
 import {
-  Award,
   CalendarClock,
+  ClipboardCheck,
   FileCode2,
   GraduationCap,
   LayoutDashboard,
@@ -58,7 +58,7 @@ export const DOCENT_NAV: NavGroup[] = [
 
 export const LEERLING_NAV: NavItem[] = [
   { href: "/leerling", label: "Mijn toetsen", icon: NotebookPen, exact: true },
-  { href: "/leerling/resultaten", label: "Resultaten", icon: Award },
+  { href: "/leerling/resultaten", label: "Resultaten", icon: ClipboardCheck },
   { href: "/leerling/oefenen", label: "Oefenen", icon: SquareTerminal },
 ];
 

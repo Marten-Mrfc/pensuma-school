@@ -1,13 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  BookmarkPlus,
-  Loader2,
-  MessageSquareQuote,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { BookmarkPlus, Loader2, Search, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -100,16 +94,27 @@ export function FeedbackSnippets({
     used.mutate({ id: snippet.id });
   }
 
+  // Until the teacher saves a first snippet, only the save button shows.
+  // The Popover keeps its place in the tree, so saving the first snippet
+  // doesn't remount it (focus returns to its trigger).
+  const hasChips = !list.isPending && chips.length > 0;
+
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span
-          id={`${id}-label`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-        >
-          <MessageSquareQuote className="size-3.5" aria-hidden="true" />
-          Snelle opmerkingen
-        </span>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2",
+          hasChips ? "justify-between" : "-ml-2.5",
+        )}
+      >
+        {hasChips ? (
+          <span
+            id={`${id}-label`}
+            className="text-sm font-medium text-foreground"
+          >
+            Snelle opmerkingen
+          </span>
+        ) : null}
         <Popover
           open={saveOpen}
           onOpenChange={(open) => {
@@ -127,7 +132,7 @@ export function FeedbackSnippets({
             </Button>
           </PopoverTrigger>
           <PopoverContent
-            align="end"
+            align={hasChips ? "end" : "start"}
             className="w-[min(24rem,calc(100vw-2rem))]"
           >
             <form
@@ -194,12 +199,7 @@ export function FeedbackSnippets({
         </Popover>
       </div>
 
-      {list.isPending ? null : chips.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Nog geen snelle opmerkingen. Schrijf feedback en kies “Bewaar als
-          snelle opmerking” om hem later met één klik te gebruiken.
-        </p>
-      ) : (
+      {hasChips ? (
         <ul
           aria-labelledby={`${id}-label`}
           className="flex flex-wrap items-center gap-1.5"
@@ -212,7 +212,7 @@ export function FeedbackSnippets({
                 onClick={() => insert(snippet)}
                 title={snippet.text}
                 className={cn(
-                  "inline-flex h-7 max-w-full items-center rounded-full border px-2.5 text-xs transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                  "inline-flex h-7 max-w-full items-center rounded-md border px-2.5 text-xs transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
                   snippet.questionId
                     ? "border-primary/30 bg-primary/[0.06]"
                     : "bg-background",
@@ -233,7 +233,7 @@ export function FeedbackSnippets({
                 <button
                   type="button"
                   disabled={disabled}
-                  className="inline-flex h-7 items-center rounded-full px-2.5 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Meer…
                 </button>
@@ -302,7 +302,7 @@ export function FeedbackSnippets({
             </Popover>
           </li>
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }

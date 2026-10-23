@@ -102,7 +102,7 @@ export function ChoiceOptionsView({
               )}
             </span>
             {reveal && option.correct ? (
-              <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[0.68rem] font-medium text-success-ink">
+              <span className="shrink-0 rounded-sm bg-success/15 px-2 py-0.5 text-[0.68rem] font-medium text-success-ink">
                 goed
               </span>
             ) : null}

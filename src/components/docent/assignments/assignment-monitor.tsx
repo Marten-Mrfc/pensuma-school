@@ -4,24 +4,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
   CalendarPlus,
-  CheckCircle2,
   Clock,
   CopyPlus,
   Eye,
   KeyRound,
   Lock,
-  MonitorX,
   MoreHorizontal,
   Play,
   Presentation,
-  RefreshCw,
-  Repeat,
   RotateCcw,
   Settings2,
   Trash2,
   UserRoundCheck,
-  UserRoundX,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,7 +26,6 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { CopyButton } from "@/components/app/copy-button";
 import { getErrorMessage } from "@/components/app/get-error-message";
 import { PageHeader } from "@/components/app/page-header";
-import { StatCard } from "@/components/app/stat-card";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
@@ -167,7 +160,7 @@ export function AssignmentMonitor({
         inProgress={monitor.data?.summary.inProgress ?? a.counts.inProgress}
       />
 
-      <div className="flex flex-col gap-2 rounded-xl border bg-card px-4 py-3 shadow-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+      <div className="flex flex-col gap-2 py-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
         <label
           htmlFor={`${id}-refresh`}
           className="flex cursor-pointer items-center gap-2.5 text-sm font-medium"
@@ -191,7 +184,6 @@ export function AssignmentMonitor({
           Inleveringen voorlezen
         </label>
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground sm:ml-auto">
-          <RefreshCw className="size-3.5" aria-hidden="true" />
           {autoRefresh
             ? "Ververst automatisch elke 5 seconden."
             : "Automatisch bijwerken staat uit."}
@@ -210,42 +202,6 @@ export function AssignmentMonitor({
             </Button>
           ) : null}
         </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Niet begonnen"
-          value={monitor.data?.summary.notStarted ?? "–"}
-          icon={UserRoundX}
-          hint={`van ${plural(monitor.data?.summary.students ?? a.counts.students, "leerling", "leerlingen")}`}
-        />
-        <StatCard
-          label="Bezig"
-          value={monitor.data?.summary.inProgress ?? "–"}
-          icon={Users}
-          tone="warning"
-        />
-        <StatCard
-          label="Ingeleverd"
-          value={monitor.data?.summary.submitted ?? "–"}
-          icon={CheckCircle2}
-          tone="success"
-        />
-        <StatCard
-          label="Vensterwissels"
-          value={monitor.data?.summary.focusWarnings ?? "–"}
-          icon={MonitorX}
-          tone={
-            (monitor.data?.summary.focusWarnings ?? 0) > 0
-              ? "destructive"
-              : "default"
-          }
-          hint={
-            a.settings.logFocusEvents
-              ? "leerlingen met minstens één wissel"
-              : "registreren staat uit"
-          }
-        />
       </div>
 
       <InfoStrip assignment={a} />
@@ -371,18 +327,7 @@ function MonitorHeader({
             />
           </>
         }
-        description={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="size-4" aria-hidden="true" />
-              {a.class.name}
-            </span>
-            <span>
-              {a.test.title} · {a.test.questionCount} vragen ·{" "}
-              {a.test.totalPoints.toLocaleString("nl-NL")} punten
-            </span>
-          </span>
-        }
+        description={`${a.class.name} · ${a.test.title} · ${plural(a.test.questionCount, "vraag", "vragen")} · ${plural(a.test.totalPoints, "punt", "punten")}`}
         actions={
           <>
             {a.accessCode && status !== "closed" ? (
@@ -650,8 +595,8 @@ function StatusBanner({
             </>
           ) : (
             <>
-              Leerlingen zien deze afname nog niet. Klik op ‘Nu openen’ als de
-              klas klaar is om te beginnen.
+              Leerlingen zien deze afname nog niet. Kies ‘Nu openen’ als de klas
+              klaar is om te beginnen.
             </>
           )}
         </p>
@@ -708,19 +653,12 @@ function InfoStrip({ assignment: a }: { assignment: Assignment }) {
   return (
     <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border bg-card p-4 shadow-xs sm:grid-cols-3 lg:grid-cols-4">
       <InfoItem label="Tijdvak">
-        <span className="inline-flex items-center gap-1.5">
-          <CalendarClock
-            className="size-4 text-muted-foreground"
-            aria-hidden="true"
-          />
+        <span className="whitespace-normal">
           {formatWindow(a.opensAt, a.closesAt)}
         </span>
       </InfoItem>
       <InfoItem label="Tijdslimiet">
-        <span className="inline-flex items-center gap-1.5">
-          <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
-          {formatMinutes(a.timeLimitMinutes)}
-        </span>
+        {formatMinutes(a.timeLimitMinutes)}
       </InfoItem>
       <InfoItem label="Toegangscode">
         {a.accessCode ? (
@@ -739,14 +677,20 @@ function InfoStrip({ assignment: a }: { assignment: Assignment }) {
         )}
       </InfoItem>
       <InfoItem label="Resultaten tonen">
-        {SHOW_RESULTS_LABELS[a.settings.showResults]}
+        <span className="whitespace-normal">
+          {SHOW_RESULTS_LABELS[a.settings.showResults]}
+        </span>
       </InfoItem>
       <InfoItem label="Pogingen">
-        <span className="inline-flex items-center gap-1.5">
-          <Repeat className="size-4 text-muted-foreground" aria-hidden="true" />
-          {a.settings.maxAttempts === 1
-            ? "1 poging"
-            : `max. ${a.settings.maxAttempts}`}
+        {a.settings.maxAttempts === 1
+          ? "1 poging"
+          : `max. ${a.settings.maxAttempts}`}
+      </InfoItem>
+      <InfoItem label="Vensterwissels">
+        <span className="whitespace-normal">
+          {a.settings.logFocusEvents
+            ? "Worden geregistreerd"
+            : "Worden niet geregistreerd"}
         </span>
       </InfoItem>
       <InfoItem label="Cijferberekening">

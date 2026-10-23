@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { CircleAlert, Inbox, RotateCcw } from "lucide-react";
+import { CircleAlert, RotateCcw } from "lucide-react";
 import { isValidElement, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -46,7 +46,7 @@ export function LoadingState({
             <Skeleton className="h-3.5" style={{ width: `${w}%` }} />
             <Skeleton className="h-3 w-1/4" />
           </div>
-          <Skeleton className="hidden h-6 w-20 rounded-full sm:block" />
+          <Skeleton className="hidden h-6 w-20 rounded-sm sm:block" />
         </div>
       ))}
     </div>
@@ -68,10 +68,11 @@ export function LoadingState({
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="flex flex-col gap-3 rounded-xl border bg-card p-5"
+                className="flex flex-col gap-2 rounded-xl border bg-card px-4 py-3.5"
               >
                 <Skeleton className="h-3.5 w-24" />
                 <Skeleton className="h-7 w-16" />
+                <Skeleton className="h-3 w-20" />
               </div>
             ))}
           </div>
@@ -95,7 +96,7 @@ export interface ErrorStateProps {
   className?: string;
 }
 
-/** Friendly error block with an optional retry. */
+/** Compact, left-aligned error notice with an optional retry. */
 export function ErrorState({
   title = "Er ging iets mis",
   error,
@@ -111,23 +112,29 @@ export function ErrorState({
     <div
       role="alert"
       className={cn(
-        "flex flex-col items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/[0.04] px-6 py-10 text-center",
+        "flex items-start gap-3 rounded-xl border border-destructive/25 bg-destructive/[0.04] p-4 text-left",
         className,
       )}
     >
-      <span className="grid size-11 place-items-center rounded-full bg-destructive/10 text-destructive">
-        <CircleAlert className="size-5" aria-hidden="true" />
-      </span>
-      <div className="flex max-w-md flex-col gap-1">
+      <CircleAlert
+        className="mt-0.5 size-4 shrink-0 text-destructive-ink"
+        aria-hidden="true"
+      />
+      <div className="flex min-w-0 flex-col gap-1">
         <h3 className="font-semibold text-foreground">{title}</h3>
         <p className="text-sm text-muted-foreground">{message}</p>
+        {onRetry ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="mt-2 w-fit"
+          >
+            <RotateCcw aria-hidden="true" />
+            Opnieuw proberen
+          </Button>
+        ) : null}
       </div>
-      {onRetry ? (
-        <Button variant="outline" size="sm" onClick={onRetry} className="mt-1">
-          <RotateCcw aria-hidden="true" />
-          Opnieuw proberen
-        </Button>
-      ) : null}
     </div>
   );
 }
@@ -148,7 +155,7 @@ export interface EmptyBlockProps {
 
 /** Empty list / nothing-here-yet block. */
 export function EmptyBlock({
-  icon = Inbox,
+  icon,
   title,
   description,
   action,
@@ -165,17 +172,15 @@ export function EmptyBlock({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card/50 px-6 py-12 text-center",
+        "flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-8 text-center",
         className,
       )}
     >
       {iconNode ? (
-        <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15 [&>svg]:size-5">
-          {iconNode}
-        </span>
+        <span className="text-muted-foreground [&>svg]:size-5">{iconNode}</span>
       ) : null}
       <div className="flex max-w-sm flex-col gap-1">
-        <h3 className="font-semibold text-foreground">{title}</h3>
+        <h3 className="font-medium text-foreground">{title}</h3>
         {description ? (
           <p className="text-sm text-balance text-muted-foreground">
             {description}

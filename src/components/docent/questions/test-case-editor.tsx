@@ -6,13 +6,12 @@ import {
   CircleX,
   Copy,
   EyeOff,
-  FlaskConical,
   Loader2,
+  Play,
   SquareFunction,
   Terminal,
   Trash2,
   Undo2,
-  WandSparkles,
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -345,7 +344,7 @@ export function TestCaseEditor({
                       aria-hidden="true"
                     />
                   ) : (
-                    <WandSparkles aria-hidden="true" />
+                    <Play aria-hidden="true" />
                   )}
                   Verwachte uitvoer invullen met modeloplossing
                 </Button>
@@ -353,7 +352,7 @@ export function TestCaseEditor({
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               {solution.trim()
-                ? "Voert de modeloplossing uit met de invoer van elke test en vult de verwachte uitvoer (of returnwaarde) in. Controleer het resultaat!"
+                ? "Voert de modeloplossing uit met de invoer van elke test en vult de verwachte uitvoer (of returnwaarde) in. Controleer daarna of het klopt."
                 : "Schrijf eerst een modeloplossing."}
             </TooltipContent>
           </Tooltip>
@@ -398,18 +397,13 @@ export function TestCaseEditor({
       <IssueList issues={generalIssues} />
 
       {tests.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center">
-          <FlaskConical
-            className="size-6 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <p className="text-sm font-medium">Nog geen tests</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
-            Een <strong>uitvoertest</strong> geeft invoer en vergelijkt wat het
-            programma print. Een <strong>functietest</strong> roept een functie
-            aan en vergelijkt de returnwaarde.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Deze vraag heeft nog geen tests. Een{" "}
+          <strong className="font-medium text-foreground">uitvoertest</strong>{" "}
+          geeft invoer en vergelijkt wat het programma print. Een{" "}
+          <strong className="font-medium text-foreground">functietest</strong>{" "}
+          roept een functie aan en vergelijkt de returnwaarde.
+        </p>
       ) : (
         <ol className="flex flex-col gap-2.5">
           {tests.map((test, index) => (
@@ -578,19 +572,19 @@ function TestCard({
               </span>
               <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
                 {test.kind === "io" ? (
-                  <span className="rounded-full border px-2 py-0.5 text-[0.68rem] text-muted-foreground">
+                  <span className="inline-flex h-6 items-center rounded-sm bg-muted px-2 text-xs font-medium whitespace-nowrap text-muted-foreground">
                     {OUTPUT_MATCH_MODE_LABELS[test.match]}
                   </span>
                 ) : null}
                 {test.weight !== 1 ? (
-                  <span className="rounded-full border px-2 py-0.5 text-[0.68rem] text-muted-foreground tabular-nums">
+                  <span className="inline-flex h-6 items-center rounded-sm bg-muted px-2 text-xs font-medium whitespace-nowrap text-muted-foreground tabular-nums">
                     ×{test.weight}
                   </span>
                 ) : null}
               </span>
               {test.hidden ? (
                 <span
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.68rem] font-medium text-muted-foreground"
+                  className="inline-flex h-6 shrink-0 items-center gap-1 rounded-sm bg-muted px-2 text-xs font-medium whitespace-nowrap text-muted-foreground"
                   title="Verborgen voor leerlingen"
                 >
                   <EyeOff className="size-3" aria-hidden="true" />
@@ -749,7 +743,7 @@ function GenerateButton({
           aria-hidden="true"
         />
       ) : (
-        <WandSparkles className="size-3.5" aria-hidden="true" />
+        <Play className="size-3.5" aria-hidden="true" />
       )}
       {label}
     </Button>

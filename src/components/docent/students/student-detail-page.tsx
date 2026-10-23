@@ -3,12 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
-  ClipboardList,
   KeyRound,
   LockOpen,
   Pencil,
   Printer,
-  School,
   ShieldAlert,
   UserMinus,
 } from "lucide-react";
@@ -27,18 +25,13 @@ import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { type RouterOutputs, useTRPC } from "@/trpc/react";
 import { AccommodationPanel } from "./accommodation-panel";
-import {
-  formatDate,
-  formatDateTime,
-  formatScore,
-  initials,
-  plural,
-} from "./format";
+import { formatDate, formatDateTime, formatScore, plural } from "./format";
 import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
 import { StudentActionsMenu } from "./student-actions-menu";
 import { StudentFormDialog } from "./student-form-dialog";
 import {
+  isLoginLocked,
   LoginLockBadge,
   RestrictedBadge,
   StudentStatus,
@@ -110,27 +103,21 @@ export function StudentDetailPage({
 
   const s = query.data;
   const submitted = s.attempts.filter((a) => a.status === "submitted");
+  const showBadges =
+    s.banned || Boolean(s.restricted) || isLoginLocked(s.loginLockedUntil);
 
   return (
     <>
       <PageHeader
-        title={
-          <span className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 font-sans text-sm font-semibold text-primary ring-1 ring-primary/15"
-            >
-              {initials(s.name)}
-            </span>
-            {s.name}
-          </span>
-        }
+        title={s.name}
         badge={
-          <span className="flex flex-wrap items-center gap-1.5">
-            <StudentStatus banned={s.banned} />
-            <LoginLockBadge lockedUntil={s.loginLockedUntil} />
-            <RestrictedBadge restricted={s.restricted} />
-          </span>
+          showBadges ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              {s.banned ? <StudentStatus banned /> : null}
+              <LoginLockBadge lockedUntil={s.loginLockedUntil} />
+              <RestrictedBadge restricted={s.restricted} />
+            </span>
+          ) : undefined
         }
         backHref={routes.docent.students}
         backLabel="Leerlingen"
@@ -195,14 +182,12 @@ export function StudentDetailPage({
         </p>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
-          <Panel title="Inloggen" icon={<KeyRound className="size-4" />}>
+          <Panel title="Inloggen">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  Pincode
-                </span>
+                <span className="text-xs text-muted-foreground">Pincode</span>
                 <PinReveal userId={s.id} hasPin={s.hasPin} size="lg" />
               </div>
               {s.loginLockedUntil &&
@@ -277,7 +262,7 @@ export function StudentDetailPage({
             restricted={s.restricted}
           />
 
-          <Panel title="Klassen" icon={<School className="size-4" />}>
+          <Panel title="Klassen">
             {s.classes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Deze leerling zit nog niet in een klas. Voeg de leerling toe
@@ -330,7 +315,6 @@ export function StudentDetailPage({
 
         <Panel
           title="Pogingen"
-          icon={<ClipboardList className="size-4" />}
           aside={
             s.attempts.length > 0
               ? `${plural(s.attempts.length, "poging", "pogingen")} · ${submitted.length} ingeleverd`
@@ -380,13 +364,11 @@ export function StudentDetailPage({
 
 function Panel({
   title,
-  icon,
   aside,
   flush,
   children,
 }: {
   title: string;
-  icon?: ReactNode;
   aside?: ReactNode;
   flush?: boolean;
   children: ReactNode;
@@ -394,10 +376,7 @@ function Panel({
   return (
     <section className="flex flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs">
       <header className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4 pb-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          {icon ? <span className="text-muted-foreground">{icon}</span> : null}
-          {title}
-        </h2>
+        <h2 className="text-sm font-semibold">{title}</h2>
         {aside ? (
           <span className="text-xs text-muted-foreground">{aside}</span>
         ) : null}
@@ -462,7 +441,7 @@ function AttemptRow({ attempt: a }: { attempt: Attempt }) {
           ) : null}
         </div>
         <ChevronRight
-          className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+          className="size-4 shrink-0 text-muted-foreground"
           aria-hidden="true"
         />
       </Link>

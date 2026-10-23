@@ -41,23 +41,23 @@ export function DataInventoryTable({
         <ScrollRegion label={caption}>
           <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <caption className="sr-only">{caption}</caption>
-            <thead className="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
+            <thead className="bg-muted/50 text-xs text-muted-foreground">
               <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Gegevens
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Wat precies
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Waarom
                 </th>
                 {detailed ? (
-                  <th scope="col" className="px-4 py-3 font-semibold">
+                  <th scope="col" className="px-4 py-3 font-medium">
                     Grondslag
                   </th>
                 ) : null}
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="px-4 py-3 font-medium">
                   Bewaartermijn
                 </th>
               </tr>

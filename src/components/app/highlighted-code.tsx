@@ -166,7 +166,7 @@ export function HighlightedCode({
     >
       {showHeader ? (
         <div className="flex h-9 items-center justify-between gap-2 border-b bg-muted/40 pr-1.5 pl-3">
-          <span className="font-mono text-[0.7rem] font-medium tracking-wider text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground">
             {label}
           </span>
           <CopyButton value={source} size="icon-xs" successMessage={null} />

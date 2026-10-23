@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  AlertTriangle,
   CheckCircle2,
   ChevronDown,
-  EyeOff,
   ShieldCheck,
   ShieldX,
   Timer,
@@ -49,11 +47,12 @@ export function CodeResultView({ result }: { result: CodeGradingResult }) {
           ) : (
             <XCircle className="size-4" aria-hidden="true" />
           )}
-          {total ? `${passed} van ${total} tests geslaagd` : "Geen tests"}
+          {total
+            ? `${passed} van ${total} ${total === 1 ? "test" : "tests"} geslaagd`
+            : "Geen tests"}
         </span>
         {result.status !== "ok" ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-ink">
-            <AlertTriangle className="size-3.5" aria-hidden="true" />
+          <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-destructive/10 px-2 text-xs font-medium whitespace-nowrap text-destructive-ink">
             {STATUS_TEXT[result.status]}
           </span>
         ) : null}
@@ -143,8 +142,7 @@ function TestRow({ test: t, index }: { test: TestResult; index: number }) {
           {t.name || `Test ${index + 1}`}
         </span>
         {t.hidden ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            <EyeOff className="size-3" aria-hidden="true" />
+          <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-muted px-2 text-xs font-medium whitespace-nowrap text-muted-foreground">
             Verborgen
           </span>
         ) : null}

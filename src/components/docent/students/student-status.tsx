@@ -1,6 +1,5 @@
 "use client";
 
-import { Lock, ShieldAlert } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -8,7 +7,11 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-/** Pill: Actief / Gedeactiveerd. */
+/** Shared classes for the small status tags on the student screens. */
+const TAG =
+  "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-sm px-2 text-xs font-medium whitespace-nowrap";
+
+/** "Actief" as plain text (the normal state); a tag only for "Gedeactiveerd". */
 export function StudentStatus({
   banned,
   className,
@@ -16,24 +19,17 @@ export function StudentStatus({
   banned: boolean;
   className?: string;
 }) {
+  if (!banned)
+    return (
+      <span className={cn("text-sm text-muted-foreground", className)}>
+        Actief
+      </span>
+    );
   return (
     <span
-      className={cn(
-        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset",
-        banned
-          ? "bg-destructive/10 text-destructive-ink ring-destructive/25"
-          : "bg-success/10 text-success-ink ring-success/25",
-        className,
-      )}
+      className={cn(TAG, "bg-destructive/10 text-destructive-ink", className)}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "size-1.5 rounded-full",
-          banned ? "bg-destructive" : "bg-success",
-        )}
-      />
-      {banned ? "Gedeactiveerd" : "Actief"}
+      Gedeactiveerd
     </span>
   );
 }
@@ -58,7 +54,7 @@ export function isLoginLocked(
 }
 
 /**
- * Warning pill “Geblokkeerd tot {HH:mm}” while a student's login is locked
+ * Warning tag “Geblokkeerd tot {HH:mm}” while a student's login is locked
  * after too many wrong PINs. Focusable, so the explanation (tooltip) also
  * works with the keyboard; screen readers get it as part of the name.
  */
@@ -79,11 +75,11 @@ export function LoginLockBadge({
         <button
           type="button"
           className={cn(
-            "inline-flex h-6 w-fit shrink-0 cursor-help items-center gap-1.5 rounded-full bg-warning/12 px-2.5 text-xs font-medium whitespace-nowrap text-warning-ink ring-1 ring-warning/30 ring-inset outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            TAG,
+            "cursor-help bg-warning/15 text-warning-ink outline-none focus-visible:ring-2 focus-visible:ring-ring",
             className,
           )}
         >
-          <Lock className="size-3" aria-hidden="true" />
           Geblokkeerd tot {time}
           <span className="sr-only">. {LOCK_HELP}</span>
         </button>
@@ -97,7 +93,7 @@ export function LoginLockBadge({
 export const RESTRICTED_LABEL = "Verwerking beperkt (AVG art. 18)";
 
 /**
- * Pill “Verwerking beperkt (AVG art. 18)”: the student's data may only be
+ * Tag “Verwerking beperkt (AVG art. 18)”: the student's data may only be
  * stored (privacy.setRestriction). Renders nothing when not restricted.
  */
 export function RestrictedBadge({
@@ -109,13 +105,7 @@ export function RestrictedBadge({
 }) {
   if (!restricted) return null;
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-full bg-warning/12 px-2.5 text-xs font-medium whitespace-nowrap text-warning-ink ring-1 ring-warning/30 ring-inset",
-        className,
-      )}
-    >
-      <ShieldAlert className="size-3" aria-hidden="true" />
+    <span className={cn(TAG, "bg-warning/15 text-warning-ink", className)}>
       {RESTRICTED_LABEL}
     </span>
   );

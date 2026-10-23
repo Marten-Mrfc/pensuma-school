@@ -122,7 +122,7 @@ export function AccessCodePresenter({
               style={{
                 fontSize: `clamp(3rem, ${Math.floor(80 / Math.max(code.length, 5))}vw, 15rem)`,
               }}
-              className="rounded-3xl border-2 border-primary/30 bg-primary/[0.06] px-[4vw] py-[2vh] font-mono leading-none font-bold tracking-[0.12em] text-foreground tabular-nums select-all"
+              className="rounded-xl border-2 border-primary/30 bg-primary/[0.06] px-[4vw] py-[2vh] font-mono leading-none font-bold tracking-[0.12em] text-foreground tabular-nums select-all"
             >
               {code}
             </p>

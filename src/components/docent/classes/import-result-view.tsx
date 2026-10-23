@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  CircleAlert,
-  CircleCheck,
-  Printer,
-  ShieldAlert,
-  UsersRound,
-} from "lucide-react";
+import { CircleAlert, CircleCheck, Printer, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 import { CopyButton } from "@/components/app/copy-button";
@@ -91,9 +85,10 @@ export function ImportResultView({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 sm:px-6">
         <div className="flex items-start gap-3 rounded-xl border border-success/25 bg-success/[0.06] p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-success/15 text-success-ink">
-            <CircleCheck className="size-5" aria-hidden="true" />
-          </span>
+          <CircleCheck
+            className="mt-0.5 size-5 shrink-0 text-success-ink"
+            aria-hidden="true"
+          />
           <div className="flex flex-col gap-0.5">
             <p className="font-semibold">
               {total > 0
@@ -157,7 +152,7 @@ export function ImportResultView({
             <div className="overflow-hidden rounded-lg border">
               <div className="max-h-[38vh] overflow-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+                  <thead className="sticky top-0 bg-muted">
                     <tr className="text-left text-xs text-muted-foreground">
                       <th scope="col" className="px-3 py-2 font-medium">
                         Nummer
@@ -203,12 +198,8 @@ export function ImportResultView({
           >
             <h3
               id={`${uid}-existing-heading`}
-              className="flex items-center gap-1.5 text-sm font-semibold"
+              className="text-sm font-semibold"
             >
-              <UsersRound
-                className="size-4 text-muted-foreground"
-                aria-hidden="true"
-              />
               Bestaande leerlingen
             </h3>
             <ul className="divide-y rounded-lg border text-sm">

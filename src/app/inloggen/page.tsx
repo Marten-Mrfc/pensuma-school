@@ -34,20 +34,8 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
       {/* Brand panel (desktop) */}
-      <aside className="relative hidden overflow-hidden bg-[oklch(0.29_0.045_152)] text-[oklch(0.96_0.01_130)] lg:flex lg:flex-col dark:bg-[oklch(0.2_0.02_150)]">
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-60 [background-image:linear-gradient(to_right,oklch(1_0_0/0.05)_1px,transparent_1px),linear-gradient(to_bottom,oklch(1_0_0/0.05)_1px,transparent_1px)] [background-size:28px_28px]"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute -top-40 -right-32 size-[34rem] rounded-full bg-[oklch(0.62_0.12_145)]/25 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute -bottom-48 -left-24 size-[30rem] rounded-full bg-[oklch(0.8_0.1_85)]/12 blur-3xl"
-        />
-        <div className="relative flex flex-1 flex-col justify-between gap-10 p-10 xl:p-14">
+      <aside className="hidden bg-[oklch(0.29_0.045_152)] text-[oklch(0.96_0.01_130)] lg:flex lg:flex-col dark:bg-[oklch(0.2_0.02_150)]">
+        <div className="flex flex-1 flex-col justify-between gap-10 p-10 xl:p-14">
           <Link
             href="/"
             className="inline-flex w-fit items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white"
@@ -73,21 +61,18 @@ export default function LoginPage() {
           </Link>
 
           <div className="flex max-w-lg flex-col gap-8">
-            <div className="flex flex-col gap-4">
-              <p className="text-sm font-medium tracking-[0.14em] text-[oklch(0.85_0.08_140)] uppercase">
-                Informatica · Python
-              </p>
-              {/* A tagline, not a heading: the page's h1 is "Inloggen". */}
-              <p className="font-display-wide text-4xl leading-[1.05] font-bold text-balance xl:text-5xl">
-                Je code telt. Je{" "}
-                <span className="text-[oklch(0.86_0.12_140)]">input()</span>
-                -vraag niet.
-              </p>
-              <p className="max-w-md text-base leading-relaxed text-[oklch(0.88_0.015_130)]">
-                Pensuma kijkt naar wat je programma écht doet. Een vraag als
-                “Wat is je naam?” wordt nooit meer als fout gerekend.
-              </p>
-            </div>
+            {/* A tagline, not a heading: the page's h1 is "Inloggen". */}
+            <p className="font-display-wide text-[2.125rem] leading-[1.1] font-bold xl:text-[2.5rem]">
+              <span className="block">Je code telt.</span>
+              Je{" "}
+              <span className="whitespace-nowrap">
+                <code className="font-mono text-[0.9em] font-medium text-[oklch(0.86_0.12_140)]">
+                  input()
+                </code>
+                -vraag
+              </span>{" "}
+              niet.
+            </p>
             <GradingDemo className="max-w-md" />
           </div>
 
@@ -114,7 +99,8 @@ export default function LoginPage() {
                 Inloggen
               </h1>
               <p className="text-muted-foreground">
-                Welkom terug! Kies hieronder hoe je inlogt.
+                Met je leerlingnummer en pincode, of als docent met je
+                e-mailadres.
               </p>
             </div>
             <Suspense fallback={<LoginFormSkeleton />}>

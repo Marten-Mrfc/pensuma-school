@@ -130,7 +130,7 @@ export function BankFilters({
                     aria-pressed={on}
                     onClick={() => toggleTag(tag)}
                     className={cn(
-                      "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       on
                         ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
                         : "bg-background text-foreground hover:bg-accent",

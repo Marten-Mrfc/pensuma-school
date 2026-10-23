@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -266,9 +266,7 @@ function SettingsForm({
                 className="motion-safe:animate-spin"
                 aria-hidden="true"
               />
-            ) : (
-              <Save aria-hidden="true" />
-            )}
+            ) : null}
             Opslaan
           </Button>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Info, Loader2, ShieldAlert, TimerReset } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -77,14 +77,7 @@ export function AccommodationPanel({
       className="flex flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs"
     >
       <header className="flex items-center justify-between gap-2 px-5 pt-4 pb-3">
-        <h2
-          id={`${id}-title`}
-          className="flex items-center gap-2 text-sm font-semibold"
-        >
-          <TimerReset
-            className="size-4 text-muted-foreground"
-            aria-hidden="true"
-          />
+        <h2 id={`${id}-title`} className="text-sm font-semibold">
           Faciliteiten bij toetsen
         </h2>
       </header>
@@ -153,13 +146,12 @@ export function AccommodationPanel({
           />
         </fieldset>
 
-        <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
-          <p className="flex gap-2">
-            <Info className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+        <div className="flex flex-col gap-1.5 border-t pt-4 text-xs text-muted-foreground">
+          <p>
             Vul nergens een diagnose of reden in. Pensuma bewaart alleen deze
             instellingen.
           </p>
-          <p className="pl-5.5">
+          <p>
             Een toets die al bezig is, verandert niet. Gebruik daarvoor ‘Tijd
             verlengen’ in het live overzicht.
           </p>

@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Ban,
   BookOpenCheck,
   Check,
@@ -15,10 +14,7 @@ import {
   EyeOff,
   Hourglass,
   Lightbulb,
-  ListChecks,
   Loader2,
-  MessageSquareText,
-  PartyPopper,
   PlayCircle,
   RotateCcw,
   X,
@@ -84,60 +80,73 @@ function verdictOf(q: ResultQuestion): Verdict {
 
 const VERDICT: Record<
   Verdict,
-  { icon: typeof CheckCircle2; label: string; className: string }
+  {
+    icon: typeof CheckCircle2;
+    label: string;
+    /** Tag tone (the counts in the score summary). */
+    className: string;
+    /** Icon colour in a question row. */
+    ink: string;
+  }
 > = {
   correct: {
     icon: CheckCircle2,
     label: "Goed",
     className: "bg-success/12 text-success-ink",
+    ink: "text-success-ink",
   },
   partial: {
     icon: CircleDashed,
     label: "Deels goed",
     className: "bg-warning/15 text-warning-ink",
+    ink: "text-warning-ink",
   },
   wrong: {
     icon: XCircle,
     label: "Niet goed",
     className: "bg-destructive/10 text-destructive-ink",
+    ink: "text-destructive-ink",
   },
   review: {
     icon: Clock,
     label: "Wordt nagekeken door je docent",
-    className: "bg-info/10 text-info-ink",
+    className: "bg-info/12 text-info-ink",
+    ink: "text-info-ink",
   },
   empty: {
     icon: CircleMinus,
     label: "Niet beantwoord",
     className: "bg-muted text-muted-foreground",
+    ink: "text-muted-foreground",
   },
   pending: {
     icon: Hourglass,
     label: "Wordt nagekeken",
-    className: "bg-info/10 text-info-ink",
+    className: "bg-info/12 text-info-ink",
+    ink: "text-info-ink",
   },
   neutralized: {
     icon: Ban,
     label: "Vervalt",
     className: "bg-muted text-muted-foreground",
+    ink: "text-muted-foreground",
   },
 };
 
 function Centered({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl border bg-card px-6 py-12 text-center shadow-xs">
+    <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-4 rounded-xl border bg-card px-6 py-12 text-center">
       {children}
     </div>
   );
 }
 
 function motivation(pct: number) {
-  if (pct >= 90) return "Wauw, fantastisch gedaan! 🌟";
-  if (pct >= 75) return "Heel goed gedaan! 💪";
-  if (pct >= 55) return "Netjes, je bent op de goede weg! 👍";
-  if (pct >= 35)
-    return "Een begin! Bekijk wat er mis ging en probeer het nog eens.";
-  return "Niet getreurd: van fouten leer je het meest. Bekijk de feedback hieronder.";
+  if (pct >= 90) return "Uitstekend gedaan.";
+  if (pct >= 75) return "Goed gedaan.";
+  if (pct >= 55) return "Netjes. Kijk hieronder wat er nog beter kan.";
+  if (pct >= 35) return "Een begin. Kijk hieronder wat er misging.";
+  return "Dit ging nog niet goed. Kijk per vraag wat er misging.";
 }
 
 function ScoreHero({ result }: { result: VisibleResult }) {
@@ -161,55 +170,19 @@ function ScoreHero({ result }: { result: VisibleResult }) {
       neutralized: 0,
     } as Record<Verdict, number>,
   );
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-
   return (
-    <section className="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-sm sm:p-7">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-24 -right-24 size-72 rounded-full bg-primary/8 blur-3xl"
-      />
-      <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-8">
-        <div className="relative grid size-36 shrink-0 place-items-center">
-          <svg
-            viewBox="0 0 120 120"
-            className="absolute inset-0 -rotate-90"
-            aria-hidden="true"
-          >
-            <circle
-              cx="60"
-              cy="60"
-              r={radius}
-              fill="none"
-              strokeWidth="10"
-              className="stroke-muted"
-            />
-            <circle
-              cx="60"
-              cy="60"
-              r={radius}
-              fill="none"
-              strokeWidth="10"
-              strokeLinecap="round"
-              className="stroke-primary transition-[stroke-dashoffset] duration-1000"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference * (1 - pct / 100)}
-            />
-          </svg>
-          <div className="flex flex-col items-center">
-            <span className="font-display text-4xl leading-none font-bold tabular-nums">
-              {formatGrade(result.grade)}
-            </span>
-            <span className="mt-1 text-xs font-medium text-muted-foreground">
-              {reviewCount ? "voorlopig cijfer" : "cijfer"}
-            </span>
-          </div>
+    <section className="rounded-xl border bg-card p-5 sm:p-7">
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-8">
+        <div className="flex shrink-0 flex-col items-center sm:items-start sm:border-r sm:pr-8">
+          <span className="font-display text-5xl leading-none font-bold tabular-nums">
+            {formatGrade(result.grade)}
+          </span>
+          <span className="mt-1 text-xs font-medium text-muted-foreground">
+            {reviewCount ? "voorlopig cijfer" : "cijfer"}
+          </span>
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-center gap-3 text-center sm:items-start sm:text-left">
-          <p className="font-display text-2xl font-bold tracking-tight">
-            {motivation(pct)}
-          </p>
+          <p className="text-lg font-semibold">{motivation(pct)}</p>
           <p className="text-muted-foreground">
             Je haalde{" "}
             <strong className="font-semibold text-foreground tabular-nums">
@@ -232,16 +205,14 @@ function ScoreHero({ result }: { result: VisibleResult }) {
               .filter((v) => counts[v])
               .map((v) => {
                 const meta = VERDICT[v];
-                const Icon = meta.icon;
                 return (
                   <li
                     key={v}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                      "inline-flex h-6 w-fit shrink-0 items-center rounded-sm px-2 text-xs font-medium whitespace-nowrap tabular-nums",
                       meta.className,
                     )}
                   >
-                    <Icon className="size-3.5" aria-hidden="true" />
                     {counts[v]}{" "}
                     {v === "review"
                       ? "nog na te kijken"
@@ -362,13 +333,7 @@ function RubricReview({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <h4 className="flex items-center gap-2 text-sm font-semibold">
-        <ListChecks
-          className="size-4 text-muted-foreground"
-          aria-hidden="true"
-        />
-        Beoordelingscriteria
-      </h4>
+      <h4 className="text-sm font-semibold">Beoordelingscriteria</h4>
       <ul className="flex flex-col gap-1.5">
         {rubric.map((item) => (
           <li
@@ -377,20 +342,18 @@ function RubricReview({
           >
             <span
               className={cn(
-                "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full",
-                item.achieved
-                  ? "bg-success/12 text-success-ink"
-                  : "bg-destructive/10 text-destructive-ink",
+                "mt-1 shrink-0",
+                item.achieved ? "text-success-ink" : "text-destructive-ink",
               )}
             >
               {item.achieved ? (
                 <Check
-                  className="size-3.5"
-                  strokeWidth={3}
+                  className="size-4"
+                  strokeWidth={2.5}
                   aria-hidden="true"
                 />
               ) : (
-                <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                <X className="size-4" strokeWidth={2.5} aria-hidden="true" />
               )}
             </span>
             <span className="min-w-0 flex-1 leading-6">{item.label}</span>
@@ -418,7 +381,6 @@ function SolutionReview({
   return (
     <Collapsible className="group/solution rounded-lg border">
       <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-sm font-medium outline-none hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring">
-        <BookOpenCheck className="size-4 text-primary" aria-hidden="true" />
         Modeloplossing bekijken
         <ChevronDown
           className="ml-auto size-4 text-muted-foreground transition-transform group-data-[state=open]/solution:rotate-180 motion-reduce:transition-none"
@@ -535,11 +497,8 @@ function QuestionReview({
       ) : null}
 
       {q.feedback?.trim() ? (
-        <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[0.05] p-4">
-          <h4 className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <MessageSquareText className="size-4" aria-hidden="true" />
-            Feedback van je docent
-          </h4>
+        <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+          <h4 className="text-sm font-semibold">Feedback van je docent</h4>
           <div className="text-sm">
             <Markdown>{q.feedback}</Markdown>
           </div>
@@ -573,7 +532,7 @@ export function QuestionAccordion({
     <Accordion
       type="multiple"
       variant="separated"
-      className="flex flex-col gap-2.5"
+      className="flex flex-col gap-2 space-y-0"
     >
       {questions.map((q) => {
         const verdict = verdictOf(q);
@@ -584,26 +543,21 @@ export function QuestionAccordion({
             key={q.id}
             value={q.id}
             className={cn(
-              "overflow-hidden rounded-xl border bg-card shadow-xs",
+              "overflow-hidden rounded-xl border bg-card",
               QUESTION_ITEM_FOCUS_CLASS,
             )}
           >
             <AccordionHeader>
               <AccordionTrigger className="items-center gap-3 px-4 py-3.5 hover:no-underline focus-visible:ring-0">
-                <span
-                  className={cn(
-                    "grid size-9 shrink-0 place-items-center rounded-full",
-                    meta.className,
-                  )}
-                >
-                  <Icon className="size-[18px]" aria-hidden="true" />
+                <span className={cn("shrink-0", meta.ink)}>
+                  <Icon className="size-5" aria-hidden="true" />
                   <span className="sr-only">{meta.label}</span>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-muted-foreground">
                     Vraag {q.position} · {QUESTION_TYPE_LABELS[q.type]}
                     {q.neutralized ? (
-                      <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 text-foreground">
                         Vervalt
                       </span>
                     ) : null}
@@ -618,7 +572,7 @@ export function QuestionAccordion({
                     {q.title}
                   </span>
                 </span>
-                <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-sm font-semibold tabular-nums">
+                <span className="shrink-0 text-sm font-semibold tabular-nums">
                   {q.earned == null ? "–" : formatNumber(q.earned)}
                   <span className="font-normal text-muted-foreground">
                     /{formatNumber(q.points)}
@@ -709,9 +663,6 @@ function ResultContent({ attemptId }: { attemptId: string }) {
       <>
         {header(r.title, <ModeBadge mode={r.mode} />)}
         <Centered>
-          <span className="grid size-14 place-items-center rounded-2xl bg-warning/15 text-warning-ink">
-            <Hourglass className="size-7" aria-hidden="true" />
-          </span>
           <h2 className="font-display text-2xl font-bold">Je bent nog bezig</h2>
           <p className="text-muted-foreground">
             Deze toets is nog niet ingeleverd.
@@ -732,20 +683,14 @@ function ResultContent({ attemptId }: { attemptId: string }) {
       <>
         {header(r.title, <ModeBadge mode={r.mode} />)}
         <Centered>
-          <span className="grid size-16 place-items-center rounded-2xl bg-success/12 text-success-ink">
-            <PartyPopper className="size-8" aria-hidden="true" />
-          </span>
-          <h2 className="font-display text-3xl font-bold tracking-tight">
-            Ingeleverd! <span aria-hidden="true">🎉</span>
+          <h2 className="font-display text-2xl font-bold">
+            Je werk is ingeleverd
           </h2>
           <p className="text-muted-foreground">{r.message}</p>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             <Button asChild variant="outline">
-              <Link href={routes.leerling.dashboard}>
-                <ArrowLeft aria-hidden="true" />
-                Naar mijn toetsen
-              </Link>
+              <Link href={routes.leerling.dashboard}>Naar mijn toetsen</Link>
             </Button>
             {retry}
           </div>

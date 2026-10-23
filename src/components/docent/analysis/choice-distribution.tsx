@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, TriangleAlert } from "lucide-react";
+import { Check } from "lucide-react";
 import { AccessibleChart } from "@/components/a11y/accessible-chart";
 import { isPopularDistractor } from "@/lib/analytics/common-errors";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,7 @@ export function choiceSummary(summary: ChoiceSummary): string {
 export function ChoiceDistribution({ questions }: { questions: Choices }) {
   if (!questions.length) return null;
   return (
-    <ul className="grid gap-4 lg:grid-cols-2">
+    <ul className="grid items-start gap-4 lg:grid-cols-2">
       {questions.map((q) => {
         const summary = choiceSummary(q.summary);
         return (
@@ -71,8 +71,7 @@ export function ChoiceDistribution({ questions }: { questions: Choices }) {
                           </span>
                         ) : null}
                         {popular ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-warning/12 px-2 py-0.5 text-[11px] font-medium text-warning-ink">
-                            <TriangleAlert className="size-3" />
+                          <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-warning/15 px-2 text-xs font-medium whitespace-nowrap text-warning-ink">
                             Populaire afleider
                           </span>
                         ) : null}

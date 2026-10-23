@@ -1,6 +1,5 @@
 "use client";
 
-import { ClipboardCheck } from "lucide-react";
 import { useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
 import type {
@@ -30,11 +29,7 @@ export function OpenQuestionEditor({
     onChange({ ...data, ...patch });
 
   return (
-    <EditorSection
-      title="Nakijken"
-      description={OPEN_QUESTION_VISIBILITY_NOTE}
-      icon={<ClipboardCheck />}
-    >
+    <EditorSection title="Nakijken" description={OPEN_QUESTION_VISIBILITY_NOTE}>
       <IssueList
         issues={issues.filter((i) => i.target?.field === "modelAnswer")}
       />

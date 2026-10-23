@@ -1,15 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Bot,
-  Check,
-  Loader2,
-  MessageSquarePlus,
-  RotateCcw,
-  Save,
-  UserRoundPen,
-} from "lucide-react";
+import { Check, Loader2, MessageSquarePlus, RotateCcw } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/components/app/get-error-message";
@@ -243,7 +235,7 @@ export function ScoreBox({
         <div className="flex flex-col gap-1">
           <span
             id={`${id}-total-label`}
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-sm font-medium text-foreground"
           >
             Beoordeling
           </span>
@@ -260,16 +252,14 @@ export function ScoreBox({
           </output>
         </div>
         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Bot className="size-3.5" aria-hidden="true" />
+          <span>
             Automatisch:{" "}
             {answer.autoScore == null
               ? "geen score"
               : formatNumber(answer.autoScore)}
           </span>
           {answer.manualScore != null ? (
-            <span className="inline-flex items-center gap-1.5 font-medium text-primary">
-              <UserRoundPen className="size-3.5" aria-hidden="true" />
+            <span className="font-medium text-foreground">
               Handmatig: {formatNumber(answer.manualScore)}
             </span>
           ) : needsReview ? (
@@ -377,7 +367,7 @@ export function ScoreBox({
                 value={feedback}
                 onChange={setFeedback}
                 minRows={compact ? 3 : 4}
-                placeholder="Bijvoorbeeld: Goed bedacht! Let op: input() geeft altijd tekst terug."
+                placeholder="Bijvoorbeeld: Goed bedacht. Let op: input() geeft altijd tekst terug."
               />
             </div>
           ) : null}
@@ -437,9 +427,7 @@ export function ScoreBox({
                   className="motion-safe:animate-spin"
                   aria-hidden="true"
                 />
-              ) : dirty || needsReview || bulk ? (
-                <Save aria-hidden="true" />
-              ) : (
+              ) : dirty || needsReview || bulk ? null : (
                 <Check aria-hidden="true" />
               )}
               {dirty || needsReview || bulk ? saveLabel : "Opgeslagen"}

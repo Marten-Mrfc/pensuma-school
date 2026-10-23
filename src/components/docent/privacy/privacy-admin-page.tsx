@@ -1,6 +1,5 @@
 "use client";
 
-import { ScrollText } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
@@ -53,10 +52,7 @@ export function PrivacyAdminPage() {
         description="Bewaartermijnen, inzage- en verwijderverzoeken en het logboek van wie welke leerlinggegevens heeft bekeken of gewijzigd."
         actions={
           <Button variant="outline" asChild>
-            <Link href={routes.docent.privacyLog}>
-              <ScrollText aria-hidden="true" />
-              Logboek
-            </Link>
+            <Link href={routes.docent.privacyLog}>Logboek</Link>
           </Button>
         }
       />

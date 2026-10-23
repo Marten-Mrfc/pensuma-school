@@ -4,16 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
-  Award,
   Ban,
-  CheckCircle2,
   ChevronDown,
   Download,
   EyeOff,
-  Gauge,
   Loader2,
   MessageSquareText,
-  NotebookPen,
   RefreshCw,
   RotateCcw,
   Send,
@@ -345,8 +341,6 @@ export function ResultsContent({ data }: { data: Results }) {
         <StatCard
           label="Gemiddeld cijfer"
           value={formatGrade(data.stats.averageGrade)}
-          icon={Award}
-          tone="primary"
           hint={
             data.stats.averagePercentage != null
               ? `${formatPercent(data.stats.averagePercentage)} van de punten`
@@ -360,14 +354,11 @@ export function ResultsContent({ data }: { data: Results }) {
               ? `${data.stats.passed}/${data.stats.submitted}`
               : "–"
           }
-          icon={CheckCircle2}
-          tone="success"
           hint="cijfer 5,5 of hoger"
         />
         <StatCard
           label="Ingeleverd"
           value={`${data.stats.submitted}/${data.stats.students}`}
-          icon={Users}
           hint={
             data.stats.inProgress
               ? `${data.stats.inProgress} nog bezig · ${data.stats.notStarted} niet begonnen`
@@ -377,7 +368,6 @@ export function ResultsContent({ data }: { data: Results }) {
         <StatCard
           label="Nog nakijken"
           value={needsReview ?? "–"}
-          icon={NotebookPen}
           tone={needsReview ? "warning" : "default"}
           hint={
             needsReview == null ? (
@@ -387,7 +377,7 @@ export function ResultsContent({ data }: { data: Results }) {
                 href={routes.docent.assignmentGrading(a.id)}
                 className="font-medium text-primary hover:underline"
               >
-                Naar nakijken →
+                Naar nakijken
               </Link>
             ) : (
               "alles is beoordeeld"
@@ -411,8 +401,8 @@ export function ResultsContent({ data }: { data: Results }) {
                 Scores per vraag
               </h2>
               <p className="text-sm text-muted-foreground">
-                Klik op een score om de poging te bekijken en na te kijken. Klik
-                op een kolomkop om te sorteren.
+                Kies een score om de poging te openen en na te kijken. Sorteer
+                met de kolomkoppen.
               </p>
             </div>
             <Legend />
@@ -569,15 +559,9 @@ export function ResultsContent({ data }: { data: Results }) {
       )}
 
       {data.stats.submitted > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
           <section className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-xs">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <Gauge
-                className="size-4 text-muted-foreground"
-                aria-hidden="true"
-              />
-              Gemiddelde score per vraag
-            </h2>
+            <h2 className="font-semibold">Gemiddelde score per vraag</h2>
             <AccessibleChart
               title="Percentage van de punten per vraag"
               summary={questionAverageSummary(data, statsByQuestion)}
@@ -605,7 +589,7 @@ export function ResultsContent({ data }: { data: Results }) {
               />
             </AccessibleChart>
             <p className="text-xs text-muted-foreground">
-              Percentage van de punten, gemiddeld over{" "}
+              Gemiddeld over{" "}
               {data.stats.submitted === 1
                 ? "1 ingeleverde poging"
                 : `${data.stats.submitted} ingeleverde pogingen`}
@@ -613,13 +597,7 @@ export function ResultsContent({ data }: { data: Results }) {
             </p>
           </section>
           <section className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-xs">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <Award
-                className="size-4 text-muted-foreground"
-                aria-hidden="true"
-              />
-              Cijferverdeling
-            </h2>
+            <h2 className="font-semibold">Cijferverdeling</h2>
             <AccessibleChart
               title="Aantal leerlingen per cijfer"
               summary={distributionSummary(data)}
@@ -637,10 +615,7 @@ export function ResultsContent({ data }: { data: Results }) {
                 ariaLabel={distributionSummary(data)}
               />
             </AccessibleChart>
-            <p className="text-xs text-muted-foreground">
-              Aantal leerlingen per cijfer ({describeScale(a.grading)}). Rood =
-              lager dan 5.
-            </p>
+            <p className="text-xs text-muted-foreground">Rood = lager dan 5.</p>
           </section>
         </div>
       ) : null}
@@ -975,8 +950,7 @@ function QuestionStatsTable({
                     </span>
                     <span className="font-medium">{q.title}</span>
                     {data.neutralized[q.id] ? (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning/12 px-1.5 py-0.5 text-[11px] font-medium text-warning-ink">
-                        <Ban className="size-3" aria-hidden="true" />
+                      <span className="ml-2 inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-warning/15 px-2 align-middle text-xs font-medium whitespace-nowrap text-warning-ink">
                         Vervallen
                       </span>
                     ) : null}
@@ -1068,7 +1042,6 @@ function RetakeMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline">
-          <RotateCcw aria-hidden="true" />
           Herkansing plannen
           <ChevronDown aria-hidden="true" />
         </Button>

@@ -1,26 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Award,
-  CalendarClock,
-  CalendarDays,
-  CircleCheckBig,
-  Clock3,
-  FileQuestion,
-  Hourglass,
-  KeyRound,
-  ListChecks,
-  PartyPopper,
-  PlayCircle,
-  RotateCcw,
-  SquareTerminal,
-} from "lucide-react";
+import { ArrowRight, PlayCircle, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { useCurrentUser } from "@/components/app/current-user";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
+import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { claimLocalData, pruneAttemptBackups } from "@/lib/local-data";
 import { routes } from "@/lib/routes";
@@ -33,7 +19,6 @@ import {
 } from "./dashboard-logic";
 import {
   formatGrade,
-  formatLongDate,
   formatMinutes,
   formatMoment,
   formatNumber,
@@ -61,12 +46,15 @@ function Section({
 }) {
   return (
     <section className="flex flex-col gap-3" aria-label={title}>
-      <h2 className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight">
+      <h2 className="font-display text-lg font-semibold tracking-tight">
         {title}
         {count ? (
-          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary tabular-nums">
-            {count}
-          </span>
+          <>
+            {" "}
+            <span className="ml-1 font-normal text-muted-foreground tabular-nums">
+              {count}
+            </span>
+          </>
         ) : null}
       </h2>
       {children}
@@ -74,22 +62,8 @@ function Section({
   );
 }
 
-function Fact({
-  icon: Icon,
-  children,
-}: {
-  icon: typeof Clock3;
-  children: ReactNode;
-}) {
-  return (
-    <li className="flex items-center gap-1.5 text-sm text-muted-foreground">
-      <Icon
-        className="size-4 shrink-0 text-muted-foreground/80"
-        aria-hidden="true"
-      />
-      <span className="truncate">{children}</span>
-    </li>
-  );
+function Fact({ children }: { children: ReactNode }) {
+  return <li className="truncate text-sm text-muted-foreground">{children}</li>;
 }
 
 function ScorePill({ item }: { item: DashboardItem }) {
@@ -132,31 +106,21 @@ function OpenCard({ item }: { item: DashboardItem }) {
   return (
     <article
       className={cn(
-        "group relative flex flex-col gap-4 overflow-hidden rounded-2xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-md",
+        "flex flex-col gap-4 rounded-xl border bg-card p-5",
         inProgress && "border-warning/40 ring-1 ring-warning/20",
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "absolute inset-x-0 top-0 h-1",
-          inProgress
-            ? "bg-warning"
-            : item.mode === "exam"
-              ? "bg-primary"
-              : "bg-info",
-        )}
-      />
       <div className="flex flex-wrap items-center gap-2">
         <ModeBadge mode={item.mode} />
         <span className="text-xs font-medium text-muted-foreground">
           {item.className}
         </span>
         {inProgress ? (
-          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-warning/12 px-2.5 py-0.5 text-xs font-medium text-warning-ink">
-            <Hourglass className="size-3.5" aria-hidden="true" />
-            Bezig
-          </span>
+          <StatusBadge
+            kind="attempt"
+            status="in_progress"
+            className="ml-auto"
+          />
         ) : null}
       </div>
       <div className="flex flex-col gap-1">
@@ -165,25 +129,25 @@ function OpenCard({ item }: { item: DashboardItem }) {
         </h3>
       </div>
       <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
-        <Fact icon={FileQuestion}>
+        <Fact>
           {pluralize(item.questionCount, "vraag", "vragen")} ·{" "}
           {formatNumber(item.totalPoints)}{" "}
           {item.totalPoints === 1 ? "punt" : "punten"}
         </Fact>
-        <Fact icon={Clock3}>
+        <Fact>
           {item.timeLimitMinutes
             ? formatMinutes(item.timeLimitMinutes)
             : "Geen tijdslimiet"}
         </Fact>
-        <Fact icon={CalendarClock}>
+        <Fact>
           {item.closesAt
             ? `Sluit ${formatMoment(item.closesAt)}`
             : "Geen sluitingstijd"}
         </Fact>
         {item.needsAccessCode ? (
-          <Fact icon={KeyRound}>Toegangscode nodig</Fact>
+          <Fact>Toegangscode nodig</Fact>
         ) : item.maxAttempts > 1 ? (
-          <Fact icon={RotateCcw}>
+          <Fact>
             Poging{" "}
             {Math.min(
               item.attemptsUsed + (inProgress ? 0 : 1),
@@ -224,10 +188,7 @@ function OpenCard({ item }: { item: DashboardItem }) {
                   Opnieuw proberen
                 </>
               ) : (
-                <>
-                  Starten
-                  <ArrowRight aria-hidden="true" />
-                </>
+                "Starten"
               )}
             </Link>
           </Button>
@@ -240,9 +201,6 @@ function OpenCard({ item }: { item: DashboardItem }) {
 function UpcomingRow({ item }: { item: DashboardItem }) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-info/10 text-info-ink max-sm:hidden">
-        <CalendarDays className="size-5" aria-hidden="true" />
-      </span>
       <div className="flex min-w-[min(100%,14rem)] flex-1 flex-col gap-0.5">
         <span className="truncate font-medium">{item.title}</span>
         <span className="text-sm text-muted-foreground">
@@ -266,20 +224,6 @@ function FinishedRow({ item }: { item: DashboardItem }) {
   const last = item.lastAttempt;
   const content = (
     <>
-      <span
-        className={cn(
-          "grid size-10 shrink-0 place-items-center rounded-xl",
-          last
-            ? "bg-success/12 text-success-ink"
-            : "bg-muted text-muted-foreground",
-        )}
-      >
-        {last ? (
-          <CircleCheckBig className="size-5" aria-hidden="true" />
-        ) : (
-          <FileQuestion className="size-5" aria-hidden="true" />
-        )}
-      </span>
       <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-0.5">
         <span className="truncate font-medium">{item.title}</span>
         <span className="text-sm text-muted-foreground">
@@ -317,7 +261,7 @@ function FinishedRow({ item }: { item: DashboardItem }) {
         ) : null}
         {last ? (
           <ArrowRight
-            className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+            className="size-4 text-muted-foreground"
             aria-hidden="true"
           />
         ) : null}
@@ -347,16 +291,13 @@ export function FinishedEmpty({ open }: { open: readonly DashboardItem[] }) {
   const copy = finishedEmptyCopy(open);
   return (
     <EmptyBlock
-      icon={Award}
+      icon={null}
       title={copy.title}
       description={copy.description}
       action={
         copy.linkToResults ? (
           <Button asChild variant="outline">
-            <Link href={routes.leerling.results}>
-              <ListChecks aria-hidden="true" />
-              Naar Resultaten
-            </Link>
+            <Link href={routes.leerling.results}>Naar Resultaten</Link>
           </Button>
         ) : undefined
       }
@@ -384,26 +325,21 @@ export function StudentDashboard() {
     pruneAttemptBackups(keepKeyIds(keepKey));
   }, [keepKey]);
 
+  const hi = `Hoi ${firstName(user.name)}`;
   const greeting = (
     <header className="flex flex-col gap-1.5">
-      <p
-        className="text-sm font-medium text-muted-foreground first-letter:uppercase"
-        suppressHydrationWarning
-      >
-        {formatLongDate(new Date())}
-      </p>
       <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-        Hoi {firstName(user.name)}! <span aria-hidden="true">👋</span>
+        Mijn toetsen
       </h1>
       {query.data ? (
         <p className="text-muted-foreground">
           {query.data.open.length === 0
-            ? "Er staat op dit moment geen toets voor je open."
+            ? `${hi}, er staat op dit moment geen toets voor je open.`
             : query.data.open.some((i) => i.inProgress)
-              ? "Je bent nog met een toets bezig. Ga verder waar je gebleven was."
+              ? `${hi}, je bent nog met een toets bezig. Ga verder waar je gebleven was.`
               : query.data.open.length === 1
-                ? "Er staat één toets voor je klaar. Succes!"
-                : `Er staan ${query.data.open.length} toetsen voor je klaar. Succes!`}
+                ? `${hi}, er staat één toets voor je klaar.`
+                : `${hi}, er staan ${query.data.open.length} toetsen voor je klaar.`}
         </p>
       ) : null}
     </header>
@@ -441,15 +377,12 @@ export function StudentDashboard() {
           </div>
         ) : (
           <EmptyBlock
-            icon={PartyPopper}
-            title="Alles is af!"
-            description="Er staat nu niets voor je klaar. Zin om alvast te oefenen met Python?"
+            icon={null}
+            title="Geen open toetsen"
+            description="Zodra je docent een toets of oefening openzet, staat die hier. Intussen kun je vrij oefenen met Python."
             action={
               <Button asChild variant="outline">
-                <Link href={routes.leerling.practice}>
-                  <SquareTerminal aria-hidden="true" />
-                  Naar Oefenen
-                </Link>
+                <Link href={routes.leerling.practice}>Naar Oefenen</Link>
               </Button>
             }
           />
@@ -458,7 +391,7 @@ export function StudentDashboard() {
 
       {upcoming.length ? (
         <Section title="Binnenkort" count={upcoming.length}>
-          <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-xs">
+          <ul className="divide-y overflow-hidden rounded-xl border bg-card">
             {upcoming.map((item) => (
               <UpcomingRow key={item.id} item={item} />
             ))}

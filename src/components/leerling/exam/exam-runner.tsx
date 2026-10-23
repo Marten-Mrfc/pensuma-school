@@ -156,11 +156,9 @@ function ExamLoader({ attemptId }: { attemptId: string }) {
   if (submitted && contentHidden) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <span className="grid size-14 place-items-center rounded-2xl bg-success/12 text-success-ink">
-          <CheckCircle2 className="size-7" aria-hidden="true" />
-        </span>
+        <CheckCircle2 className="size-8 text-success-ink" aria-hidden="true" />
         <h1 className="font-display text-2xl font-bold tracking-tight">
-          Je hebt deze toets ingeleverd.
+          Je hebt deze toets ingeleverd
         </h1>
         <p className="max-w-md text-muted-foreground">
           Je antwoorden zijn veilig opgeslagen. Op de statuspagina zie je
@@ -445,7 +443,7 @@ function ExamRunner({
         politeness: "assertive",
         dedupeKey: "time-up",
       });
-      toast.info("De tijd is om! Je werk is ingeleverd.", TOAST);
+      toast.info("De tijd is om. Je werk is ingeleverd.", TOAST);
     }
     logger.stop();
     goToResult();
@@ -968,7 +966,7 @@ function ExamRunner({
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetContent
           side="bottom"
-          className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-5 pb-6"
+          className="max-h-[85dvh] overflow-y-auto rounded-t-xl px-5 pb-6"
         >
           <SheetHeader className="px-0">
             <SheetTitle>Vragen</SheetTitle>

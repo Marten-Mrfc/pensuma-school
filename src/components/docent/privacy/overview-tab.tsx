@@ -1,14 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  CalendarClock,
-  ClipboardCheck,
-  Eraser,
-  FileWarning,
-  Lock,
-  ScrollText,
-} from "lucide-react";
+import { FileWarning } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { DataInventoryTable } from "@/components/privacy/data-inventory-table";
@@ -58,7 +51,6 @@ export function OverviewTab({
           title="Stel de bewaartermijnen vast"
           action={
             <Button size="sm" onClick={() => onNavigate("bewaartermijnen")}>
-              <CalendarClock aria-hidden="true" />
               Bewaartermijnen instellen
             </Button>
           }
@@ -72,25 +64,17 @@ export function OverviewTab({
       ) : null}
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-4">
-        <StatCard
-          label="Bewaartermijnen"
-          value={
-            <span className="text-xl">
-              {confirmed ? "Vastgesteld" : "Nog niet vastgesteld"}
-            </span>
-          }
-          tone={confirmed ? "success" : "warning"}
-          icon={ClipboardCheck}
-          hint={
-            confirmed
-              ? `Op ${formatDate(s.retention.confirmedAt)}${
-                  settings.data.confirmedByName
-                    ? ` door ${settings.data.confirmedByName}`
-                    : ""
-                }`
-              : "Pogingen worden nog niet automatisch verwijderd"
-          }
-        />
+        {confirmed ? (
+          <StatCard
+            label="Bewaartermijnen"
+            value={<span className="text-xl">Vastgesteld</span>}
+            hint={`Op ${formatDate(s.retention.confirmedAt)}${
+              settings.data.confirmedByName
+                ? ` door ${settings.data.confirmedByName}`
+                : ""
+            }`}
+          />
+        ) : null}
         <StatCard
           label="Laatste opschoning"
           value={
@@ -104,7 +88,6 @@ export function OverviewTab({
               <span className="text-xl">Nog niet</span>
             )
           }
-          icon={Eraser}
           tone={o.lastRun?.error ? "destructive" : "default"}
           hint={
             o.lastRun
@@ -117,15 +100,11 @@ export function OverviewTab({
         <StatCard
           label="Logboekregels toetsen"
           value={nf.format(o.attemptEvents)}
-          icon={ScrollText}
-          tone="info"
           hint={`Na ${s.retention.attemptEventsDays} dagen automatisch verwijderd`}
         />
         <StatCard
           label="Bewaarblokkades"
           value={nf.format(o.holds)}
-          icon={Lock}
-          tone={o.holds > 0 ? "primary" : "default"}
           hint={
             o.holds > 0
               ? "Deze gegevens worden niet automatisch verwijderd"
@@ -135,7 +114,7 @@ export function OverviewTab({
       </div>
 
       <PanelCard
-        title="Wat staat er in Pensuma?"
+        title="Wat er in Pensuma staat"
         description="Aantallen op dit moment. Leerlingen zonder actieve klas worden verwijderd volgens de bewaartermijn, of bij het afsluiten van het schooljaar."
       >
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -177,7 +156,7 @@ export function OverviewTab({
       </PanelCard>
 
       <PanelCard
-        title="Welke gegevens verwerkt Pensuma?"
+        title="Welke gegevens Pensuma verwerkt"
         description="Dit overzicht staat ook in de privacyverklaring. De bewaartermijnen volgen jullie instellingen; de grondslag per soort gegevens staat in het verwerkingsregister."
       >
         <DataInventoryTable

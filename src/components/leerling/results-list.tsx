@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Award, EyeOff, Hourglass, Timer } from "lucide-react";
+import { ArrowRight, EyeOff, Hourglass } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
@@ -64,7 +64,7 @@ export function ResultsList() {
   const header = (
     <PageHeader
       title="Resultaten"
-      description="Alle toetsen en oefeningen die je hebt ingeleverd. Klik op een toets om te zien hoe het ging."
+      description="Alles wat je hebt ingeleverd, nieuwste bovenaan."
     />
   );
 
@@ -93,22 +93,14 @@ export function ResultsList() {
     <>
       {header}
       {rows.length ? (
-        <>
+        <div className="flex flex-col gap-2.5">
           {best != null ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border bg-card p-4 shadow-xs">
-                <p className="text-sm text-muted-foreground">Ingeleverd</p>
-                <p className="font-display text-3xl font-bold tabular-nums">
-                  {rows.length}
-                </p>
-              </div>
-              <div className="rounded-xl border bg-card p-4 shadow-xs">
-                <p className="text-sm text-muted-foreground">Hoogste cijfer</p>
-                <p className="font-display text-3xl font-bold text-primary tabular-nums">
-                  {formatGrade(best)}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {rows.length} keer ingeleverd · hoogste cijfer{" "}
+              <strong className="font-semibold text-foreground">
+                {formatGrade(best)}
+              </strong>
+            </p>
           ) : null}
           <ul className={ROW_LIST_CLASS}>
             {rows.map((row) => (
@@ -133,17 +125,17 @@ export function ResultsList() {
                         </>
                       ) : null}
                       {row.autoSubmitted ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Timer className="size-3.5" aria-hidden="true" />
-                          automatisch ingeleverd
-                        </span>
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span>automatisch ingeleverd</span>
+                        </>
                       ) : null}
                     </span>
                   </div>
                   <div className="ml-auto flex items-center gap-3">
                     <ScoreCell row={row} />
                     <ArrowRight
-                      className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                      className="size-4 text-muted-foreground"
                       aria-hidden="true"
                     />
                   </div>
@@ -151,10 +143,10 @@ export function ResultsList() {
               </li>
             ))}
           </ul>
-        </>
+        </div>
       ) : (
         <EmptyBlock
-          icon={Award}
+          icon={null}
           title="Nog geen resultaten"
           description="Zodra je een toets of oefening inlevert, zie je hier je resultaat."
           action={

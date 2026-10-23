@@ -1,13 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity,
-  ChartNoAxesColumn,
-  ShieldCheck,
-  Sigma,
-  Users,
-} from "lucide-react";
+import { ChartNoAxesColumn } from "lucide-react";
 import { use, useId } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { StatCard } from "@/components/app/stat-card";
@@ -69,7 +63,7 @@ function AnalysisContent({ data }: { data: Analysis }) {
             <ModeBadge mode={a.mode} />
           </>
         }
-        description={`Toetsanalyse · ${a.className} · ${a.testTitle}`}
+        description={`${a.className} · ${a.testTitle}`}
       />
       <AssignmentNav assignmentId={a.id} active="analysis" />
 
@@ -88,8 +82,6 @@ function AnalysisContent({ data }: { data: Analysis }) {
             <StatCard
               label="Gemiddelde score"
               value={`${formatStat(t.mean, 1)} / ${formatStat(t.maxTotal, 0)}`}
-              icon={Sigma}
-              tone="primary"
               hint={
                 t.mean != null && t.maxTotal
                   ? `${formatShare(t.mean / t.maxTotal)} van de punten`
@@ -99,26 +91,17 @@ function AnalysisContent({ data }: { data: Analysis }) {
             <StatCard
               label="Spreiding"
               value={formatStat(t.sd, 1)}
-              icon={Activity}
               hint="standaarddeviatie in punten"
             />
             <StatCard
               label="Betrouwbaarheid (α)"
               value={formatStat(t.alpha)}
-              icon={ShieldCheck}
-              tone={
-                t.alphaLevel?.tone === "success"
-                  ? "success"
-                  : t.alphaLevel?.tone === "warning"
-                    ? "warning"
-                    : "default"
-              }
+              tone={t.alphaLevel?.tone === "warning" ? "warning" : "default"}
               hint={t.alphaLevel?.label ?? "te weinig gegevens"}
             />
             <StatCard
               label="Ingeleverd"
               value={`${t.n}/${t.students}`}
-              icon={Users}
               hint={t.k === 1 ? "1 vraag telt mee" : `${t.k} vragen tellen mee`}
             />
           </div>

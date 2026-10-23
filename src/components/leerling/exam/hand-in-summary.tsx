@@ -148,7 +148,7 @@ export function HandInSummary({
         />
       ) : (
         <p className="rounded-lg bg-success/10 p-3 font-medium text-success-ink">
-          Je hebt alle {questions.length} vragen beantwoord. Goed bezig!
+          Je hebt alle {questions.length} vragen beantwoord.
         </p>
       )}
       {withTips.length ? (

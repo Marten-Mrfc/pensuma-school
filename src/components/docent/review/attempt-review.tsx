@@ -4,16 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlarmClockPlus,
   ArrowLeftRight,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CircleDot,
   ClipboardPaste,
-  Clock,
   Copy,
   Expand,
   FlaskConical,
-  History,
   Lightbulb,
   Loader2,
   type LucideIcon,
@@ -347,7 +344,7 @@ function AttemptContent({
               key={s.id}
               href={routes.docent.attempt(assignmentId, s.id)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent",
+                "rounded-md border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent",
                 s.id === attempt.id &&
                   "border-primary bg-primary/10 text-primary",
               )}
@@ -364,9 +361,7 @@ function AttemptContent({
           aria-label="Vragen"
           className="flex flex-col gap-1 rounded-xl border bg-card p-2 shadow-xs lg:sticky lg:top-20"
         >
-          <span className="px-2 pt-1 pb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Vragen
-          </span>
+          <span className="px-2 pt-1 pb-2 text-sm font-medium">Vragen</span>
           <ol className="flex flex-col gap-0.5">
             {data.items.map((item) => (
               <li key={item.question.id}>
@@ -389,7 +384,6 @@ function AttemptContent({
             href={`#${logId}`}
             className="mt-1 flex items-center gap-2 rounded-md border-t px-2 pt-2.5 pb-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
-            <History className="size-4" aria-hidden="true" />
             Logboek ({data.events.length})
           </a>
         </nav>
@@ -666,13 +660,12 @@ function AnswerView({ item }: { item: Item }) {
                 </div>
                 <span className="flex shrink-0 gap-1">
                   {chosen ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
+                    <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-secondary px-2 text-xs font-medium whitespace-nowrap text-secondary-foreground">
                       Gekozen
                     </span>
                   ) : null}
                   {o.correct ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2 py-0.5 text-[11px] font-medium text-success-ink">
-                      <CheckCircle2 className="size-3" aria-hidden="true" />
+                    <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-success/12 px-2 text-xs font-medium whitespace-nowrap text-success-ink">
                       Juist
                     </span>
                   ) : null}
@@ -903,14 +896,7 @@ function EventTimeline({
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2
-            id={`${domId}-title`}
-            className="flex items-center gap-2 font-semibold"
-          >
-            <History
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
+          <h2 id={`${domId}-title`} className="font-semibold">
             Logboek
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -969,10 +955,6 @@ function EventTimeline({
                       dateTime={new Date(e.createdAt).toISOString()}
                       className="text-xs text-muted-foreground tabular-nums"
                     >
-                      <Clock
-                        className="mr-1 inline size-3"
-                        aria-hidden="true"
-                      />
                       {formatTime(e.createdAt)}
                     </time>
                   </TimelineHeader>

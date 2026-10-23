@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { FormErrorSummary } from "@/components/a11y/form-error-summary";
@@ -328,7 +327,6 @@ function SchoolDetailsInner({ data }: { data: Data }) {
             disabled={update.isPending}
             aria-busy={update.isPending}
           >
-            <Save aria-hidden="true" />
             Opslaan
           </Button>
         </div>

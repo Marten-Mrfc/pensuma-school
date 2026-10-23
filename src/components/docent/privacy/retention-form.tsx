@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Eraser, Save } from "lucide-react";
+import { Eraser } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { FormErrorSummary } from "@/components/a11y/form-error-summary";
@@ -365,7 +365,6 @@ function RetentionFormInner({
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <Button type="submit" disabled={update.isPending || !dirty}>
-            <Save aria-hidden="true" />
             Opslaan
           </Button>
           <ConfirmDialog
@@ -387,7 +386,6 @@ function RetentionFormInner({
                 variant="outline"
                 disabled={update.isPending}
               >
-                <BadgeCheck aria-hidden="true" />
                 Opslaan en vaststellen
               </Button>
             }

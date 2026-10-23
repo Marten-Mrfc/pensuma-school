@@ -130,15 +130,6 @@ export function fromDateTimeLocal(value: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** "Goedemorgen" / "Goedemiddag" / "Goedenavond". */
-export function greeting(now = new Date()): string {
-  const h = now.getHours();
-  if (h < 6) return "Goedenacht";
-  if (h < 12) return "Goedemorgen";
-  if (h < 18) return "Goedemiddag";
-  return "Goedenavond";
-}
-
 export function pluralize(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }

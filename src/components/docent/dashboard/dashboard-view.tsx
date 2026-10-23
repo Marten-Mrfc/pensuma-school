@@ -1,27 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  Award,
-  CalendarClock,
-  CalendarPlus,
-  ChevronRight,
-  Clock,
-  FileCode2,
-  FilePlus2,
-  Inbox,
-  KeyRound,
-  type LucideIcon,
-  NotebookPen,
-  Radio,
-  Send,
-  Upload,
-  Users,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 import { AccessibleChart } from "@/components/a11y/accessible-chart";
-import { useCurrentUser } from "@/components/app/current-user";
 import { PageHeader } from "@/components/app/page-header";
 import { StatCard } from "@/components/app/stat-card";
 import { ErrorState, LoadingState } from "@/components/app/states";
@@ -31,7 +14,6 @@ import {
   formatMinutes,
   formatMoment,
   formatNumber,
-  greeting,
 } from "@/components/docent/assignments/format";
 import {
   AssignmentProgress,
@@ -57,15 +39,27 @@ type Active = Overview["activeAssignments"][number];
 export const LIST_ROW_LINK =
   "flex items-center gap-3 px-4 transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset forced-colors:focus-visible:-outline-offset-2!";
 
+const dayFormat = new Intl.DateTimeFormat("nl-NL", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+
+/** "Vrijdag 23 oktober": today's date as the dashboard title. */
+function formatToday(value: Date | string): string {
+  const text = dayFormat.format(
+    typeof value === "string" ? new Date(value) : value,
+  );
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function DashboardView() {
   const trpc = useTRPC();
-  const user = useCurrentUser();
   const query = useQuery(
     trpc.dashboard.overview.queryOptions(undefined, {
       refetchInterval: 10_000,
     }),
   );
-  const firstName = user.name.trim().split(/\s+/)[0] ?? "";
   const uid = useId();
 
   if (query.isPending) return <LoadingState />;
@@ -80,18 +74,17 @@ export function DashboardView() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title={`${greeting()}${firstName ? `, ${firstName}` : ""}`}
+        title={formatToday(d.serverTime)}
         description={
-          open.length
-            ? `Er ${open.length === 1 ? "loopt nu 1 afname" : `lopen nu ${open.length} afnames`}. Hieronder zie je live hoe ver je leerlingen zijn.`
-            : "Er loopt nu geen afname. Plan een toets of kijk werk na."
+          open.length === 0
+            ? "Er loopt nu geen afname."
+            : open.length === 1
+              ? "Er loopt nu 1 afname."
+              : `Er lopen nu ${open.length} afnames.`
         }
         actions={
           <Button asChild>
-            <Link href={routes.docent.newAssignment()}>
-              <CalendarPlus aria-hidden="true" />
-              Afname plannen
-            </Link>
+            <Link href={routes.docent.newAssignment()}>Afname plannen</Link>
           </Button>
         }
       />
@@ -100,30 +93,20 @@ export function DashboardView() {
         <StatCard
           label="Open afnames"
           value={d.counts.openAssignments}
-          icon={Radio}
-          tone="success"
           hint={
             d.counts.plannedAssignments
               ? `${d.counts.plannedAssignments} gepland`
               : "niets gepland"
           }
         />
-        <StatCard
-          label="Leerlingen"
-          value={d.counts.students}
-          icon={Users}
-          tone="info"
-        />
+        <StatCard label="Leerlingen" value={d.counts.students} />
         <StatCard
           label="Gepubliceerde toetsen"
           value={d.counts.publishedTests}
-          icon={FileCode2}
-          tone="primary"
         />
         <StatCard
           label="Te beoordelen"
           value={d.counts.answersNeedingReview}
-          icon={NotebookPen}
           tone={d.counts.answersNeedingReview ? "warning" : "default"}
           hint={
             d.counts.answersNeedingReview === 1
@@ -142,30 +125,24 @@ export function DashboardView() {
         >
           <SectionTitle
             id={`${uid}-now`}
-            icon={Radio}
             title="Nu bezig"
             href={routes.docent.assignments}
             linkLabel="Alle afnames"
           />
           {open.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card/50 px-6 py-10 text-center">
-              <span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <Radio className="size-5" aria-hidden="true" />
-              </span>
-              <p className="font-medium">Er is nu geen afname open</p>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                Als een afname open is, zie je hier live hoeveel leerlingen
-                bezig zijn en wie al heeft ingeleverd.
-              </p>
-              <Button asChild size="sm" variant="outline">
-                <Link href={routes.docent.newAssignment()}>
-                  <CalendarPlus aria-hidden="true" />
-                  Afname plannen
-                </Link>
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Er staat nu geen afname open.{" "}
+              <Link
+                href={routes.docent.newAssignment()}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Afname plannen
+              </Link>
+            </p>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div
+              className={cn("grid gap-3", open.length > 1 && "md:grid-cols-2")}
+            >
               {open.map((a) => (
                 <LiveCard key={a.id} a={a} />
               ))}
@@ -174,7 +151,7 @@ export function DashboardView() {
 
           {planned.length ? (
             <div className="mt-3 flex flex-col gap-3">
-              <SectionTitle icon={CalendarClock} title="Gepland" />
+              <SectionTitle title="Gepland" />
               <ul className="divide-y overflow-hidden rounded-xl border bg-card shadow-xs">
                 {planned.map((a) => (
                   <li key={a.id}>
@@ -182,9 +159,6 @@ export function DashboardView() {
                       href={routes.docent.assignment(a.id)}
                       className={cn(LIST_ROW_LINK, "py-3")}
                     >
-                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-info/10 text-info-ink">
-                        <CalendarClock className="size-4" aria-hidden="true" />
-                      </span>
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-sm font-medium">
                           {a.title}
@@ -215,44 +189,12 @@ export function DashboardView() {
         <div className="flex flex-col gap-6">
           <section
             className="flex flex-col gap-3"
-            aria-labelledby={`${uid}-quick`}
-          >
-            <SectionTitle id={`${uid}-quick`} title="Snel aan de slag" />
-            <div className="grid gap-2">
-              <QuickAction
-                href={routes.docent.tests}
-                icon={FilePlus2}
-                title="Nieuwe toets"
-                description="Maak vragen met code, meerkeuze of open antwoorden."
-              />
-              <QuickAction
-                href={routes.docent.newAssignment()}
-                icon={CalendarPlus}
-                title="Afname plannen"
-                description="Zet een toets klaar voor een klas."
-              />
-              <QuickAction
-                href={routes.docent.classes}
-                icon={Upload}
-                title="Leerlingen importeren"
-                description="Voeg een klas toe vanuit een lijst of Excel."
-              />
-            </div>
-          </section>
-
-          <section
-            className="flex flex-col gap-3"
             aria-labelledby={`${uid}-review`}
           >
-            <SectionTitle
-              id={`${uid}-review`}
-              icon={NotebookPen}
-              title="Te beoordelen"
-            />
+            <SectionTitle id={`${uid}-review`} title="Te beoordelen" />
             {d.reviewQueue.length === 0 ? (
-              <p className="flex items-center gap-2 rounded-xl border bg-card px-4 py-4 text-sm text-muted-foreground shadow-xs">
-                <Inbox className="size-4" aria-hidden="true" />
-                Niets na te kijken. Lekker bezig!
+              <p className="text-sm text-muted-foreground">
+                Niets na te kijken.
               </p>
             ) : (
               <ul className="divide-y overflow-hidden rounded-xl border bg-card shadow-xs">
@@ -270,7 +212,7 @@ export function DashboardView() {
                           {r.className}
                         </span>
                       </span>
-                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning-ink tabular-nums">
+                      <span className="rounded-sm bg-warning/15 px-1.5 py-0.5 text-xs font-semibold text-warning-ink tabular-nums">
                         {r.count}
                       </span>
                       <ChevronRight
@@ -291,13 +233,9 @@ export function DashboardView() {
           className="flex min-w-0 flex-col gap-3"
           aria-labelledby={`${uid}-recent`}
         >
-          <SectionTitle
-            id={`${uid}-recent`}
-            icon={Send}
-            title="Recent ingeleverd"
-          />
+          <SectionTitle id={`${uid}-recent`} title="Recent ingeleverd" />
           {d.recentSubmissions.length === 0 ? (
-            <p className="rounded-xl border bg-card px-4 py-6 text-center text-sm text-muted-foreground shadow-xs">
+            <p className="text-sm text-muted-foreground">
               Nog niets ingeleverd.
             </p>
           ) : (
@@ -367,11 +305,7 @@ export function DashboardView() {
           className="flex min-w-0 flex-col gap-3"
           aria-labelledby={`${uid}-last`}
         >
-          <SectionTitle
-            id={`${uid}-last`}
-            icon={Award}
-            title="Laatst gesloten afname"
-          />
+          <SectionTitle id={`${uid}-last`} title="Laatst gesloten afname" />
           {d.lastClosed ? (
             <div className="flex flex-col gap-3 rounded-xl border bg-card p-5 shadow-xs">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -434,7 +368,7 @@ export function DashboardView() {
               </p>
             </div>
           ) : (
-            <p className="rounded-xl border bg-card px-4 py-6 text-center text-sm text-muted-foreground shadow-xs">
+            <p className="text-sm text-muted-foreground">
               Zodra een afname gesloten is, zie je hier de cijferverdeling.
             </p>
           )}
@@ -446,23 +380,18 @@ export function DashboardView() {
 
 function SectionTitle({
   id,
-  icon: Icon,
   title,
   href,
   linkLabel,
 }: {
   id?: string;
-  icon?: LucideIcon;
   title: string;
   href?: string;
   linkLabel?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 id={id} className="flex items-center gap-2 font-semibold">
-        {Icon ? (
-          <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-        ) : null}
+      <h2 id={id} className="font-semibold">
         {title}
       </h2>
       {href ? (
@@ -484,14 +413,11 @@ function LiveCard({ a }: { a: Active }) {
   return (
     <Link
       href={routes.docent.assignment(a.id)}
-      className="group flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs transition-all outline-none hover:border-primary/40 hover:shadow-sm focus-visible:ring-[3px] focus-visible:ring-ring"
+      className="group flex flex-col gap-4 rounded-xl border bg-card p-5 transition-colors outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <StatusBadge kind="assignment" status="open" />
-            <ModeBadge mode={a.mode} />
-          </div>
+          <ModeBadge mode={a.mode} />
           <span className="mt-1 truncate font-semibold group-hover:text-primary">
             {a.title}
           </span>
@@ -509,62 +435,27 @@ function LiveCard({ a }: { a: Active }) {
       <AssignmentProgress counts={a.counts} size="lg" />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {a.accessCode ? (
-          <span className="inline-flex items-center gap-1.5">
-            <KeyRound className="size-3.5" aria-hidden="true" />
+          <span>
+            Toegangscode{" "}
             <span className="font-mono font-semibold tracking-widest text-foreground">
               {a.accessCode}
             </span>
           </span>
         ) : null}
-        <span className="inline-flex items-center gap-1.5">
-          <Clock className="size-3.5" aria-hidden="true" />
+        <span>
           {a.closesAt
             ? `sluit ${formatMoment(a.closesAt)}`
             : "sluit wanneer jij dat doet"}
         </span>
         <span className="ml-auto inline-flex items-center gap-1 font-medium text-primary">
           Live overzicht
-          <ChevronRight
-            className="size-3.5 transition-transform group-hover:translate-x-0.5"
-            aria-hidden="true"
-          />
+          <ChevronRight className="size-3.5" aria-hidden="true" />
         </span>
       </div>
       <span className="sr-only">
         {formatNumber(a.counts.submitted)} van {formatNumber(a.counts.students)}{" "}
         ingeleverd
       </span>
-    </Link>
-  );
-}
-
-function QuickAction({
-  href,
-  icon: Icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs transition-all outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring"
-    >
-      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-semibold">{title}</span>
-        <span className="text-xs text-muted-foreground">{description}</span>
-      </span>
-      <ChevronRight
-        className="ml-auto size-4 shrink-0 text-muted-foreground"
-        aria-hidden="true"
-      />
     </Link>
   );
 }

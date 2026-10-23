@@ -200,7 +200,7 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium ring-1 ring-border">
+                <span className="inline-flex h-6 items-center rounded-sm bg-muted px-2 text-xs font-medium">
                   {preview.questions.length}{" "}
                   {preview.questions.length === 1 ? "vraag" : "vragen"} ·{" "}
                   {preview.questions.reduce((s, q) => s + q.points, 0)} punten
@@ -212,7 +212,7 @@ export function ImportTestDialog({ trigger }: { trigger?: ReactNode }) {
                     return (
                       <span
                         key={type}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-xs ring-1 ring-border"
+                        className="inline-flex h-6 items-center gap-1.5 rounded-sm bg-muted px-2 text-xs"
                       >
                         <Icon
                           className="size-3.5 text-muted-foreground"

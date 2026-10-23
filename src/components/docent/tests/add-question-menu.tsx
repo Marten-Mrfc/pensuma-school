@@ -3,7 +3,6 @@
 import { Library, Loader2, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
-  QUESTION_TYPE_ICONS,
   QUESTION_TYPE_TONE,
   TEMPLATE_ICONS,
 } from "@/components/docent/questions/question-icons";
@@ -123,7 +122,6 @@ export function AddQuestionMenu({
           {[GROUPS.slice(0, 1), GROUPS.slice(1)].map((column, ci) => (
             <div key={column[0].type} className="flex flex-col">
               {column.map((group, gi) => {
-                const GroupIcon = QUESTION_TYPE_ICONS[group.type];
                 return (
                   <DropdownMenuGroup key={group.type}>
                     {gi > 0 || (ci > 0 && gi === 0) ? (
@@ -131,8 +129,7 @@ export function AddQuestionMenu({
                         className={gi === 0 ? "md:hidden" : undefined}
                       />
                     ) : null}
-                    <DropdownMenuLabel className="flex items-center gap-1.5 text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase">
-                      <GroupIcon className="size-3.5" aria-hidden="true" />
+                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
                       {group.label}
                     </DropdownMenuLabel>
                     {QUESTION_TEMPLATES.filter(

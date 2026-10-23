@@ -173,7 +173,7 @@ export function ClassStudentsTable({
       sortValue: (m) => extraTime(m.id),
       cell: (m) =>
         extraTime(m.id) > 0 ? (
-          <span className="inline-flex h-6 items-center rounded-full bg-info/10 px-2 text-xs font-medium text-info-ink tabular-nums ring-1 ring-info/25 ring-inset">
+          <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-info/12 px-2 text-xs font-medium whitespace-nowrap text-info-ink tabular-nums">
             +{extraTime(m.id)}%
           </span>
         ) : (

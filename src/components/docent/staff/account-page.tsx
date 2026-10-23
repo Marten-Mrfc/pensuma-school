@@ -1,13 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  KeyRound,
-  Loader2,
-  LogOut,
-  MonitorSmartphone,
-  UserRound,
-} from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
@@ -20,6 +14,7 @@ import { ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/react";
 import { focusInvalidField } from "../a11y/invalid-field-focus";
 import { ChangePasswordForm } from "../account/change-password-form";
@@ -56,7 +51,7 @@ export function AccountPage() {
         title="Mijn account"
         description={`Ingelogd als ${me.email} · account sinds ${formatDate(me.createdAt)}`}
       />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         <ProfilePanel name={me.name} email={me.email} />
         <PasswordPanel name={me.name} email={me.email} />
         <SessionsPanel activeSessions={me.activeSessions} />
@@ -68,26 +63,26 @@ export function AccountPage() {
 function Panel({
   title,
   description,
-  icon,
+  className,
   children,
 }: {
   title: string;
   description?: string;
-  icon: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-5 rounded-xl border bg-card p-5 text-card-foreground shadow-xs sm:p-6">
-      <header className="flex items-start gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&>svg]:size-[18px]">
-          {icon}
-        </span>
-        <div className="flex flex-col gap-0.5">
-          <h2 className="font-semibold">{title}</h2>
-          {description ? (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          ) : null}
-        </div>
+    <section
+      className={cn(
+        "flex flex-col gap-5 rounded-xl border bg-card p-5 text-card-foreground shadow-xs sm:p-6",
+        className,
+      )}
+    >
+      <header className="flex flex-col gap-0.5">
+        <h2 className="font-semibold">{title}</h2>
+        {description ? (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        ) : null}
       </header>
       {children}
     </section>
@@ -142,7 +137,6 @@ function ProfilePanel({
     <Panel
       title="Profiel"
       description="Je naam is zichtbaar voor andere docenten."
-      icon={<UserRound />}
     >
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         <FormField label="Naam" htmlFor={nameId} error={error}>
@@ -189,7 +183,7 @@ function PasswordPanel({ name, email }: { name: string; email: string }) {
     <Panel
       title="Wachtwoord wijzigen"
       description="Na het wijzigen word je op al je andere apparaten uitgelogd."
-      icon={<KeyRound />}
+      className="lg:row-span-2"
     >
       <ChangePasswordForm email={email} name={name} />
     </Panel>
@@ -208,7 +202,6 @@ function SessionsPanel({ activeSessions }: { activeSessions: number }) {
     <Panel
       title="Apparaten"
       description="Ben je ergens vergeten uit te loggen, bijvoorbeeld op een computer in het lokaal?"
-      icon={<MonitorSmartphone />}
     >
       <div className="flex flex-col gap-4">
         <p className="text-sm">

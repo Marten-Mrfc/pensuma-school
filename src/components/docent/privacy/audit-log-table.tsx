@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
-import { Download, Filter, Loader2, ScrollText, X } from "lucide-react";
+import { Download, Loader2, ScrollText, X } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -149,14 +149,7 @@ export function AuditLogTable() {
         className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs sm:p-5"
       >
         <div className="flex items-center justify-between gap-3">
-          <h2
-            id={`${id}-filters`}
-            className="flex items-center gap-2 text-sm font-semibold"
-          >
-            <Filter
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
+          <h2 id={`${id}-filters`} className="text-sm font-semibold">
             Filters
           </h2>
           {filtered ? (
@@ -325,7 +318,7 @@ function Subject({ row }: { row: Row }) {
         ? (row.subjectLabel ?? "Leerling")
         : (row.subjectName ?? row.subjectLabel ?? "—")}
       {row.subjectDeleted ? (
-        <span className="ml-1.5 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[0.7rem] font-medium text-muted-foreground">
+        <span className="ml-1.5 inline-flex rounded-sm bg-muted px-1.5 py-0.5 text-[0.7rem] font-medium text-muted-foreground">
           verwijderd
         </span>
       ) : null}
@@ -354,7 +347,7 @@ function Action({ row }: { row: Row }) {
       {row.category ? (
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 text-[0.7rem] font-medium",
+            "rounded-sm px-2 py-0.5 text-[0.7rem] font-medium",
             CATEGORY_TONES[row.category],
           )}
         >

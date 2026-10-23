@@ -46,7 +46,7 @@ export function ExamShell({
         className,
       )}
     >
-      <header className="z-30 flex min-h-14 shrink-0 items-center gap-3 border-b bg-card/85 px-3 py-1.5 backdrop-blur-md sm:min-h-16 sm:px-5">
+      <header className="z-30 flex min-h-14 shrink-0 items-center gap-3 border-b bg-card px-3 py-1.5 sm:min-h-16 sm:px-5">
         <LogoMark className="size-7 max-sm:hidden sm:size-8" />
         <div className="flex min-w-0 flex-col">
           <h1
@@ -79,7 +79,7 @@ export function ExamShell({
       {footer ? (
         <section
           aria-label="Vraagnavigatie"
-          className="shrink-0 border-t bg-card/85 backdrop-blur-md"
+          className="shrink-0 border-t bg-card"
         >
           {footer}
         </section>

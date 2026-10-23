@@ -14,7 +14,7 @@ export function TemporaryPasswordView({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 rounded-xl border bg-muted/40 p-4">
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <span className="text-xs font-medium text-muted-foreground">
           Tijdelijk wachtwoord
         </span>
         <div className="flex items-center justify-between gap-2">

@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils";
 export interface EditorSectionProps {
   title: ReactNode;
   description?: ReactNode;
-  icon?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -42,7 +41,6 @@ export interface EditorSectionProps {
 export function EditorSection({
   title,
   description,
-  icon,
   actions,
   children,
   className,
@@ -58,26 +56,19 @@ export function EditorSection({
       )}
     >
       <header className="flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="flex min-w-0 items-start gap-3">
-          {icon ? (
-            <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground [&>svg]:size-4">
-              {icon}
-            </span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2
+            ref={headingRef}
+            tabIndex={headingRef ? -1 : undefined}
+            className="rounded-sm text-[0.95rem] leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {title}
+          </h2>
+          {description ? (
+            <p className="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-[0.8rem]">
+              {description}
+            </p>
           ) : null}
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h2
-              ref={headingRef}
-              tabIndex={headingRef ? -1 : undefined}
-              className="rounded-sm text-[0.95rem] leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {title}
-            </h2>
-            {description ? (
-              <p className="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-[0.8rem]">
-                {description}
-              </p>
-            ) : null}
-          </div>
         </div>
         {actions ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">

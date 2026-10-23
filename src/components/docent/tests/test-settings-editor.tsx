@@ -1,6 +1,5 @@
 "use client";
 
-import { Settings2 } from "lucide-react";
 import { type Ref, useId } from "react";
 import { MarkdownEditor } from "@/components/app/markdown-editor";
 import {
@@ -33,7 +32,6 @@ export function TestSettingsEditor({
     <EditorSection
       title="Toetsinstellingen"
       description="De titel en beschrijving zien leerlingen voordat ze aan de toets beginnen."
-      icon={<Settings2 />}
       actions={status}
       headingRef={headingRef}
     >

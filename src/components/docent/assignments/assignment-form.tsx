@@ -3,23 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
-  CalendarPlus,
   Check,
-  Clock,
-  Dumbbell,
-  FileCheck2,
-  FileCode2,
-  GraduationCap,
   Hand,
-  KeyRound,
   Loader2,
   type LucideIcon,
   Play,
-  RotateCcw,
-  School,
-  Settings2,
-  UserRoundCheck,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -77,11 +65,10 @@ const CODE_MODES: CodeMode[] = ["generate", "none", "custom"];
 
 const PRESET_INFO: Record<
   Preset,
-  { title: string; icon: LucideIcon; description?: string; points: string[] }
+  { title: string; description?: string; points: string[] }
 > = {
   exam: {
     title: "Toets",
-    icon: FileCheck2,
     points: [
       "Eén poging per leerling",
       "Toegangscode op het bord",
@@ -91,7 +78,6 @@ const PRESET_INFO: Record<
   },
   practice: {
     title: "Oefenen",
-    icon: Dumbbell,
     points: [
       "Meerdere pogingen (standaard 5)",
       "Geen toegangscode nodig",
@@ -101,7 +87,6 @@ const PRESET_INFO: Record<
   },
   selfstudy: {
     title: "Zelfstudie (altijd open)",
-    icon: GraduationCap,
     description:
       "Leerlingen kunnen dit hele schooljaar oefenen, zo vaak als ze willen.",
     points: [
@@ -269,7 +254,6 @@ function AssignmentFormInner({ options }: { options: Options }) {
           backLabel="Afnames"
         />
         <EmptyBlock
-          icon={FileCode2}
           title="Je hebt nog geen gepubliceerde toets"
           description="Alleen gepubliceerde toetsen kun je inplannen. Maak een toets en publiceer hem eerst."
           action={
@@ -307,7 +291,6 @@ function AssignmentFormInner({ options }: { options: Options }) {
     <form onSubmit={submit} noValidate className="flex flex-col gap-6">
       <PageHeader
         title={retakeOf ? "Herkansing plannen" : "Afname plannen"}
-        description="Kies een toets en een of meer klassen, en bepaal wanneer en hoe de leerlingen hem maken."
         backHref={routes.docent.assignments}
         backLabel="Afnames"
       />
@@ -316,7 +299,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-6">
-          <Section step={1} title="Toets en klassen" icon={School}>
+          <Section step={1} title="Toets en klassen">
             <div className="flex flex-col gap-5">
               {unavailableTestId ? (
                 <Notice
@@ -401,15 +384,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
               />
 
               {singleClass ? (
-                <div className="flex flex-col gap-3 rounded-lg border bg-background/50 p-3">
+                <div className="flex flex-col gap-3 rounded-lg border p-3">
                   <label
                     htmlFor={`${id}-targeted`}
                     className="flex cursor-pointer items-start gap-3"
                   >
-                    <UserRoundCheck
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
                     <span className="flex flex-1 flex-col gap-0.5">
                       <span className="text-sm font-medium">
                         Alleen voor een paar leerlingen (inhaaltoets of
@@ -456,7 +435,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
             </div>
           </Section>
 
-          <Section step={2} title="Modus" icon={FileCheck2}>
+          <Section step={2} title="Modus">
             <div
               role="radiogroup"
               aria-label="Modus"
@@ -464,7 +443,6 @@ function AssignmentFormInner({ options }: { options: Options }) {
             >
               {PRESETS.map((p, index) => {
                 const info = PRESET_INFO[p];
-                const Icon = info.icon;
                 const active = state.preset === p;
                 return (
                   // biome-ignore lint/a11y/useSemanticElements: card-style radio (arrow keys and one Tab stop via useRovingRadioGroup)
@@ -483,16 +461,6 @@ function AssignmentFormInner({ options }: { options: Options }) {
                     )}
                   >
                     <span className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "grid size-10 shrink-0 place-items-center rounded-lg",
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        <Icon className="size-5" aria-hidden="true" />
-                      </span>
                       <span className="text-base leading-tight font-semibold">
                         {info.title}
                       </span>
@@ -524,12 +492,11 @@ function AssignmentFormInner({ options }: { options: Options }) {
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              De modus zet handige standaardinstellingen. Je kunt alles
-              hieronder nog aanpassen.
+              Je kunt alles hieronder nog aanpassen.
             </p>
           </Section>
 
-          <Section step={3} title="Wanneer" icon={CalendarClock}>
+          <Section step={3} title="Wanneer">
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium" id={`${id}-start`}>
@@ -675,7 +642,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                         aria-pressed={limitMinutes === m}
                         onClick={() => set("timeLimit", String(m))}
                         className={cn(
-                          "h-7 rounded-full border px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
+                          "h-7 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring",
                           limitMinutes === m &&
                             "border-primary bg-primary/10 text-primary",
                         )}
@@ -689,7 +656,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
             </div>
           </Section>
 
-          <Section step={4} title="Toegangscode" icon={KeyRound}>
+          <Section step={4} title="Toegangscode">
             <div
               role="radiogroup"
               aria-label="Toegangscode"
@@ -742,12 +709,8 @@ function AssignmentFormInner({ options }: { options: Options }) {
             {chosenClasses.length > 1 && state.codeMode === "generate" ? (
               <label
                 htmlFor={`${id}-per-class`}
-                className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background/50 p-3"
+                className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
               >
-                <KeyRound
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
                 <span className="flex flex-1 flex-col gap-0.5">
                   <span className="text-sm font-medium">
                     Elke klas een eigen toegangscode
@@ -769,7 +732,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
             </p>
           </Section>
 
-          <Section step={5} title="Instellingen" icon={Settings2}>
+          <Section step={5} title="Instellingen">
             <AssignmentSettingsFields
               value={state.settings}
               onChange={(settings) => set("settings", settings)}
@@ -787,7 +750,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
               Samenvatting
             </h2>
             <dl className="flex flex-col gap-3 text-sm">
-              <SummaryRow icon={FileCode2} label="Toets">
+              <SummaryRow label="Toets">
                 {test ? (
                   <>
                     {test.title}
@@ -802,10 +765,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   </span>
                 )}
               </SummaryRow>
-              <SummaryRow
-                icon={Users}
-                label={chosenClasses.length > 1 ? "Klassen" : "Klas"}
-              >
+              <SummaryRow label={chosenClasses.length > 1 ? "Klassen" : "Klas"}>
                 {chosenClasses.length ? (
                   classesSummary(chosenClasses)
                 ) : (
@@ -815,19 +775,17 @@ function AssignmentFormInner({ options }: { options: Options }) {
                 )}
               </SummaryRow>
               {students && singleClass ? (
-                <SummaryRow icon={UserRoundCheck} label="Leerlingen">
+                <SummaryRow label="Leerlingen">
                   {studentsSummary(students.length, singleClass.studentCount)}
                 </SummaryRow>
               ) : null}
               {retakeOf ? (
-                <SummaryRow icon={RotateCcw} label="Soort">
-                  Herkansing
-                </SummaryRow>
+                <SummaryRow label="Soort">Herkansing</SummaryRow>
               ) : null}
-              <SummaryRow icon={PRESET_INFO[state.preset].icon} label="Modus">
+              <SummaryRow label="Modus">
                 {PRESET_INFO[state.preset].title}
               </SummaryRow>
-              <SummaryRow icon={CalendarClock} label="Tijdvak">
+              <SummaryRow label="Tijdvak">
                 {state.startMode === "now"
                   ? "Opent direct"
                   : state.startMode === "manual"
@@ -841,12 +799,12 @@ function AssignmentFormInner({ options }: { options: Options }) {
                     : "Sluit wanneer jij dat doet"}
                 </span>
               </SummaryRow>
-              <SummaryRow icon={Clock} label="Tijdslimiet">
+              <SummaryRow label="Tijdslimiet">
                 {formatMinutes(
                   limitMinutes && limitMinutes > 0 ? limitMinutes : null,
                 )}
               </SummaryRow>
-              <SummaryRow icon={KeyRound} label="Toegangscode">
+              <SummaryRow label="Toegangscode">
                 {state.codeMode === "generate"
                   ? chosenClasses.length > 1 && state.accessCodePerClass
                     ? "Per klas een eigen code"
@@ -857,7 +815,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                       ? normalizeAccessCode(state.customCode)
                       : "Zelf kiezen"}
               </SummaryRow>
-              <SummaryRow icon={Settings2} label="Resultaten">
+              <SummaryRow label="Resultaten">
                 {SHOW_RESULTS_LABELS[state.settings.showResults]}
                 <span className="block text-xs text-muted-foreground">
                   {describeScale(state.settings.grading)}
@@ -875,11 +833,7 @@ function AssignmentFormInner({ options }: { options: Options }) {
                   className="motion-safe:animate-spin"
                   aria-hidden="true"
                 />
-              ) : state.startMode === "now" ? (
-                <Play aria-hidden="true" />
-              ) : (
-                <CalendarPlus aria-hidden="true" />
-              )}
+              ) : null}
               {submitLabel}
             </Button>
           </div>
@@ -892,29 +846,23 @@ function AssignmentFormInner({ options }: { options: Options }) {
 function Section({
   step,
   title,
-  icon: Icon,
   children,
 }: {
   step: number;
   title: string;
-  icon: LucideIcon;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-xs sm:p-6">
-      <h2 className="flex items-center gap-3 font-semibold">
+      <h2 className="flex items-baseline gap-2.5 font-semibold">
         <span
-          className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary tabular-nums"
+          className="font-normal text-muted-foreground tabular-nums"
           aria-hidden="true"
         >
           {step}
         </span>
         <span className="sr-only">Stap {step}: </span>
         {title}
-        <Icon
-          className="ml-auto size-4 text-muted-foreground"
-          aria-hidden="true"
-        />
       </h2>
       {children}
     </section>
@@ -980,25 +928,16 @@ function ChoiceButton({
 }
 
 function SummaryRow({
-  icon: Icon,
   label,
   children,
 }: {
-  icon: LucideIcon;
   label: string;
   children: ReactNode;
 }) {
-  // dt and dd sit directly in the wrapping div (valid dl structure); the
-  // icon is part of the term.
+  // dt and dd sit directly in the wrapping div (valid dl structure).
   return (
-    <div className="relative flex min-w-0 flex-col pl-7">
-      <dt className="text-xs text-muted-foreground">
-        <Icon
-          className="absolute top-0.5 left-0 size-4 shrink-0 text-muted-foreground"
-          aria-hidden="true"
-        />
-        {label}
-      </dt>
+    <div className="flex min-w-0 flex-col">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="font-medium break-words">{children}</dd>
     </div>
   );

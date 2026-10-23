@@ -10,7 +10,7 @@ import { ScrollRegion } from "@/components/a11y/scroll-region";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FormField } from "@/components/app/form-field";
 import { getErrorMessage } from "@/components/app/get-error-message";
-import { EmptyBlock, ErrorState, LoadingState } from "@/components/app/states";
+import { ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,11 +51,10 @@ export function RetentionHolds() {
       ) : query.isError ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
       ) : query.data.length === 0 ? (
-        <EmptyBlock
-          icon={Lock}
-          title="Geen bewaarblokkades"
-          description="Alle gegevens volgen de gewone bewaartermijnen."
-        />
+        <p className="text-sm text-muted-foreground">
+          Er zijn geen bewaarblokkades. Alle gegevens volgen de gewone
+          bewaartermijnen.
+        </p>
       ) : (
         <HoldsTable holds={query.data} />
       )}

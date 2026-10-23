@@ -2,7 +2,7 @@
  * Keyboard focus in the teacher's review screens (real browser, group U3a):
  * - Nakijken: after "Opslaan en volgende" (and Alt+↑/↓) focus lands on the
  *   next student's name instead of <body>; after the last one on "Klaar met
- *   deze vraag!" (WCAG 2.4.3).
+ *   deze vraag" (WCAG 2.4.3).
  * - Resultaten: a focused score link or column header is never hidden under
  *   the sticky "Leerling" column, also at 320px wide (WCAG 2.4.11).
  * Two throwaway students hand in the practice afname; they are removed
@@ -87,7 +87,7 @@ test("Nakijken: focus follows the teacher from student to student", async ({
   await expect(studentHeading(page)).toBeFocused();
 
   // Past the last answer: the "Klaar" panel takes focus.
-  const done = page.getByRole("heading", { name: "Klaar met deze vraag!" });
+  const done = page.getByRole("heading", { name: "Klaar met deze vraag" });
   for (let i = 0; i < 100 && !(await done.isVisible()); i++) {
     await page.keyboard.press("Alt+ArrowDown");
     await expect(page.locator("h2:focus")).toHaveCount(1);

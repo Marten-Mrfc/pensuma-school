@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Users } from "lucide-react";
+import { Search } from "lucide-react";
 import { useId, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -123,8 +123,7 @@ export function ClassMultiSelect({
                         </span>
                       ) : null}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
-                      <Users className="size-3" aria-hidden="true" />
+                    <span className="text-xs text-muted-foreground tabular-nums">
                       {c.studentCount}{" "}
                       {c.studentCount === 1 ? "leerling" : "leerlingen"}
                       {c.schoolYear ? ` · ${c.schoolYear}` : ""}

@@ -490,7 +490,7 @@ function BankRow({
             {item.tags.map((tag) => (
               <li
                 key={tag}
-                className="rounded-full bg-secondary px-2 py-0.5 text-[0.7rem] font-medium text-secondary-foreground"
+                className="rounded-sm bg-secondary px-2 py-0.5 text-[0.7rem] font-medium text-secondary-foreground"
               >
                 {tag}
               </li>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { resetPreferences } from "@/components/preferences/preferences-store";
 import { Button } from "@/components/ui/button";
@@ -62,12 +62,6 @@ export function PasswordChangeGate({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <span
-            aria-hidden="true"
-            className="mx-auto mb-1 grid size-10 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15 sm:mx-0"
-          >
-            <KeyRound className="size-5" />
-          </span>
           <DialogTitle>Kies een eigen wachtwoord</DialogTitle>
           <DialogDescription>
             Je bent ingelogd met een tijdelijk wachtwoord. Kies nu een eigen

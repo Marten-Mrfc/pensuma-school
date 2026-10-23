@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   type PreviewQuestion,
   StudentQuestionPreview,
@@ -41,8 +41,7 @@ export function PreviewSheet({
       >
         <div className="flex flex-col gap-3 border-b bg-card px-4 pt-4 pb-3 pr-12 sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-info/10 px-2.5 py-1 text-xs font-medium text-info-ink">
-              <Eye className="size-3.5" aria-hidden="true" />
+            <span className="inline-flex h-6 w-fit shrink-0 items-center rounded-sm bg-secondary px-2 text-xs font-medium whitespace-nowrap text-secondary-foreground">
               Voorbeeld als leerling
             </span>
             <span className="text-xs text-muted-foreground">

@@ -102,7 +102,7 @@ export function LoginCardsView({ classId, ids }: LoginCardsViewProps) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-muted/50 print:block print:min-h-0 print:bg-transparent">
-      <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-md print:hidden">
+      <header className="sticky top-0 z-20 border-b bg-background print:hidden">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Button variant="ghost" size="sm" asChild>
             <Link href={backHref}>

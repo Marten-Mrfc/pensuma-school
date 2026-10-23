@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  BookOpen,
-  ChevronDown,
-  Download,
-  Eraser,
-  Lightbulb,
-} from "lucide-react";
+import { ChevronDown, Download, Eraser } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -145,7 +139,7 @@ export function PracticePlayground() {
   const header = (
     <PageHeader
       title="Oefenen"
-      description="Probeer Python uit, gewoon in je browser. Niets wordt nagekeken, dus experimenteer er lekker op los!"
+      description="Probeer hier vrij Python uit. Je docent ziet hier niets van en er wordt niets nagekeken."
     />
   );
   if (!mounted) {
@@ -167,7 +161,6 @@ export function PracticePlayground() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
-                  <BookOpen aria-hidden="true" />
                   Voorbeelden
                   <ChevronDown aria-hidden="true" />
                 </Button>
@@ -259,15 +252,11 @@ export function PracticePlayground() {
         </section>
       </div>
 
-      <section
-        className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6"
-        aria-labelledby={tipsTitleId}
-      >
+      <section className="border-t pt-6" aria-labelledby={tipsTitleId}>
         <h2
           id={tipsTitleId}
-          className="mb-3 flex items-center gap-2 font-display text-base font-semibold"
+          className="mb-3 font-display text-base font-semibold"
         >
-          <Lightbulb className="size-5 text-warning-ink" aria-hidden="true" />
           Tips
         </h2>
         <ul className="grid gap-3 text-sm leading-6 sm:grid-cols-2">

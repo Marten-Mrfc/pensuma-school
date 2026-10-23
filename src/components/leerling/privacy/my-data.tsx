@@ -1,17 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Clock,
-  Download,
-  Eye,
-  FileJson,
-  Loader2,
-  type LucideIcon,
-  NotebookPen,
-  UserRound,
-} from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useId } from "react";
 import { toast } from "sonner";
@@ -36,28 +26,14 @@ import { formatMoment } from "../format";
 const linkClass =
   "font-medium text-primary underline underline-offset-[3px] hover:no-underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-function Section({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: LucideIcon;
-  title: string;
-  children: ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
     <section
       aria-labelledby={id}
-      className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-xs sm:p-6"
+      className="flex flex-col gap-4 rounded-xl border bg-card p-5 sm:p-6"
     >
-      <h2
-        id={id}
-        className="flex items-center gap-3 font-display text-lg font-semibold"
-      >
-        <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="size-[18px]" aria-hidden="true" />
-        </span>
+      <h2 id={id} className="font-display text-lg font-semibold">
         {title}
       </h2>
       <div className="flex flex-col gap-3 text-[0.95rem] leading-relaxed text-muted-foreground">
@@ -101,7 +77,7 @@ export function facilitiesText(acc: {
  */
 export function ExamLogSection() {
   return (
-    <Section icon={Eye} title="Wat we bijhouden tijdens toetsen">
+    <Section title="Wat we bijhouden tijdens toetsen">
       <p>
         Bij elke toets, ook een oefentoets van je docent, houdt Pensuma bij
         wanneer je je code uitvoert of test: bij welke vraag, hoe lang het
@@ -142,8 +118,8 @@ export function RetentionSection({
 }) {
   const notice = autoDeleteNotice(r);
   return (
-    <Section icon={Clock} title="Hoe lang we dit bewaren">
-      <ul className="ml-5 list-disc space-y-1.5 marker:text-primary">
+    <Section title="Hoe lang we dit bewaren">
+      <ul className="ml-5 list-disc space-y-1.5 marker:text-muted-foreground">
         <li>
           Je antwoorden en resultaten:{" "}
           <strong className="text-foreground">
@@ -183,12 +159,8 @@ export const EXPORT_EXPLANATION =
 /** Under the page header, next to the download button it describes. */
 export function DownloadExplanation({ id }: { id?: string }) {
   return (
-    <p
-      id={id}
-      className="flex max-w-2xl items-start gap-2 text-sm text-pretty text-muted-foreground"
-    >
-      <FileJson className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <span>{EXPORT_EXPLANATION}</span>
+    <p id={id} className="max-w-2xl text-sm text-pretty text-muted-foreground">
+      {EXPORT_EXPLANATION}
     </p>
   );
 }
@@ -271,12 +243,12 @@ export function MyData() {
   return (
     <div className="flex flex-col gap-6">
       {header}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Section icon={UserRound} title="Over jou">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <Section title="Over jou">
           <dl>
             <Fact label="Naam">{d.profile.name}</Fact>
             <Fact label="Leerlingnummer">
-              <span className="tabular-nums">{d.profile.studentNumber}</span>
+              <span className="font-mono">{d.profile.studentNumber}</span>
             </Fact>
             <Fact label="Klassen">
               {d.classes.length
@@ -294,7 +266,7 @@ export function MyData() {
           </dl>
         </Section>
 
-        <Section icon={NotebookPen} title="Je toetsen">
+        <Section title="Je toetsen">
           <p>
             Je hebt{" "}
             <strong className="text-foreground">
@@ -311,10 +283,7 @@ export function MyData() {
           </p>
           <div>
             <Button variant="outline" asChild>
-              <Link href={routes.leerling.results}>
-                Naar je resultaten
-                <ArrowRight aria-hidden="true" />
-              </Link>
+              <Link href={routes.leerling.results}>Naar je resultaten</Link>
             </Button>
           </div>
         </Section>
@@ -324,7 +293,7 @@ export function MyData() {
         <RetentionSection retention={r} />
       </div>
 
-      <p className="rounded-2xl border border-primary/20 bg-primary/[0.04] px-5 py-4 text-[0.95rem] text-foreground">
+      <p className="text-sm text-muted-foreground">
         Klopt er iets niet? Vraag je docent om het te verbeteren. Je kunt ook
         mailen naar{" "}
         {email ? (
