@@ -147,7 +147,12 @@ export function MonitorTable({
               )}
             >
               {f.label}
-              <span className="text-xs tabular-nums opacity-70">
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  filter === f.value ? "text-primary" : "text-muted-foreground",
+                )}
+              >
                 {counts[f.value]}
               </span>
             </button>
