@@ -12,9 +12,14 @@
  *   `totalMs / questions`. Once a question's code has timed out or crashed,
  *   it only starts another test when the worst case (its time limit) still
  *   fits in its share, or in time that no other question can claim any
- *   more. An endless loop in one question therefore never uses up the time
- *   of the student's other questions, which would otherwise be marked
- *   "niet meer uitgevoerd".
+ *   more. Another question can claim at most what its remaining tests would
+ *   take if every one of them timed out, capped at its own share. An endless
+ *   loop in one question therefore never uses up the time of the student's
+ *   other questions, which would otherwise be marked "niet meer uitgevoerd".
+ * - A test that may not start yet is not given up: it waits until the end
+ *   of its phase and runs then if the time allows (often it does: the other
+ *   questions usually need only milliseconds). So code that loops on one
+ *   input still gets its other tests run.
  * - Code that runs normally (no timeouts) is not limited by its share:
  *   legitimately slow programs keep running until the hard limit.
  */
@@ -28,22 +33,30 @@ export class JobBudget {
   private readonly spent: number[];
   private readonly troubled: boolean[];
   private readonly finished: boolean[];
+  private readonly remaining: number[];
 
   /**
    * @param totalMs     budget of the whole job
    * @param timeLimits  per question: the time limit of one test
    * @param clock       current time in ms (tests use a fake clock)
+   * @param testCounts  per question: its number of tests in the whole job
+   *                    (all phases). Without it, a question that hasn't
+   *                    finished may claim its whole remaining share.
    */
   constructor(
     totalMs: number,
     private readonly timeLimits: readonly number[],
     readonly clock: () => number = Date.now,
+    testCounts?: readonly number[],
   ) {
     this.deadline = clock() + totalMs;
     this.share = totalMs / Math.max(1, timeLimits.length);
     this.spent = timeLimits.map(() => 0);
     this.troubled = timeLimits.map(() => false);
     this.finished = timeLimits.map(() => false);
+    this.remaining = timeLimits.map((_, i) =>
+      testCounts ? Math.max(0, testCounts[i] ?? 0) : Number.POSITIVE_INFINITY,
+    );
   }
 
   /** Whether question `i` may start its next test now. */
@@ -51,7 +64,7 @@ export class JobBudget {
     const t = this.clock();
     if (t >= this.deadline) return false;
     if (!this.troubled[i]) return true;
-    const worstCase = this.timeLimits[i] + RESPAWN_MARGIN_MS;
+    const worstCase = this.worstCase(i);
     if (this.spent[i] + worstCase <= this.share) return true;
     return this.deadline - t - this.reservedByOthers(i) >= worstCase;
   }
@@ -60,6 +73,12 @@ export class JobBudget {
   record(i: number, durationMs: number, troubled: boolean): void {
     this.spent[i] += Math.max(0, durationMs);
     if (troubled) this.troubled[i] = true;
+    this.remaining[i] = Math.max(0, this.remaining[i] - 1);
+  }
+
+  /** A test of question `i` was given up (not run): it needs no more time. */
+  skipped(i: number): void {
+    this.remaining[i] = Math.max(0, this.remaining[i] - 1);
   }
 
   /** Question `i` has no tests left: its unused share becomes spare time. */
@@ -67,11 +86,18 @@ export class JobBudget {
     this.finished[i] = true;
   }
 
+  private worstCase(i: number): number {
+    return this.timeLimits[i] + RESPAWN_MARGIN_MS;
+  }
+
   private reservedByOthers(i: number): number {
     let reserved = 0;
     for (let j = 0; j < this.spent.length; j++) {
       if (j === i || this.finished[j]) continue;
-      reserved += Math.max(0, this.share - this.spent[j]);
+      reserved += Math.min(
+        Math.max(0, this.share - this.spent[j]),
+        this.remaining[j] * this.worstCase(j),
+      );
     }
     return reserved;
   }
@@ -80,9 +106,12 @@ export class JobBudget {
 /**
  * Run one phase of tests round-robin over the questions: test 1 of every
  * question, then test 2, and so on. Before each test the budget decides
- * whether it runs (`execute`, which returns true when the code timed out or
- * crashed) or is skipped (`skip`). `lastPhase[i]`: question `i` has no tests
- * after this phase, so it is finished after its last one here.
+ * whether it runs now (`execute`, which returns true when the code timed out
+ * or crashed). A test that may not start yet waits until the end of the
+ * phase and is tried once more then (in the same order); if it still may
+ * not start, it is given up (`skip`). Tests never move to a later phase.
+ * `lastPhase[i]`: question `i` has no tests after this phase, so it is
+ * finished once all of its tests here have run or been given up.
  */
 export async function runPhase<T>(
   budget: JobBudget,
@@ -91,22 +120,38 @@ export async function runPhase<T>(
   execute: (question: number, test: T) => Promise<boolean>,
   skip: (question: number, test: T) => void,
 ): Promise<void> {
+  const open = tests.map((list) => list.length);
+  const settle = (i: number) => {
+    open[i]--;
+    if (open[i] === 0 && lastPhase[i]) budget.finish(i);
+  };
+  const run = async (i: number, test: T) => {
+    const started = budget.clock();
+    const troubled = await execute(i, test);
+    budget.record(i, budget.clock() - started, troubled);
+    settle(i);
+  };
   tests.forEach((list, i) => {
     if (list.length === 0 && lastPhase[i]) budget.finish(i);
   });
+
+  const waiting: Array<{ question: number; test: T }> = [];
   const rounds = tests.reduce((max, list) => Math.max(max, list.length), 0);
   for (let k = 0; k < rounds; k++) {
     for (let i = 0; i < tests.length; i++) {
       const list = tests[i];
       if (k >= list.length) continue;
-      if (budget.mayStart(i)) {
-        const started = budget.clock();
-        const troubled = await execute(i, list[k]);
-        budget.record(i, budget.clock() - started, troubled);
-      } else {
-        skip(i, list[k]);
-      }
-      if (k === list.length - 1 && lastPhase[i]) budget.finish(i);
+      if (budget.mayStart(i)) await run(i, list[k]);
+      else waiting.push({ question: i, test: list[k] });
+    }
+  }
+  for (const { question, test } of waiting) {
+    if (budget.mayStart(question)) {
+      await run(question, test);
+    } else {
+      skip(question, test);
+      budget.skipped(question);
+      settle(question);
     }
   }
 }

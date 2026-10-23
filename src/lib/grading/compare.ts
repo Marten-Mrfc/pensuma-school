@@ -174,11 +174,18 @@ function containsTokens(hay: Token[], needle: Token[]): boolean {
   return needle.length === 0 || occurrences(hay, needle).length > 0;
 }
 
-function sameTokens(a: Token[], b: Token[]): boolean {
-  return a.length === b.length && a.every((t, i) => tokenEqual(t, b[i]));
-}
-
 const isWordToken = (t: Token) => t.word;
+
+/** Lookup key of a line's tokens: equal keys mean equal lines. */
+const lineKeys = new WeakMap<Token[], string>();
+function lineKey(tokens: Token[]): string {
+  let key = lineKeys.get(tokens);
+  if (key === undefined) {
+    key = tokens.map((t) => tokenKey(t)).join(" ");
+    lineKeys.set(tokens, key);
+  }
+  return key;
+}
 
 /** Lookup key of a token (numbers rounded like `numbersEqual` compares them). */
 function tokenKey(t: Token): string {
@@ -204,28 +211,33 @@ const NEGATIONS: ReadonlySet<string> = new Set([
   "no",
   "never",
 ]);
-const isNegation = (t: Token) =>
-  t.word && NEGATIONS.has(t.text.toLowerCase());
+const isNegation = (t: Token) => t.word && NEGATIONS.has(t.text.toLowerCase());
 
 /** Text between two tokens that makes the part before it a label: "3 + 4 = 7", "Stap 2: 8". */
 const LABEL_SEPARATOR = /[:=?>→⇒]/u;
 
 /* -------------------------- Flexible: line matching ------------------------ */
 
+type ExpectedLines = { raw: string[]; tokens: Token[][] };
+const expectedCache = new Map<string, ExpectedLines>();
+
 /**
  * Tokenized non-empty lines of an expected output. Cached: the same
  * expected outputs come back for every test of a question and every
  * student (small and bounded; teacher data only).
  */
-const expectedCache = new Map<string, Token[][]>();
-
-function expectedLineTokens(text: string, ignoreCase: boolean): Token[][] {
+function expectedLineTokens(text: string, ignoreCase: boolean): ExpectedLines {
   const key = `${ignoreCase ? 1 : 0}${text}`;
   const cached = expectedCache.get(key);
   if (cached) return cached;
-  const lines = normalizeLines(text)
-    .map((l) => tokenize(l, ignoreCase))
-    .filter((t) => t.length > 0);
+  const lines: ExpectedLines = { raw: [], tokens: [] };
+  for (const line of normalizeLines(text)) {
+    const t = tokenize(line, ignoreCase);
+    if (t.length > 0) {
+      lines.raw.push(line.trim());
+      lines.tokens.push(t);
+    }
+  }
   if (text.length <= 20_000) {
     if (expectedCache.size >= 500) expectedCache.clear();
     expectedCache.set(key, lines);
@@ -234,6 +246,14 @@ function expectedLineTokens(text: string, ignoreCase: boolean): Token[][] {
 }
 
 type Line = { raw: string; tokens: Token[] };
+
+/** An expected line of another test (see FlexibleContext.foreign). */
+type ForeignLine = {
+  keys: string[];
+  sibling: number;
+  /** Contains a word (not only numbers). */
+  wordy: boolean;
+};
 
 /** An occurrence of another test's expected line inside an output line. */
 type ForeignHit = {
@@ -255,14 +275,14 @@ class FlexibleContext {
   private readonly negated: boolean[];
   /**
    * The sibling tests' expected lines that this test does not also expect,
-   * by the key of their first token.
+   * indexed by their first token and then their second.
    */
   private readonly foreign = new Map<
     string,
-    { tokens: Token[]; sibling: number; wordy: boolean }[]
+    { single: ForeignLine[]; bySecond: Map<string, ForeignLine[]> }
   >();
-  /** Per sibling test: all its expected lines. */
-  private readonly siblingLines: Token[][][];
+  /** Per sibling test: the keys of all its expected lines. */
+  private readonly siblingKeys: Set<string>[];
   private readonly echo: Token[];
   private readonly stdinLines: number;
   /** At most this many prompt/heading lines (with words) may be skipped. */
@@ -281,20 +301,30 @@ class FlexibleContext {
   ) {
     this.expected = expected;
     this.negated = expected.map((e) => e.some(isNegation));
-    this.siblingLines = (options.siblings ?? []).map((text) =>
-      expectedLineTokens(text, options.ignoreCase),
+    const siblingLines = (options.siblings ?? []).map(
+      (text) => expectedLineTokens(text, options.ignoreCase).tokens,
     );
-    this.siblingLines.forEach((lines, sibling) => {
+    this.siblingKeys = siblingLines.map(
+      (lines) => new Set(lines.map((l) => lineKey(l))),
+    );
+    const own = new Set(expected.map((e) => lineKey(e)));
+    siblingLines.forEach((lines, sibling) => {
       for (const tokens of lines) {
-        if (expected.some((e) => sameTokens(e, tokens))) continue;
-        // Keyed by the first two tokens (one for a one-token line).
-        const key = tokens
-          .slice(0, 2)
-          .map((t) => tokenKey(t))
-          .join(" ");
-        const list = this.foreign.get(key) ?? [];
-        list.push({ tokens, sibling, wordy: tokens.some(isWordToken) });
-        this.foreign.set(key, list);
+        if (own.has(lineKey(tokens))) continue;
+        // Indexed by the first two tokens (one for a one-token line).
+        const keys = tokens.map((t) => tokenKey(t));
+        const entry = { keys, sibling, wordy: tokens.some(isWordToken) };
+        let bucket = this.foreign.get(keys[0]);
+        if (!bucket) {
+          bucket = { single: [], bySecond: new Map() };
+          this.foreign.set(keys[0], bucket);
+        }
+        if (keys.length === 1) bucket.single.push(entry);
+        else {
+          const list = bucket.bySecond.get(keys[1]) ?? [];
+          list.push(entry);
+          bucket.bySecond.set(keys[1], list);
+        }
       }
     });
     const stdin = options.stdin ?? "";
@@ -338,23 +368,24 @@ class FlexibleContext {
     const L = line.tokens;
     if (this.foreign.size > 0) {
       const keys = L.map((t) => tokenKey(t));
-      const none: never[] = [];
-      for (let start = 0; start < L.length; start++) {
-        const one = this.foreign.get(keys[start]) ?? none;
-        const two =
-          start + 1 < L.length
-            ? (this.foreign.get(`${keys[start]} ${keys[start + 1]}`) ?? none)
-            : none;
-        for (const list of [one, two]) {
-          for (const s of list) {
-            const end = start + s.tokens.length;
-            if (end > L.length) continue;
-            if (!s.tokens.every((t, k) => tokenEqual(L[start + k], t)))
-              continue;
-            if (L.slice(start, end).every((t) => this.isEcho(t))) continue;
-            hits.push({ start, end, sibling: s.sibling, wordy: s.wordy });
-          }
+      const check = (start: number, list: ForeignLine[] | undefined) => {
+        for (const s of list ?? []) {
+          const end = start + s.keys.length;
+          if (end > keys.length) continue;
+          let same = true;
+          for (let k = 2; k < s.keys.length && same; k++)
+            same = keys[start + k] === s.keys[k];
+          if (!same) continue;
+          if (L.slice(start, end).every((t) => this.isEcho(t))) continue;
+          hits.push({ start, end, sibling: s.sibling, wordy: s.wordy });
         }
+      };
+      for (let start = 0; start < keys.length; start++) {
+        const bucket = this.foreign.get(keys[start]);
+        if (!bucket) continue;
+        check(start, bucket.single);
+        if (start + 1 < keys.length)
+          check(start, bucket.bySecond.get(keys[start + 1]));
       }
     }
     this.hitCache.set(line.raw, hits);
@@ -443,7 +474,7 @@ class FlexibleContext {
       if (covered) return false;
       const rescued = this.expected.some(
         (e, idx) =>
-          !this.siblingLines[h.sibling].some((s) => sameTokens(s, e)) &&
+          !this.siblingKeys[h.sibling].has(lineKey(e)) &&
           ownHits[idx].some((o) => o.end <= h.start || o.start >= h.end),
       );
       return !rescued;
@@ -601,15 +632,7 @@ function compareFlexible(
     raw,
     tokens: tokenize(raw, ignoreCase),
   }));
-  const eRaw: string[] = [];
-  const eTok: Token[][] = [];
-  for (const line of normalizeLines(expected)) {
-    const t = tokenize(line, ignoreCase);
-    if (t.length > 0) {
-      eRaw.push(line.trim());
-      eTok.push(t);
-    }
-  }
+  const { raw: eRaw, tokens: eTok } = expectedLineTokens(expected, ignoreCase);
   const ctx = new FlexibleContext(eTok, options);
   const A = out.length;
   const E = eTok.length;
@@ -628,8 +651,7 @@ function compareFlexible(
       cur[A] = Number.POSITIVE_INFINITY;
       for (let j = A - 1; j >= 0; j--) {
         let best = skip[j] + cur[j + 1];
-        if (next[j + 1] < best && ctx.matches(i, out[j]))
-          best = next[j + 1];
+        if (next[j + 1] < best && ctx.matches(i, out[j])) best = next[j + 1];
         cur[j] = best;
       }
       next = cur;

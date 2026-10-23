@@ -207,6 +207,13 @@ export async function findActiveHolds(
     .orderBy(retentionHolds.createdAt);
 }
 
+/**
+ * Where a teacher lifts a retention hold: the page in the menu, its tab
+ * and the section (privacy-admin-page.tsx, retention-holds.tsx).
+ */
+export const HOLDS_LOCATION =
+  "Privacy & gegevens › Inzage & verwijderen › Bewaarblokkades";
+
 /** "Examendossier: PTA bewaren" (the reason shortened). */
 function holdLabel(hold: ActiveHold) {
   const kind = HOLD_KIND_LABELS[hold.kind] ?? "Bewaarblokkade";
@@ -239,7 +246,7 @@ export async function assertNoActiveHolds(
       : "";
   throw new TRPCError({
     code: "PRECONDITION_FAILED",
-    message: `Voor ${subject} geldt een bewaarblokkade (${holdLabel(first)}). ${text.consequence} ${text.remedy ?? "Hef de blokkade eerst op onder Privacy › Bewaarblokkades."}${more}`,
+    message: `Voor ${subject} geldt een bewaarblokkade (${holdLabel(first)}). ${text.consequence} ${text.remedy ?? `Hef de blokkade eerst op onder ${HOLDS_LOCATION}.`}${more}`,
   });
 }
 

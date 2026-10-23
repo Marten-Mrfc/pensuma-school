@@ -5,6 +5,7 @@ import { ROLES } from "@/lib/auth-shared";
 import {
   assertNoActiveHolds,
   auditAttemptsDeleted,
+  HOLDS_LOCATION,
   studentsWithAttempts,
 } from "@/server/api/routers/assignment";
 import { adminProcedure, createTRPCRouter } from "@/server/api/trpc";
@@ -384,8 +385,7 @@ export const classRouter = createTRPCRouter({
           {
             afname: "een afname van deze klas",
             consequence: "Je kunt de klas daarom niet verwijderen.",
-            remedy:
-              "Hef de blokkade eerst op onder Privacy › Bewaarblokkades, of archiveer de klas in plaats van hem te verwijderen.",
+            remedy: `Hef de blokkade eerst op onder ${HOLDS_LOCATION}, of archiveer de klas in plaats van hem te verwijderen.`,
           },
         );
         await auditAttemptsDeleted(ctx, tx, {

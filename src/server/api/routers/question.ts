@@ -28,7 +28,10 @@ import {
   safeParseQuestionData,
   solutionFingerprint,
 } from "@/lib/questions/validate";
-import { assertNoActiveHolds } from "@/server/api/routers/assignment";
+import {
+  assertNoActiveHolds,
+  HOLDS_LOCATION,
+} from "@/server/api/routers/assignment";
 import {
   countTestAttempts,
   requireTest,
@@ -374,8 +377,7 @@ export const questionRouter = createTRPCRouter({
               afname: "een afname met antwoorden op deze vraag",
               consequence:
                 "Je kunt de vraag daarom niet verwijderen, want dan gaan die antwoorden verloren.",
-              remedy:
-                "Laat de vraag in plaats daarvan vervallen via de toetsanalyse van de afname, of hef de blokkade eerst op onder Privacy › Bewaarblokkades.",
+              remedy: `Laat de vraag in plaats daarvan vervallen via Analyse bij de afname (‘Vraag laten vervallen’), of hef de blokkade eerst op onder ${HOLDS_LOCATION}.`,
             },
           );
           await auditQuestionDeleted(ctx, tx, question, rows);

@@ -138,6 +138,14 @@ describe("retention holds stop teacher deletes", () => {
       code: "PRECONDITION_FAILED",
       message: expect.stringContaining("Examendossier: PTA-toets bewaren"),
     });
+    // The message says where the teacher lifts the hold.
+    await expect(
+      t.assignment.resetAttempt({ attemptId: attempt.id }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining(
+        "Privacy & gegevens › Inzage & verwijderen › Bewaarblokkades",
+      ),
+    });
     await db.delete(retentionHolds).where(eq(retentionHolds.id, afnameHold.id));
 
     await addHold({ userId: w.s1.id, kind: "restriction" });
