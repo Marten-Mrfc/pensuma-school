@@ -28,7 +28,11 @@ import { PinDialog, type PinDialogStudent } from "./pin-dialog";
 import { PinReveal } from "./pin-reveal";
 import { StudentActionsMenu } from "./student-actions-menu";
 import { StudentFormDialog } from "./student-form-dialog";
-import { LoginLockBadge, StudentStatus } from "./student-status";
+import {
+  LoginLockBadge,
+  RestrictedBadge,
+  StudentStatus,
+} from "./student-status";
 
 type Row = RouterOutputs["student"]["list"]["rows"][number];
 type Status = "all" | "active" | "inactive";
@@ -123,6 +127,10 @@ export function StudentsPage() {
             lockedUntil={s.loginLockedUntil}
             className="mt-1 lg:hidden"
           />
+          <RestrictedBadge
+            restricted={s.restricted}
+            className="mt-1 lg:hidden"
+          />
         </div>
       ),
     },
@@ -156,6 +164,7 @@ export function StudentsPage() {
         <span className="flex flex-wrap items-center gap-1.5">
           <StudentStatus banned={s.banned} />
           <LoginLockBadge lockedUntil={s.loginLockedUntil} />
+          <RestrictedBadge restricted={s.restricted} />
         </span>
       ),
     },

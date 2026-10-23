@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { Lock, ShieldAlert } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -90,5 +90,33 @@ export function LoginLockBadge({
       </TooltipTrigger>
       <TooltipContent className="max-w-64">{LOCK_HELP}</TooltipContent>
     </Tooltip>
+  );
+}
+
+/** Badge text for a student whose processing is restricted (AVG art. 18). */
+export const RESTRICTED_LABEL = "Verwerking beperkt (AVG art. 18)";
+
+/**
+ * Pill “Verwerking beperkt (AVG art. 18)”: the student's data may only be
+ * stored (privacy.setRestriction). Renders nothing when not restricted.
+ */
+export function RestrictedBadge({
+  restricted,
+  className,
+}: {
+  restricted: boolean | null | undefined;
+  className?: string;
+}) {
+  if (!restricted) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 w-fit shrink-0 items-center gap-1.5 rounded-full bg-warning/12 px-2.5 text-xs font-medium whitespace-nowrap text-warning-ink ring-1 ring-warning/30 ring-inset",
+        className,
+      )}
+    >
+      <ShieldAlert className="size-3" aria-hidden="true" />
+      {RESTRICTED_LABEL}
+    </span>
   );
 }
